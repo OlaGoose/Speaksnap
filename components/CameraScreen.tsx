@@ -114,18 +114,34 @@ export default function CameraScreen({
     return () => container?.removeEventListener('scroll', handleScroll);
   }, [activeMode]);
 
-  // Auto-scroll to camera on mount
+  // Auto-scroll to camera on mount - ensure it's centered immediately
   useEffect(() => {
-    if (scrollContainerRef.current) {
+    const scrollToCamera = () => {
       const container = scrollContainerRef.current;
+      if (!container) return;
+
       const cameraEl = container.querySelector('[data-mode="camera"]') as HTMLElement;
-      if (cameraEl) {
-        container.scrollTo({
-          left: cameraEl.offsetLeft - container.offsetWidth / 2 + cameraEl.offsetWidth / 2,
-          behavior: 'instant',
-        });
-      }
-    }
+      if (!cameraEl) return;
+
+      // Calculate center position
+      const scrollLeft = cameraEl.offsetLeft - container.offsetWidth / 2 + cameraEl.offsetWidth / 2;
+      
+      // Set scroll position immediately (no animation)
+      container.scrollLeft = scrollLeft;
+    };
+
+    // Try immediately
+    scrollToCamera();
+
+    // Also try after a short delay to ensure DOM is fully rendered
+    const timeoutId = setTimeout(scrollToCamera, 0);
+    
+    // Use requestAnimationFrame as backup
+    requestAnimationFrame(() => {
+      requestAnimationFrame(scrollToCamera);
+    });
+
+    return () => clearTimeout(timeoutId);
   }, []);
 
   const getCurrentPosition = (): Promise<{ lat: number; lng: number } | undefined> => {
