@@ -171,9 +171,16 @@ async function transcribeAudio(
       const audioBuffer = Buffer.from(base64Data, 'base64');
       
       // Create a File object from the buffer for OpenAI SDK
-      const file = new File([audioBuffer], 'audio.webm', { 
-        type: 'audio/webm' 
-      });
+      // File is available in Node.js 18+ and modern browsers
+      let file: File | Blob;
+      try {
+        file = new File([audioBuffer], 'audio.webm', { 
+          type: 'audio/webm' 
+        });
+      } catch {
+        // Fallback to Blob if File is not available
+        file = new Blob([audioBuffer], { type: 'audio/webm' });
+      }
       
       const transcription = await openai.audio.transcriptions.create({
         file: file as any,
