@@ -1,0 +1,533 @@
+'use client';
+
+import React, { useState, useRef, useEffect } from 'react';
+import { ArrowLeft, Sparkles, BookOpen, TrendingUp, Target, Volume2 } from 'lucide-react';
+
+interface DiaryEditorProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+interface AnalysisResult {
+  overallScore: number;
+  overallLevel: string;
+  summary: string;
+  stats?: {
+    wordCount: number;
+    sentenceCount: number;
+    avgSentenceLength: number;
+    uniqueWords: number;
+  };
+  strengths?: string[];
+  improvements?: string[];
+  grammarFocus?: string[];
+  sentenceAnalysis: Array<{
+    original: string;
+    score: number;
+    errors: Array<{
+      error: string;
+      reason: string;
+      correction: string;
+    }>;
+    corrected: string;
+  }>;
+  optimized: string;
+  upgradedVersion: string;
+  patterns: Array<{
+    pattern: string;
+    explanation: string;
+    example: string;
+  }>;
+  flashcards: Array<{
+    term: string;
+    phonetic: string;
+    translation: string;
+    definition: string;
+    example: string;
+    nativeUsage: string;
+  }>;
+}
+
+export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
+  const [text, setText] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [result, setResult] = useState<AnalysisResult | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (isOpen && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [isOpen]);
+
+  const handleAnalyze = async () => {
+    if (!text.trim() || isAnalyzing) return;
+
+    setIsAnalyzing(true);
+    try {
+      const response = await fetch('/api/diary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Analysis failed');
+      }
+
+      const data = await response.json();
+      
+      // Validate required fields
+      if (!data.overallScore || !data.sentenceAnalysis) {
+        throw new Error('Incomplete analysis result. Please try again with a shorter entry.');
+      }
+      
+      setResult(data);
+
+      // Save flashcards
+      if (data.flashcards && data.flashcards.length > 0) {
+        const savedFlashcards = data.flashcards.map((f: any, i: number) => ({
+          id: `${Date.now()}_${i}`,
+          front: f.term,
+          back: {
+            phonetic: f.phonetic || '',
+            translation: f.translation || '',
+            definition: f.definition || '',
+            example: f.example || '',
+            native_usage: f.nativeUsage || '',
+            video_ids: [],
+          },
+          context: 'Diary Entry',
+          timestamp: Date.now(),
+          source: 'diary',
+        }));
+
+        const existingCards = localStorage.getItem('speakSnapFlashcards');
+        const cards = existingCards ? JSON.parse(existingCards) : [];
+        localStorage.setItem('speakSnapFlashcards', JSON.stringify([...savedFlashcards, ...cards]));
+      }
+
+      // Save diary entry
+      const entry = {
+        id: Date.now().toString(),
+        original: text,
+        optimized: data.optimized,
+        upgraded: data.upgradedVersion,
+        timestamp: Date.now(),
+      };
+
+      const existing = localStorage.getItem('speakSnapDiary');
+      const entries = existing ? JSON.parse(existing) : [];
+      localStorage.setItem('speakSnapDiary', JSON.stringify([entry, ...entries]));
+    } catch (error: any) {
+      console.error('Analysis error:', error);
+      const errorMessage = error.message || 'Failed to analyze diary. Please try again.';
+      
+      // Show user-friendly error message
+      if (errorMessage.includes('too long') || errorMessage.includes('truncated')) {
+        alert('日记内容过长，请缩短到2000字符以内，或分成多段分析。\n\nDiary entry is too long. Please shorten to under 2000 characters or split into multiple entries.');
+      } else if (errorMessage.includes('incomplete')) {
+        alert('分析结果不完整，请尝试缩短日记内容后重试。\n\nAnalysis incomplete. Please try with a shorter entry.');
+      } else {
+        alert(`分析失败：${errorMessage}\n\nAnalysis failed: ${errorMessage}`);
+      }
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  const playAudio = (text: string) => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    window.speechSynthesis.speak(utterance);
+  };
+
+  if (!isOpen) return null;
+
+  if (result) {
+    return (
+      <div className="fixed inset-0 z-50 bg-gradient-to-br from-orange-50/30 via-white to-blue-50/30 flex flex-col animate-in slide-in-from-bottom duration-300">
+        {/* Header */}
+        <div className="sticky top-0 bg-white/70 backdrop-blur-md border-b border-black/5 z-10 shadow-sm">
+          <div className="p-4 flex items-center justify-between">
+            <button
+              onClick={() => {
+                setResult(null);
+                setText('');
+                onClose();
+              }}
+              className="w-10 h-10 flex items-center justify-center bg-white rounded-full shadow-sm hover:shadow transition-all border border-black/5"
+            >
+              <ArrowLeft size={18} className="text-gray-700" />
+            </button>
+            <h2 className="text-base font-semibold text-gray-900">Analysis Results</h2>
+            <div className="w-10" />
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4 pb-24 space-y-4">
+          {/* Overall Summary */}
+          <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 shadow-sm border border-black/5 animate-in fade-in">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
+                  <Target size={18} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-base">Overall Assessment</h3>
+                  <p className="text-xs text-gray-500 font-medium">Level: {result.overallLevel}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-3xl font-black bg-gradient-to-br from-blue-600 to-indigo-600 bg-clip-text text-transparent">{result.overallScore}/10</div>
+                <div className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Score</div>
+              </div>
+            </div>
+            <p className="text-sm text-gray-700 leading-relaxed">{result.summary}</p>
+            
+            {/* Stats */}
+            {result.stats && (
+              <div className="grid grid-cols-4 gap-2 mt-4 pt-4 border-t border-gray-100">
+                <div className="text-center">
+                  <div className="text-lg font-bold text-gray-900">{result.stats.wordCount}</div>
+                  <div className="text-[10px] text-gray-500 font-medium">Words</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-gray-900">{result.stats.sentenceCount}</div>
+                  <div className="text-[10px] text-gray-500 font-medium">Sentences</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-gray-900">{result.stats.avgSentenceLength}</div>
+                  <div className="text-[10px] text-gray-500 font-medium">Avg Length</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-gray-900">{result.stats.uniqueWords}</div>
+                  <div className="text-[10px] text-gray-500 font-medium">Unique</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Strengths & Improvements */}
+          {((result.strengths && result.strengths.length > 0) || (result.improvements && result.improvements.length > 0)) && (
+            <div className="grid grid-cols-1 gap-3">
+              {/* Strengths */}
+              {result.strengths && result.strengths.length > 0 && (
+                <div className="bg-white/70 backdrop-blur-md rounded-2xl p-4 shadow-sm border border-black/5 animate-in fade-in">
+                  <h3 className="text-sm font-semibold text-green-600 mb-3 flex items-center gap-2">
+                    <span className="text-base">✨</span> What You Did Well
+                  </h3>
+                  <ul className="space-y-2">
+                    {result.strengths.map((strength, idx) => (
+                      <li key={idx} className="text-xs text-gray-700 flex items-start gap-2.5 leading-relaxed">
+                        <span className="text-green-500 flex-shrink-0 font-bold">✓</span>
+                        <span>{strength}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Areas to Improve */}
+              {result.improvements && result.improvements.length > 0 && (
+                <div className="bg-white/70 backdrop-blur-md rounded-2xl p-4 shadow-sm border border-black/5 animate-in fade-in">
+                  <h3 className="text-sm font-semibold text-orange-600 mb-3 flex items-center gap-2">
+                    <span className="text-base">🎯</span> Focus Areas
+                  </h3>
+                  <ul className="space-y-2">
+                    {result.improvements.map((improvement, idx) => (
+                      <li key={idx} className="text-xs text-gray-700 flex items-start gap-2.5 leading-relaxed">
+                        <span className="text-orange-500 flex-shrink-0 font-bold">→</span>
+                        <span>{improvement}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Grammar Focus */}
+              {result.grammarFocus && result.grammarFocus.length > 0 && (
+                <div className="bg-white/70 backdrop-blur-md rounded-2xl p-4 shadow-sm border border-black/5 animate-in fade-in">
+                  <h3 className="text-sm font-semibold text-purple-600 mb-3 flex items-center gap-2">
+                    <span className="text-base">📚</span> Grammar to Practice
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {result.grammarFocus.map((focus, idx) => (
+                      <span key={idx} className="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-full text-xs font-medium shadow-sm border border-purple-100">
+                        {focus}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Sentence Analysis */}
+          {result.sentenceAnalysis && result.sentenceAnalysis.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-gray-800 px-1 flex items-center gap-2">
+                <span>📝</span> Sentence-by-Sentence Analysis
+              </h3>
+              {result.sentenceAnalysis.map((sentence, idx) => (
+                <div key={idx} className="bg-white/70 backdrop-blur-md rounded-2xl p-4 shadow-sm border border-black/5 animate-in fade-in">
+                  {/* Original Sentence */}
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Sentence {idx + 1}</span>
+                      <span className={`text-sm font-bold px-2.5 py-1 rounded-full shadow-sm ${
+                        sentence.score >= 8 ? 'bg-green-100 text-green-700 border border-green-200' :
+                        sentence.score >= 6 ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' :
+                        sentence.score >= 4 ? 'bg-orange-100 text-orange-700 border border-orange-200' :
+                        'bg-red-100 text-red-700 border border-red-200'
+                      }`}>
+                        {sentence.score}/10
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-700 bg-gray-50/70 p-3 rounded-xl border border-gray-200/50 leading-relaxed">
+                      {sentence.original}
+                    </p>
+                  </div>
+
+                  {/* Errors Table */}
+                  {sentence.errors && sentence.errors.length > 0 && (
+                    <div className="mb-3">
+                      <p className="text-xs font-semibold text-red-600 mb-2 flex items-center gap-1">
+                        <span>⚠️</span> Issues Found:
+                      </p>
+                      <div className="overflow-x-auto rounded-lg border border-gray-200/50">
+                        <table className="w-full text-xs">
+                          <thead className="bg-gray-50/70">
+                            <tr>
+                              <th className="text-left py-2 px-3 font-semibold text-gray-700">Error</th>
+                              <th className="text-left py-2 px-3 font-semibold text-gray-700">Reason</th>
+                              <th className="text-left py-2 px-3 font-semibold text-gray-700">Correction</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white/50">
+                            {sentence.errors.map((err, errIdx) => (
+                              <tr key={errIdx} className="border-t border-gray-100">
+                                <td className="py-2 px-3 text-red-600 font-medium">{err.error}</td>
+                                <td className="py-2 px-3 text-gray-600">{err.reason}</td>
+                                <td className="py-2 px-3 text-green-600 font-medium">{err.correction}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Corrected Sentence */}
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-3 rounded-xl border border-green-200/50 shadow-sm">
+                    <p className="text-xs font-semibold text-green-700 mb-1.5 flex items-center gap-1">
+                      <span>✅</span> Corrected:
+                    </p>
+                    <p className="text-sm text-gray-900 font-medium leading-relaxed">{sentence.corrected}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Corrected Version */}
+          <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 shadow-sm border border-black/5 animate-in fade-in">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-9 h-9 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-sm">
+                <Sparkles size={16} className="text-white" />
+              </div>
+              <h3 className="font-semibold text-gray-900 text-base">Complete Corrected Version</h3>
+            </div>
+            <div className="bg-gradient-to-br from-green-50/50 to-emerald-50/50 rounded-xl p-4 border border-green-100/50">
+              <p className="text-[15px] text-gray-800 leading-relaxed whitespace-pre-wrap">{result.optimized}</p>
+            </div>
+          </div>
+
+          {/* Upgraded Version */}
+          {result.upgradedVersion && (
+            <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 shadow-sm border border-black/5 animate-in fade-in">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-9 h-9 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
+                  <TrendingUp size={16} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 text-base">Advanced Version</h3>
+                  <p className="text-[10px] text-purple-600 font-medium">+30% Difficulty</p>
+                </div>
+              </div>
+              <div className="bg-gradient-to-br from-purple-50/50 to-indigo-50/50 rounded-xl p-4 border border-purple-100/50">
+                <p className="text-[15px] text-gray-800 leading-relaxed whitespace-pre-wrap">{result.upgradedVersion}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Sentence Patterns */}
+          {result.patterns && result.patterns.length > 0 && (
+            <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 shadow-sm border border-black/5 animate-in fade-in">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-9 h-9 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-sm">
+                  <BookOpen size={16} className="text-white" />
+                </div>
+                <h3 className="font-semibold text-gray-900 text-base">Useful Patterns</h3>
+              </div>
+              <div className="space-y-3">
+                {result.patterns.map((pattern, idx) => (
+                  <div key={idx} className="bg-gradient-to-br from-amber-50/50 to-orange-50/50 rounded-xl p-4 border border-amber-100/50 space-y-2">
+                    <p className="text-sm font-semibold text-amber-900">{pattern.pattern}</p>
+                    <p className="text-xs text-gray-600 leading-relaxed">{pattern.explanation}</p>
+                    <p className="text-xs text-gray-500 italic leading-relaxed bg-white/50 px-2 py-1 rounded">"{pattern.example}"</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Flashcards */}
+          {result.flashcards && result.flashcards.length > 0 && (
+            <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 shadow-sm border border-black/5 animate-in fade-in">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl flex items-center justify-center shadow-sm">
+                    <Sparkles size={16} className="text-white" />
+                  </div>
+                  <h3 className="font-semibold text-gray-900 text-base">New Flashcards</h3>
+                </div>
+                <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">{result.flashcards.length} cards</span>
+              </div>
+              <div className="space-y-3">
+                {result.flashcards.map((card, idx) => (
+                  <div key={idx} className="bg-gradient-to-br from-gray-50/70 to-white/70 rounded-xl p-4 border border-gray-100/50 shadow-sm space-y-3">
+                    <div className="flex items-center gap-3 justify-between">
+                      <div className="flex items-baseline gap-2 flex-1">
+                        <h4 className="text-lg font-bold text-gray-900">{card.term}</h4>
+                        {card.phonetic && (
+                          <span className="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-0.5 rounded">/{card.phonetic}/</span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => playAudio(card.term)}
+                        className="p-2 hover:bg-white rounded-lg transition-all shadow-sm border border-gray-200/50 hover:shadow flex-shrink-0"
+                      >
+                        <Volume2 size={16} className="text-gray-600" />
+                      </button>
+                    </div>
+                    {card.translation && (
+                      <div className="bg-white/70 rounded-lg px-3 py-2 border border-gray-200/50">
+                        <p className="text-sm text-gray-700 font-medium">{card.translation}</p>
+                      </div>
+                    )}
+                    {card.definition && (
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Definition</p>
+                        <p className="text-xs text-gray-600 leading-relaxed">{card.definition}</p>
+                      </div>
+                    )}
+                    {card.example && (
+                      <div className="space-y-1">
+                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Example</p>
+                        <p className="text-xs text-gray-600 italic leading-relaxed bg-white/50 px-3 py-2 rounded-lg border border-gray-200/30">"{card.example}"</p>
+                      </div>
+                    )}
+                    {card.nativeUsage && (
+                      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg px-3 py-2.5 border border-blue-100/50">
+                        <p className="text-xs text-blue-700 leading-relaxed flex items-start gap-2">
+                          <span className="flex-shrink-0 text-sm">💡</span>
+                          <span className="font-medium">{card.nativeUsage}</span>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Success Message */}
+          <div className="bg-gradient-to-br from-gray-900 to-black rounded-2xl p-5 text-white shadow-lg border border-white/10">
+            <h4 className="text-lg font-bold mb-2 flex items-center gap-2">
+              <span>✨</span> Great Work!
+            </h4>
+            <p className="text-white/80 text-sm mb-4 leading-relaxed">
+              Your diary has been analyzed and flashcards saved automatically.
+            </p>
+            <button
+              onClick={() => {
+                setResult(null);
+                setText('');
+                onClose();
+              }}
+              className="w-full py-3 bg-white text-black font-semibold text-sm rounded-xl hover:bg-gray-100 active:scale-[0.98] transition-all shadow-sm"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-gradient-to-br from-orange-50/30 via-white to-blue-50/30 flex flex-col animate-in slide-in-from-bottom duration-300">
+      {/* Header */}
+      <div className="p-4 flex justify-between items-center border-b border-black/5 bg-white/70 backdrop-blur-md sticky top-0 z-10 shadow-sm">
+        <button
+          onClick={onClose}
+          className="w-10 h-10 flex items-center justify-center bg-white rounded-full shadow-sm hover:shadow transition-all border border-black/5"
+        >
+          <ArrowLeft size={18} className="text-gray-700" />
+        </button>
+        <span className="text-sm font-semibold text-gray-900">
+          {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+        </span>
+        <div className="w-10" />
+      </div>
+
+      {/* Editor */}
+      <div className="flex-1 overflow-y-auto p-5">
+        <textarea
+          ref={textareaRef}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="What happened today? Write freely in English..."
+          className="w-full h-full text-[17px] text-gray-800 leading-relaxed resize-none outline-none bg-transparent placeholder:text-gray-400"
+        />
+      </div>
+
+      {/* Footer */}
+      <div className="p-5 bg-gradient-to-t from-white via-white to-transparent sticky bottom-0">
+        {text.trim() && (
+          <div className="flex items-center justify-between mb-3 text-xs">
+            <div className="flex items-center gap-3 text-gray-500 font-medium">
+              <span className="bg-gray-100 px-2 py-1 rounded-full">{text.split(/\s+/).filter(w => w).length} words</span>
+              <span className="bg-gray-100 px-2 py-1 rounded-full">{text.split(/[.!?]+/).filter(s => s.trim()).length} sentences</span>
+            </div>
+            {text.length > 2000 && (
+              <span className="text-orange-600 font-semibold bg-orange-50 px-2 py-1 rounded-full">
+                ⚠️ Too long
+              </span>
+            )}
+          </div>
+        )}
+        <button
+          onClick={handleAnalyze}
+          disabled={!text.trim() || isAnalyzing}
+          className="w-full h-14 bg-gradient-to-r from-gray-900 to-black text-white rounded-2xl font-semibold text-base shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:scale-100 hover:shadow-xl active:scale-[0.98] transition-all border border-white/10"
+        >
+          {isAnalyzing ? (
+            <>
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <span>Analyzing...</span>
+            </>
+          ) : (
+            <>
+              <Sparkles size={18} className="text-yellow-300" />
+              <span>Analyze & Improve</span>
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}

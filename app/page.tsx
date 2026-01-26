@@ -1,0 +1,202 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import CameraScreen from '@/components/CameraScreen';
+import DialogueScreen from '@/components/DialogueScreen';
+import LibraryScreen from '@/components/LibraryScreen';
+import { Screen, Scenario, UserLevel } from '@/lib/types';
+import { Loader2 } from 'lucide-react';
+
+export default function Home() {
+  const [currentScreen, setCurrentScreen] = useState<Screen>(Screen.CAMERA);
+  const [currentScenario, setCurrentScenario] = useState<Scenario | null>(null);
+  const [currentDialogueId, setCurrentDialogueId] = useState<string | undefined>(undefined);
+  const [userLevel, setUserLevel] = useState<UserLevel>('Beginner');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // Initial setup
+  useEffect(() => {
+    // Load user level from localStorage
+    const savedLevel = localStorage.getItem('speakSnapLevel');
+    if (savedLevel) {
+      setUserLevel(savedLevel as UserLevel);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Save user level
+    localStorage.setItem('speakSnapLevel', userLevel);
+  }, [userLevel]);
+
+  const handleCapture = async (imageSrc: string, location?: { lat: number; lng: number }) => {
+    setIsAnalyzing(true);
+    setCurrentScreen(Screen.ANALYSIS);
+
+    try {
+      // Call AI service to analyze image
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image: imageSrc,
+          level: userLevel,
+          location,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Analysis failed');
+
+      const result = await response.json();
+
+      const newScenario: Scenario = {
+        id: Date.now().toString(),
+        image_url: imageSrc,
+        location: result.location,
+        situation: result.situation,
+        difficulty: result.difficulty,
+        role_name: result.role_name,
+        context: result.context,
+        timestamp: Date.now(),
+        dialogues: [],
+        total_attempts: 0,
+        best_score: 0,
+        last_practiced: Date.now(),
+      };
+
+      // Save new scenario immediately
+      try {
+        const existing = localStorage.getItem('speakSnapScenarios');
+        const scenarios = existing ? JSON.parse(existing) : [];
+        localStorage.setItem('speakSnapScenarios', JSON.stringify([newScenario, ...scenarios]));
+      } catch (e) {
+        console.error('Failed to save scenario', e);
+      }
+
+      setCurrentScenario(newScenario);
+      setCurrentDialogueId(undefined); // New dialogue
+      setIsAnalyzing(false);
+      setCurrentScreen(Screen.DIALOGUE);
+    } catch (error) {
+      console.error('Failed to analyze image:', error);
+      setIsAnalyzing(false);
+      setCurrentScreen(Screen.CAMERA);
+      alert('Could not analyze image. Please try again.');
+    }
+  };
+
+  const handleVoiceCapture = async (audioBase64: string, location?: { lat: number; lng: number }) => {
+    setIsAnalyzing(true);
+    setCurrentScreen(Screen.ANALYSIS);
+
+    try {
+      const response = await fetch('/api/analyze-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audio: audioBase64,
+          level: userLevel,
+          location,
+        }),
+      });
+
+      if (!response.ok) throw new Error('Analysis failed');
+
+      const result = await response.json();
+
+      const newScenario: Scenario = {
+        id: Date.now().toString(),
+        location: result.location,
+        situation: result.situation,
+        difficulty: result.difficulty,
+        role_name: result.role_name,
+        context: result.context,
+        timestamp: Date.now(),
+        dialogues: [],
+        total_attempts: 0,
+        best_score: 0,
+        last_practiced: Date.now(),
+      };
+
+      // Save new scenario immediately
+      try {
+        const existing = localStorage.getItem('speakSnapScenarios');
+        const scenarios = existing ? JSON.parse(existing) : [];
+        localStorage.setItem('speakSnapScenarios', JSON.stringify([newScenario, ...scenarios]));
+      } catch (e) {
+        console.error('Failed to save scenario', e);
+      }
+
+      setCurrentScenario(newScenario);
+      setCurrentDialogueId(undefined); // New dialogue
+      setIsAnalyzing(false);
+      setCurrentScreen(Screen.DIALOGUE);
+    } catch (error) {
+      console.error('Failed to analyze audio:', error);
+      setIsAnalyzing(false);
+      setCurrentScreen(Screen.CAMERA);
+      alert('Could not understand audio. Please try again.');
+    }
+  };
+
+  const renderScreen = () => {
+    switch (currentScreen) {
+      case Screen.CAMERA:
+        return (
+          <CameraScreen
+            onCapture={handleCapture}
+            onVoiceCapture={handleVoiceCapture}
+            onNavigate={setCurrentScreen}
+            userLevel={userLevel}
+            setUserLevel={setUserLevel}
+          />
+        );
+
+      case Screen.ANALYSIS:
+        return (
+          <div className="h-full w-full bg-primary-50 text-primary-900 flex flex-col items-center justify-center p-8 text-center">
+            <div className="relative mb-8">
+              <div className="absolute inset-0 bg-blue-100 rounded-full blur-xl opacity-50 animate-pulse"></div>
+              <Loader2 size={48} className="text-primary-900 animate-spin relative z-10" />
+            </div>
+            <h2 className="text-xl font-bold mb-2">Creating Scenario...</h2>
+            <p className="text-gray-500 text-sm">Adapting to {userLevel} level.</p>
+          </div>
+        );
+
+      case Screen.DIALOGUE:
+        if (!currentScenario) return null;
+        return (
+          <DialogueScreen
+            scenario={currentScenario}
+            userLevel={userLevel}
+            dialogueId={currentDialogueId}
+            onBack={() => setCurrentScreen(Screen.LIBRARY)}
+            onFinish={() => setCurrentScreen(Screen.LIBRARY)}
+          />
+        );
+
+      case Screen.LIBRARY:
+        return (
+          <LibraryScreen
+            onNavigate={setCurrentScreen}
+            onSelectScenario={(scenario, dialogueId) => {
+              setCurrentScenario(scenario);
+              setCurrentDialogueId(dialogueId);
+              setCurrentScreen(Screen.DIALOGUE);
+            }}
+          />
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="min-h-screen w-full flex items-center justify-center bg-[#E8E8E5] sm:p-4">
+      <div className="w-full h-[100dvh] sm:h-[800px] sm:max-w-[390px] bg-primary-50 sm:rounded-[40px] overflow-hidden relative shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] ring-1 ring-black/5">
+        {renderScreen()}
+      </div>
+    </div>
+  );
+}
