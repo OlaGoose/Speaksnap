@@ -273,11 +273,11 @@ export default function FlashcardDeck() {
                           ref={(el) => { iframeRefs.current[card.id] = el; }}
                           width="100%"
                           height="100%"
-                          src={`https://www.youtube.com/embed/${currentVideoId}?autoplay=${isActive && !isFlipped ? 1 : 0}&controls=0&modestbranding=1&rel=0&playsinline=1&loop=1&playlist=${currentVideoId}&mute=${isActive && !isFlipped ? 0 : 1}`}
+                          src={`https://www.youtube.com/embed/${currentVideoId}?autoplay=${isActive && !isFlipped ? 1 : 0}&controls=1&modestbranding=1&rel=0&playsinline=1&loop=1&playlist=${currentVideoId}&mute=${isActive && !isFlipped ? 0 : 1}`}
                           title="Context Video"
                           frameBorder="0"
                           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          className={`w-full h-full object-cover pointer-events-none scale-[1.35] transition-opacity duration-300 ${isVideoLoaded ? 'opacity-100' : 'opacity-0'}`}
+                          className={`w-full h-full object-cover pointer-events-auto scale-[1.35] transition-opacity duration-300 ${isVideoLoaded ? 'opacity-100' : 'opacity-0'}`}
                           onLoad={() => handleVideoLoad(card.id)}
                           onError={() => handleVideoError(card.id)}
                         />
@@ -311,8 +311,15 @@ export default function FlashcardDeck() {
                   {/* Gradient Overlay */}
                   <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/20 via-transparent to-black/90 pointer-events-none"></div>
 
-                  {/* Touch Layer */}
-                  <div className="absolute inset-0 z-20"></div>
+                  {/* Touch Layer - Click outside video to flip */}
+                  <div 
+                    className="absolute inset-0 z-20 cursor-pointer"
+                    onClick={() => {
+                      if (isActive && !isFlipped) {
+                        setIsFlipped(true);
+                      }
+                    }}
+                  ></div>
 
                   {/* Top Metadata */}
                   <div className="absolute top-4 right-4 z-40 flex justify-end items-start pointer-events-none">
@@ -451,47 +458,77 @@ export default function FlashcardDeck() {
                         }
                       }}
                     >
-                      {/* Translation */}
-                      <div className="pb-2">
-                        <p className="text-3xl font-medium text-gray-900 leading-snug">{back.translation}</p>
+                      {/* Phonetic & Pronunciation */}
+                      {back.phonetic && (
+                        <div className="flex items-center justify-between pb-3">
+                          <div className="flex items-center gap-3">
+                            <span className="text-gray-500 font-mono text-sm">/{back.phonetic}/</span>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                playAudio(front, e);
+                              }}
+                              className="p-1.5 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors"
+                              aria-label="Play pronunciation"
+                            >
+                              <Volume2 size={16} className="text-blue-600" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Translation - Primary meaning */}
+                      <div className="pb-4">
+                        <p className="text-2xl font-bold text-gray-900 leading-tight">{back.translation}</p>
                       </div>
 
-                      <hr className="border-gray-100 my-4" />
-
-                      {/* Definition */}
+                      {/* Definition - Detailed explanation */}
                       {back.definition && (
-                        <div className="space-y-2.5">
-                          <div className="flex items-center gap-2 text-blue-600 mb-2">
-                            <BookOpen size={16} className="flex-shrink-0" />
-                            <span className="text-xs font-bold uppercase tracking-widest">Grammar & Note</span>
+                        <div className="space-y-2.5 pb-5">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <BookOpen size={14} className="text-blue-600 flex-shrink-0" />
+                            <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Definition</span>
                           </div>
-                          <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
-                            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{back.definition}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Native Usage */}
-                      {back.native_usage && (
-                        <div className="space-y-2.5">
-                          <div className="flex items-center gap-2 text-purple-600 mb-2">
-                            <MessageCircle size={16} className="flex-shrink-0" />
-                            <span className="text-xs font-bold uppercase tracking-widest">Native Usage</span>
-                          </div>
-                          <div className="bg-purple-50/50 p-4 rounded-xl border border-purple-100">
-                            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">"{back.native_usage}"</p>
+                          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-2xl border border-blue-100/60">
+                            <p className="text-[15px] text-gray-800 leading-relaxed">{back.definition}</p>
                           </div>
                         </div>
                       )}
 
-                      {/* Example */}
+                      {/* Example - Usage in context */}
                       {back.example && (
-                        <div className="space-y-2.5">
-                          <div className="flex items-center gap-2 text-gray-400 mb-2">
-                            <span className="text-xs font-bold uppercase tracking-widest">Example</span>
+                        <div className="space-y-2.5 pb-5">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <MessageCircle size={14} className="text-emerald-600 flex-shrink-0" />
+                            <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Example</span>
                           </div>
-                          <div className="pl-4 border-l-3 border-gray-200 bg-gray-50/50 p-4 rounded-r-xl">
-                            <p className="text-base text-gray-800 leading-relaxed whitespace-pre-wrap">{back.example}</p>
+                          <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-4 rounded-2xl border border-emerald-100/60">
+                            <p className="text-[15px] text-gray-800 leading-relaxed italic">"{back.example}"</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Native Usage - How natives say it */}
+                      {back.native_usage && (
+                        <div className="space-y-2.5 pb-5">
+                          <div className="flex items-center gap-2 mb-1.5">
+                            <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider flex items-center gap-1.5">
+                              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-purple-100 text-purple-600 text-[10px] font-bold">💬</span>
+                              Native Speaker Tips
+                            </span>
+                          </div>
+                          <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-4 rounded-2xl border border-purple-100/60">
+                            <p className="text-[15px] text-gray-800 leading-relaxed">{back.native_usage}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Context tag */}
+                      {card.context && (
+                        <div className="pt-3 pb-2">
+                          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 rounded-full">
+                            <span className="text-xs text-gray-500 font-medium">From:</span>
+                            <span className="text-xs text-gray-700 font-semibold">{card.context}</span>
                           </div>
                         </div>
                       )}
