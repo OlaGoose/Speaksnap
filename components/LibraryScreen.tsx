@@ -149,12 +149,13 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
 
   return (
     <div className="min-h-screen bg-primary-50 flex flex-col overflow-hidden">
-      {/* Header */}
-      <div className="sticky top-0 z-30 px-4 pt-4 pb-2 bg-primary-50/95 backdrop-blur-sm border-b border-black/5">
+      {/* Header with safe area */}
+      <div className="sticky top-0 z-30 px-4 pt-4 pb-2 bg-primary-50/95 backdrop-blur-sm border-b border-black/5 safe-top">
         <div className="flex items-center gap-3 mb-4">
           <button
             onClick={() => onNavigate(Screen.CAMERA)}
-            className="w-10 h-10 rounded-full bg-white shadow-float flex items-center justify-center text-gray-700 active:scale-95 transition-transform"
+            className="w-10 h-10 rounded-full bg-white shadow-float flex items-center justify-center text-gray-700 active:scale-95 transition-transform touch-manipulation"
+            aria-label="Go back to camera"
           >
             <ArrowLeft size={18} />
           </button>
@@ -164,43 +165,53 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
               placeholder="Search scenarios..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-10 pl-10 pr-4 bg-white rounded-full border border-transparent shadow-float text-sm outline-none focus:border-gray-300 transition-all placeholder:text-gray-400"
+              className="w-full h-10 pl-10 pr-4 bg-white rounded-full border border-transparent shadow-float outline-none focus:border-gray-300 transition-all placeholder:text-gray-400 text-base"
+              aria-label="Search scenarios"
             />
-            <Search className="absolute left-3.5 top-2.5 text-gray-400" size={16} />
+            <Search className="absolute left-3.5 top-2.5 text-gray-400 pointer-events-none" size={16} />
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-2">
+        <div className="flex gap-2 mb-2" role="tablist">
           <button
             onClick={() => setActiveTab('scenarios')}
-            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${
+            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all touch-manipulation min-h-[44px] ${
               activeTab === 'scenarios' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-gray-600'
             }`}
+            role="tab"
+            aria-selected={activeTab === 'scenarios'}
+            aria-label="Scenarios tab"
           >
             Scenarios
           </button>
           <button
             onClick={() => setActiveTab('flashcards')}
-            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${
+            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all touch-manipulation min-h-[44px] ${
               activeTab === 'flashcards' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-gray-600'
             }`}
+            role="tab"
+            aria-selected={activeTab === 'flashcards'}
+            aria-label="Flashcards tab"
           >
             Flashcards
           </button>
           <button
             onClick={() => setActiveTab('diary')}
-            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all ${
+            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all touch-manipulation min-h-[44px] ${
               activeTab === 'diary' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-gray-600'
             }`}
+            role="tab"
+            aria-selected={activeTab === 'diary'}
+            aria-label="Diary tab"
           >
             Diary
           </button>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 px-4 pt-4 pb-24 overflow-y-auto">
+      {/* Content with optimized scrolling */}
+      <div className="flex-1 px-4 pt-4 pb-24 overflow-y-auto scroll-container safe-bottom">
         {activeTab === 'scenarios' && (
           <div className="space-y-3 py-4 animate-in fade-in duration-300">
             {filteredScenarios.length === 0 ? (
@@ -233,7 +244,10 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
                     {/* Scenario Header */}
                     <div
                       onClick={() => toggleExpand(scenario.id)}
-                      className="p-4 cursor-pointer active:bg-gray-50 transition-colors"
+                      className="p-4 cursor-pointer active:bg-gray-50 transition-colors touch-manipulation"
+                      role="button"
+                      aria-expanded={isExpanded}
+                      aria-label={`${isExpanded ? 'Collapse' : 'Expand'} scenario: ${scenario.location}`}
                     >
                       <div className="flex items-start gap-4">
                         {/* Image */}
@@ -400,7 +414,8 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
                         <div className="p-4 pt-2 border-t border-gray-100">
                           <button
                             onClick={(e) => handleDeleteScenario(scenario.id, e)}
-                            className="text-xs text-red-500 hover:text-red-600 font-medium flex items-center gap-1"
+                            className="text-xs text-red-500 hover:text-red-600 font-medium flex items-center gap-1 touch-manipulation min-h-[44px] px-3"
+                            aria-label="Delete scenario"
                           >
                             <Trash2 size={12} />
                             Delete Scenario
@@ -418,7 +433,7 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
         {activeTab === 'flashcards' && <FlashcardDeck />}
 
         {activeTab === 'diary' && (
-          <div className="py-4 space-y-4 pb-32">
+          <div className="py-4 space-y-4 pb-32 safe-bottom">
             {diaryEntries.length === 0 ? (
               <div className="bg-white rounded-2xl p-8 text-center shadow-float">
                 <PenTool className="w-12 h-12 mx-auto mb-4 text-gray-300" />
@@ -428,7 +443,8 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
                 </p>
                 <button
                   onClick={() => setIsWritingDiary(true)}
-                  className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium shadow-lg active:scale-95 transition-transform"
+                  className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium shadow-lg active:scale-95 transition-transform touch-manipulation min-h-[44px]"
+                  aria-label="Start writing diary"
                 >
                   Start Writing
                 </button>
@@ -448,7 +464,10 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
                   >
                     <div
                       onClick={() => setExpandedDiaryId(isExpanded ? null : entry.id)}
-                      className="p-4 cursor-pointer active:bg-gray-50 transition-colors"
+                      className="p-4 cursor-pointer active:bg-gray-50 transition-colors touch-manipulation"
+                      role="button"
+                      aria-expanded={isExpanded}
+                      aria-label={`${isExpanded ? 'Collapse' : 'Expand'} diary entry`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
@@ -536,7 +555,8 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
                                     alert('Corrected version copied!');
                                   }
                                 }}
-                                className="text-xs text-gray-600 hover:text-gray-900 font-medium flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                                className="text-xs text-gray-600 hover:text-gray-900 font-medium flex items-center gap-1.5 bg-white px-3 py-2 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors touch-manipulation min-h-[44px]"
+                                aria-label="Copy corrected version"
                               >
                                 <Eye size={12} />
                                 Copy Corrected
@@ -544,7 +564,8 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
                             )}
                             <button
                               onClick={(e) => handleDeleteDiary(entry.id, e)}
-                              className="text-xs text-red-500 hover:text-red-600 font-medium flex items-center gap-1.5 ml-auto"
+                              className="text-xs text-red-500 hover:text-red-600 font-medium flex items-center gap-1.5 ml-auto touch-manipulation min-h-[44px] px-3"
+                              aria-label="Delete diary entry"
                             >
                               <Trash2 size={12} />
                               Delete
@@ -561,12 +582,13 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
         )}
       </div>
 
-      {/* FAB */}
-      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-30">
+      {/* FAB with safe area */}
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-30 safe-bottom">
         {activeTab === 'diary' ? (
           <button
             onClick={() => setIsWritingDiary(true)}
-            className="bg-primary-900 text-white px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 hover:scale-105 transition-transform active:scale-95"
+            className="bg-primary-900 text-white px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 touch-manipulation min-h-[44px]"
+            aria-label="Write diary"
           >
             <PenTool size={18} />
             <span>Write Diary</span>
@@ -574,7 +596,8 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
         ) : (
           <button
             onClick={() => onNavigate(Screen.CAMERA)}
-            className="bg-primary-900 text-white px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 hover:scale-105 transition-transform active:scale-95"
+            className="bg-primary-900 text-white px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 touch-manipulation min-h-[44px]"
+            aria-label="Create new scenario"
           >
             <Camera size={18} />
             <span>New Scenario</span>

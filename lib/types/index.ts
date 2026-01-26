@@ -82,10 +82,20 @@ export interface SentencePattern {
 export interface DiaryEntry {
   id: string;
   user_id?: string;
-  original_text: string;
-  semantic_summary: string;
-  rewrites: string[];
-  extracted_patterns: SentencePattern[];
+  original?: string;
+  optimized?: string;
+  upgraded?: string;
+  analysis_data?: {
+    overallScore?: number;
+    overallLevel?: string;
+    summary?: string;
+    stats?: any;
+    strengths?: string[];
+    improvements?: string[];
+    grammarFocus?: string[];
+    sentenceAnalysis?: any[];
+    patterns?: any[];
+  };
   timestamp: number;
   created_at?: string;
 }

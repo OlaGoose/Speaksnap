@@ -51,10 +51,10 @@ CREATE TABLE IF NOT EXISTS flashcards (
 CREATE TABLE IF NOT EXISTS diary_entries (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
-  original_text TEXT NOT NULL,
-  semantic_summary TEXT NOT NULL,
-  rewrites JSONB NOT NULL,
-  extracted_patterns JSONB NOT NULL,
+  original_text TEXT,
+  optimized_text TEXT,
+  upgraded_text TEXT,
+  analysis_data JSONB,
   timestamp BIGINT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

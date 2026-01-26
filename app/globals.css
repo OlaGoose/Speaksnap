@@ -211,10 +211,22 @@ body {
     -webkit-touch-callout: default;
   }
 
-  /* Optimize touch targets */
-  button, a {
+  /* Optimize touch targets - minimum 44x44px */
+  button, a, [role="button"] {
     -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
     touch-action: manipulation;
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Smooth scrolling on iOS */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prevent zoom on input focus */
+  input, textarea, select {
+    font-size: 16px !important;
   }
 }
 
@@ -222,4 +234,35 @@ body {
 .touch-manipulation {
   touch-action: manipulation;
   -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Scrollable container optimization */
+.scroll-container {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* Prevent pull-to-refresh on iOS */
+body {
+  overscroll-behavior-y: none;
+}
+
+/* Safe area support for notch devices */
+@supports (padding: max(0px)) {
+  .safe-top {
+    padding-top: max(env(safe-area-inset-top), 16px);
+  }
+  
+  .safe-bottom {
+    padding-bottom: max(env(safe-area-inset-bottom), 16px);
+  }
+  
+  .safe-left {
+    padding-left: max(env(safe-area-inset-left), 16px);
+  }
+  
+  .safe-right {
+    padding-right: max(env(safe-area-inset-right), 16px);
+  }
 }
