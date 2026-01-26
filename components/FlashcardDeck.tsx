@@ -242,11 +242,11 @@ export default function FlashcardDeck() {
           return (
             <div key={card.id} className="absolute inset-0 w-full h-full" style={style}>
               <div
-                className="relative w-full h-full duration-500 shadow-2xl rounded-[24px] [transform-style:preserve-3d] bg-black"
+                className="relative w-full h-full duration-500 shadow-2xl rounded-[24px] overflow-hidden [transform-style:preserve-3d] bg-black"
                 style={{ transform: isActive && isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
               >
                 {/* Front Face */}
-                <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] rounded-[24px] overflow-hidden bg-black flex flex-col">
+                <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] rounded-[24px] overflow-visible bg-black flex flex-col">
                   {/* Video Layer */}
                   <div className="absolute inset-0 z-0">
                     {currentVideoId && !hasVideoError ? (
