@@ -447,7 +447,7 @@ export default function FlashcardDeck() {
 
                   {/* Compact Header with Delete */}
                   <div className="flex-shrink-0 px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-white">
-                    <h4 className="text-2xl font-bold text-gray-900 tracking-tight">{front}</h4>
+                    <h4 className="text-3xl font-bold text-gray-900 tracking-tight">{front}</h4>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -512,12 +512,13 @@ export default function FlashcardDeck() {
                       </div>
                     )}
 
-                    {/* YouTube Videos - Compact Row (moved before Native Tips) */}
-                    {videoIds.length > 0 && (
+                    {/* YouTube Videos OR Native Tips - 优先显示 YouTube，互斥显示 */}
+                    {videoIds.length > 0 ? (
+                      // 有视频时显示 YouTube Videos
                       <div className="space-y-2 pt-2 border-t border-gray-100">
                         <div className="flex items-center gap-2">
                           <Youtube size={14} className="text-red-500" />
-                          <span className="text-xs font-semibold text-gray-500 uppercase">Usage Videos ({videoIds.length})</span>
+                          <span className="text-xs font-semibold text-gray-500 uppercase">Videos</span>
                         </div>
                         <div 
                           className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 -mx-1 px-1"
@@ -536,8 +537,8 @@ export default function FlashcardDeck() {
                               data-video-thumbnail
                               className="flex-shrink-0 relative rounded-lg overflow-hidden bg-gray-900 cursor-pointer hover:opacity-90 transition-all active:scale-95"
                               style={{ 
-                                width: '120px', 
-                                height: '68px',
+                                width: '116px', 
+                                height: '64px',
                                 scrollSnapAlign: 'start',
                               }}
                               onClick={(e) => {
@@ -574,16 +575,16 @@ export default function FlashcardDeck() {
                           ))}
                         </div>
                       </div>
-                    )}
-
-                    {/* Native Usage - Full */}
-                    {back.native_usage && (
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-semibold text-gray-500 uppercase">💬 Native Tips</span>
+                    ) : (
+                      // 没有视频时显示 Native Tips
+                      back.native_usage && (
+                        <div className="space-y-1.5 pt-2 border-t border-gray-100">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-semibold text-gray-500 uppercase">💬 Native Tips</span>
+                          </div>
+                          <p className="text-sm text-gray-700 leading-relaxed">{back.native_usage}</p>
                         </div>
-                        <p className="text-sm text-gray-700 leading-relaxed">{back.native_usage}</p>
-                      </div>
+                      )
                     )}
 
                   </div>
