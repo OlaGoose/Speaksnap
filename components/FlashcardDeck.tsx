@@ -14,7 +14,7 @@ export default function FlashcardDeck() {
   const [videoErrors, setVideoErrors] = useState<{ [key: string]: boolean }>({});
   const [videoLoaded, setVideoLoaded] = useState<{ [key: string]: boolean }>({});
   
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const iframeRefs = useRef<{ [key: string]: HTMLIFrameElement | null }>({});
   const scrollRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
 
@@ -74,7 +74,9 @@ export default function FlashcardDeck() {
 
   const handleTouchStart = (e: React.TouchEvent) => {
     const target = e.target as HTMLElement;
-    if (target.closest('button')) return;
+    
+    // Don't handle touch on interactive elements
+    if (target.closest('button') || target.closest('iframe')) return;
     
     // Don't handle touch if it's on the scrollable content area (back face)
     if (isFlipped && target.closest('.flashcard-scroll')) {
@@ -85,6 +87,7 @@ export default function FlashcardDeck() {
     touchStartRef.current = {
       x: e.touches[0].clientX,
       y: e.touches[0].clientY,
+      time: Date.now(),
     };
     setDragOffset({ x: 0, y: 0 });
   };
@@ -108,18 +111,21 @@ export default function FlashcardDeck() {
     const deltaY = dragOffset.y;
     const absX = Math.abs(deltaX);
     const absY = Math.abs(deltaY);
+    const timeDelta = Date.now() - (touchStartRef.current.time || 0);
 
     const isHorizontalSwipe = absX > absY && absX > 60;
     const isVerticalSwipe = absY > absX && absY > 60;
-    const isTap = absX < 10 && absY < 10;
+    const isTap = absX < 10 && absY < 10 && timeDelta < 300; // Quick tap
 
     if (isHorizontalSwipe) {
+      // Swipe left/right to change cards
       if (deltaX > 0 && activeIndex > 0) {
         setActiveIndex((prev) => prev - 1);
       } else if (deltaX < 0 && activeIndex < flashcards.length - 1) {
         setActiveIndex((prev) => prev + 1);
       }
     } else if (isVerticalSwipe && !isFlipped) {
+      // Swipe up/down to change video
       const currentCard = flashcards[activeIndex];
       const videoIds = currentCard?.back?.video_ids || [];
       if (videoIds.length > 1) {
@@ -130,19 +136,18 @@ export default function FlashcardDeck() {
         }
       }
     } else if (isTap) {
-      // Tap to flip - but check if tapping on scrollable area
-      if (isFlipped) {
-        const target = (document.activeElement || document.elementFromPoint(
-          touchStartRef.current?.x || 0,
-          touchStartRef.current?.y || 0
-        )) as HTMLElement;
-        
-        // Only flip if not tapping on scroll area
-        if (target && !target.closest('.flashcard-scroll')) {
-          setIsFlipped(!isFlipped);
-        }
-      } else {
-        // On front, always allow flip
+      // Quick tap to flip
+      const target = document.elementFromPoint(
+        touchStartRef.current?.x || 0,
+        touchStartRef.current?.y || 0
+      ) as HTMLElement;
+      
+      // Check if tapping on scrollable area (back face only)
+      const isOnScrollArea = target && target.closest('.flashcard-scroll');
+      
+      if (!isOnScrollArea) {
+        // Tap anywhere (except scroll area) to flip
+        console.log('📱 Mobile tap detected - flipping card');
         setIsFlipped(!isFlipped);
       }
     }
@@ -317,16 +322,15 @@ export default function FlashcardDeck() {
                   {/* Gradient Overlay */}
                   <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/30 via-transparent to-black/95 pointer-events-none"></div>
 
-                  {/* Touch Layer - Click anywhere to flip */}
+                  {/* Touch Layer - Desktop click support */}
                   <div 
                     className="absolute inset-0 z-20 cursor-pointer active:scale-[0.99] transition-transform"
                     onClick={(e) => {
-                      // Don't flip if clicking on video controls
+                      // Desktop only - mobile uses touch events
                       const target = e.target as HTMLElement;
-                      if (!target.closest('iframe')) {
-                        if (isActive) {
-                          setIsFlipped(!isFlipped);
-                        }
+                      if (!target.closest('iframe') && isActive) {
+                        console.log('🖱️ Desktop click - flipping card');
+                        setIsFlipped(!isFlipped);
                       }
                     }}
                   ></div>
