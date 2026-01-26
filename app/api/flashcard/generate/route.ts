@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { DoubaoProvider } from '@/lib/ai/doubao';
 import OpenAI from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { searchYouTube } from '@/lib/youtube/search';
+import { getCachedSearch, setCachedSearch } from '@/lib/youtube/cache';
 
 // Initialize AI clients
 const doubaoConfig = {
@@ -46,7 +48,6 @@ Generate detailed learning content with these fields:
 3. **definition**: Grammar-focused explanation (e.g., "Noun, used in informal contexts to mean...")
 4. **example**: A natural example sentence at intermediate level
 5. **native_usage**: How native speakers actually use this (idioms, collocations, common contexts)
-6. **video_ids**: Array of 2-3 YouTube video IDs (11 characters each) showing this word/phrase in authentic content (movie clips, vlogs, interviews). Search for actual videos.
 
 Return ONLY valid JSON (no markdown):
 {
@@ -54,9 +55,10 @@ Return ONLY valid JSON (no markdown):
   "translation": "string",
   "definition": "string",
   "example": "string",
-  "native_usage": "string",
-  "video_ids": ["string", "string"]
+  "native_usage": "string"
 }
+
+Note: Do NOT include video_ids - those will be fetched separately.
     `;
 
     let lastError: any = null;
@@ -81,7 +83,12 @@ Return ONLY valid JSON (no markdown):
         if (!responseText) throw new Error('Empty response');
 
         const parsed = DoubaoProvider.parseJSONResponse(responseText);
-        console.log('✅ [Flashcard] Doubao success');
+        
+        // Fetch YouTube videos for this word/phrase
+        const videoIds = await fetchYouTubeVideos(text);
+        parsed.video_ids = videoIds;
+        
+        console.log('✅ [Flashcard] Doubao success with', videoIds.length, 'videos');
         return NextResponse.json(parsed);
       } catch (error: any) {
         lastError = error;
@@ -110,8 +117,14 @@ Return ONLY valid JSON (no markdown):
         const responseText = response.choices[0]?.message?.content;
         if (!responseText) throw new Error('Empty response');
 
-        console.log('✅ [Flashcard] OpenAI success');
-        return NextResponse.json(JSON.parse(responseText));
+        const parsed = JSON.parse(responseText);
+        
+        // Fetch YouTube videos for this word/phrase
+        const videoIds = await fetchYouTubeVideos(text);
+        parsed.video_ids = videoIds;
+        
+        console.log('✅ [Flashcard] OpenAI success with', videoIds.length, 'videos');
+        return NextResponse.json(parsed);
       } catch (error: any) {
         lastError = error;
         console.warn('❌ [Flashcard] OpenAI failed:', error.message);
@@ -139,7 +152,11 @@ Return ONLY valid JSON (no markdown):
           parsed = JSON.parse(jsonMatch[0]);
         }
 
-        console.log('✅ [Flashcard] Gemini success');
+        // Fetch YouTube videos for this word/phrase
+        const videoIds = await fetchYouTubeVideos(text);
+        parsed.video_ids = videoIds;
+        
+        console.log('✅ [Flashcard] Gemini success with', videoIds.length, 'videos');
         return NextResponse.json(parsed);
       } catch (error: any) {
         lastError = error;
@@ -160,5 +177,46 @@ Return ONLY valid JSON (no markdown):
       { error: error.message || 'Internal server error' },
       { status: 500 }
     );
+  }
+}
+
+/**
+ * Fetch YouTube videos for a given word/phrase
+ * Returns array of video IDs (max 3)
+ * Uses caching to reduce API calls
+ */
+async function fetchYouTubeVideos(text: string): Promise<string[]> {
+  try {
+    // Create search query optimized for English learning
+    const searchQuery = `${text} English pronunciation usage example`;
+    
+    // Check cache first (server-side doesn't have localStorage, but client-side will)
+    const cached = getCachedSearch(searchQuery);
+    if (cached && cached.videos.length > 0) {
+      const videoIds = cached.videos.slice(0, 3).map(v => v.videoId);
+      console.log(`💾 [Flashcard] Using cached videos (${cached.source}) for "${text}"`);
+      return videoIds;
+    }
+    
+    console.log(`🎥 [Flashcard] Searching YouTube for: "${searchQuery}"`);
+    
+    const result = await searchYouTube(searchQuery);
+    
+    if (result.error || result.videos.length === 0) {
+      console.warn(`⚠️ [Flashcard] No videos found for "${text}":`, result.error);
+      return [];
+    }
+    
+    // Save to cache for future use
+    setCachedSearch(searchQuery, result.videos, result.source);
+    
+    // Return top 3 video IDs
+    const videoIds = result.videos.slice(0, 3).map(v => v.videoId);
+    console.log(`✅ [Flashcard] Found ${videoIds.length} videos from ${result.source}`);
+    
+    return videoIds;
+  } catch (error) {
+    console.error(`❌ [Flashcard] YouTube search failed for "${text}":`, error);
+    return []; // Return empty array on error, don't fail the entire flashcard generation
   }
 }

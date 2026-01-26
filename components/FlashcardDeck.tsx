@@ -10,8 +10,11 @@ export default function FlashcardDeck() {
   const [isFlipped, setIsFlipped] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [currentVideoIndices, setCurrentVideoIndices] = useState<{ [key: string]: number }>({});
+  const [videoErrors, setVideoErrors] = useState<{ [key: string]: boolean }>({});
+  const [videoLoaded, setVideoLoaded] = useState<{ [key: string]: boolean }>({});
 
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const iframeRefs = useRef<{ [key: string]: HTMLIFrameElement | null }>({});
 
   useEffect(() => {
     try {
@@ -112,12 +115,36 @@ export default function FlashcardDeck() {
       ...prev,
       [cardId]: ((prev[cardId] || 0) + 1) % total,
     }));
+    // Reset error state when changing video
+    setVideoErrors((prev) => ({
+      ...prev,
+      [cardId]: false,
+    }));
   };
 
   const prevVideo = (cardId: string, total: number) => {
     setCurrentVideoIndices((prev) => ({
       ...prev,
       [cardId]: ((prev[cardId] || 0) - 1 + total) % total,
+    }));
+    // Reset error state when changing video
+    setVideoErrors((prev) => ({
+      ...prev,
+      [cardId]: false,
+    }));
+  };
+
+  const handleVideoError = (cardId: string) => {
+    setVideoErrors((prev) => ({
+      ...prev,
+      [cardId]: true,
+    }));
+  };
+
+  const handleVideoLoad = (cardId: string) => {
+    setVideoLoaded((prev) => ({
+      ...prev,
+      [cardId]: true,
     }));
   };
 
@@ -155,6 +182,8 @@ export default function FlashcardDeck() {
           const videoIds = back.video_ids || [];
           const currentVidIndex = currentVideoIndices[card.id] || 0;
           const currentVideoId = videoIds.length > 0 ? videoIds[currentVidIndex] : null;
+          const hasVideoError = videoErrors[card.id] || false;
+          const isVideoLoaded = videoLoaded[card.id] || false;
 
           let style: React.CSSProperties = {
             zIndex: flashcards.length - index,
@@ -188,23 +217,51 @@ export default function FlashcardDeck() {
                 <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] rounded-[24px] overflow-hidden bg-black flex flex-col">
                   {/* Video Layer */}
                   <div className="absolute inset-0 z-0">
-                    {currentVideoId ? (
-                      <iframe
-                        width="100%"
-                        height="100%"
-                        src={`https://www.youtube.com/embed/${currentVideoId}?autoplay=${isActive && !isFlipped ? 1 : 0}&controls=0&modestbranding=1&rel=0&playsinline=1&loop=1&playlist=${currentVideoId}`}
-                        title="Context Video"
-                        frameBorder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        className="w-full h-full object-cover pointer-events-none scale-[1.35]"
-                      />
+                    {currentVideoId && !hasVideoError ? (
+                      <>
+                        {/* Loading skeleton */}
+                        {!isVideoLoaded && (
+                          <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900 animate-pulse">
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="w-16 h-16 rounded-full border-4 border-white/20 border-t-white/80 animate-spin" />
+                            </div>
+                          </div>
+                        )}
+                        <iframe
+                          key={currentVideoId}
+                          ref={(el) => { iframeRefs.current[card.id] = el; }}
+                          width="100%"
+                          height="100%"
+                          src={`https://www.youtube.com/embed/${currentVideoId}?autoplay=${isActive && !isFlipped ? 1 : 0}&controls=0&modestbranding=1&rel=0&playsinline=1&loop=1&playlist=${currentVideoId}&mute=${isActive && !isFlipped ? 0 : 1}`}
+                          title="Context Video"
+                          frameBorder="0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          className={`w-full h-full object-cover pointer-events-none scale-[1.35] transition-opacity duration-300 ${isVideoLoaded ? 'opacity-100' : 'opacity-0'}`}
+                          onLoad={() => handleVideoLoad(card.id)}
+                          onError={() => handleVideoError(card.id)}
+                        />
+                      </>
                     ) : (
                       <>
-                        {card.image_url && (
+                        {card.image_url ? (
                           <img src={card.image_url} alt="fallback" className="w-full h-full object-cover opacity-60" />
+                        ) : (
+                          <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 opacity-60" />
                         )}
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <Youtube size={48} className="text-white/20" />
+                        <div className="absolute inset-0 flex items-center justify-center flex-col gap-3">
+                          <Youtube size={48} className="text-white/30" />
+                          {hasVideoError && (
+                            <p className="text-white/50 text-xs px-4 text-center">
+                              Video unavailable
+                              {videoIds.length > 1 && <br />}
+                              {videoIds.length > 1 && 'Swipe to try another'}
+                            </p>
+                          )}
+                          {!currentVideoId && !hasVideoError && (
+                            <p className="text-white/50 text-xs px-4 text-center">
+                              No videos found
+                            </p>
+                          )}
                         </div>
                       </>
                     )}
@@ -217,18 +274,39 @@ export default function FlashcardDeck() {
                   <div className="absolute inset-0 z-20"></div>
 
                   {/* Top Metadata */}
-                  <div className="absolute top-4 left-4 right-4 z-30 flex justify-end items-start pointer-events-none">
-                    <div className="text-[10px] font-mono text-white/50 bg-black/20 px-2 py-1 rounded-full backdrop-blur-md">
+                  <div className="absolute top-4 right-4 z-30 flex justify-end items-start pointer-events-none">
+                    <div className="text-[10px] font-mono text-white/50 bg-black/30 px-2 py-1 rounded-full backdrop-blur-md">
                       {index + 1} / {flashcards.length}
                     </div>
                   </div>
 
                   {/* Video Navigation Indicators */}
-                  {videoIds.length > 1 && (
+                  {videoIds.length > 1 && !isFlipped && (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-1 items-center pointer-events-none opacity-60">
                       <ChevronUp size={20} className="text-white animate-bounce-subtle" />
-                      <div className="h-10 w-0.5 bg-white/20 rounded-full"></div>
+                      <div className="flex flex-col gap-0.5 py-2">
+                        {videoIds.map((_, idx) => (
+                          <div
+                            key={idx}
+                            className={`h-1.5 w-1.5 rounded-full transition-all ${
+                              idx === currentVidIndex
+                                ? 'bg-white scale-125'
+                                : 'bg-white/30'
+                            }`}
+                          />
+                        ))}
+                      </div>
                       <ChevronDown size={20} className="text-white animate-bounce-subtle" />
+                    </div>
+                  )}
+
+                  {/* Video source indicator */}
+                  {currentVideoId && !hasVideoError && isActive && (
+                    <div className="absolute top-4 left-4 z-30 flex items-center gap-1.5 px-2 py-1 rounded-full bg-red-600/80 backdrop-blur-sm pointer-events-none">
+                      <Youtube size={12} className="text-white" />
+                      <span className="text-[9px] font-medium text-white uppercase tracking-wider">
+                        {currentVidIndex + 1}/{videoIds.length}
+                      </span>
                     </div>
                   )}
 

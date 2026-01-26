@@ -85,27 +85,44 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
       
       setResult(data);
 
-      // Save flashcards
+      // Save flashcards with YouTube videos
       if (data.flashcards && data.flashcards.length > 0) {
-        const savedFlashcards = data.flashcards.map((f: any, i: number) => ({
-          id: `${Date.now()}_${i}`,
-          front: f.term,
-          back: {
-            phonetic: f.phonetic || '',
-            translation: f.translation || '',
-            definition: f.definition || '',
-            example: f.example || '',
-            native_usage: f.nativeUsage || '',
-            video_ids: [],
-          },
-          context: 'Diary Entry',
-          timestamp: Date.now(),
-          source: 'diary',
-        }));
+        // Fetch YouTube videos for each flashcard in parallel
+        const flashcardsWithVideos = await Promise.all(
+          data.flashcards.map(async (f: any, i: number) => {
+            let videoIds: string[] = [];
+            try {
+              const searchQuery = `${f.term} English pronunciation usage example`;
+              const videoResponse = await fetch(`/api/youtube/search?q=${encodeURIComponent(searchQuery)}`);
+              if (videoResponse.ok) {
+                const videoData = await videoResponse.json();
+                videoIds = (videoData.videos || []).slice(0, 3).map((v: any) => v.videoId);
+              }
+            } catch (error) {
+              console.warn(`Failed to fetch videos for "${f.term}":`, error);
+            }
+
+            return {
+              id: `${Date.now()}_${i}`,
+              front: f.term,
+              back: {
+                phonetic: f.phonetic || '',
+                translation: f.translation || '',
+                definition: f.definition || '',
+                example: f.example || '',
+                native_usage: f.nativeUsage || '',
+                video_ids: videoIds,
+              },
+              context: 'Diary Entry',
+              timestamp: Date.now(),
+              source: 'diary',
+            };
+          })
+        );
 
         const existingCards = localStorage.getItem('speakSnapFlashcards');
         const cards = existingCards ? JSON.parse(existingCards) : [];
-        localStorage.setItem('speakSnapFlashcards', JSON.stringify([...savedFlashcards, ...cards]));
+        localStorage.setItem('speakSnapFlashcards', JSON.stringify([...flashcardsWithVideos, ...cards]));
       }
 
       // Save diary entry
