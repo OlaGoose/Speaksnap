@@ -329,6 +329,16 @@ export default function DialogueScreen({
             text: result.next_response,
           },
         ];
+        
+        // Auto-play AI response if enabled
+        if (autoPlayAudio) {
+          setTimeout(() => {
+            const utterance = new SpeechSynthesisUtterance(result.next_response);
+            utterance.lang = 'en-US';
+            utterance.rate = 0.9;
+            window.speechSynthesis.speak(utterance);
+          }, 500); // Slight delay for better UX
+        }
       }
 
       // Update state
@@ -555,10 +565,27 @@ export default function DialogueScreen({
   return (
     <div className="flex flex-col h-full w-full bg-primary-50 relative overflow-hidden">
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-30 flex justify-end p-4 pt-6 bg-gradient-to-b from-primary-50 via-primary-50/90 to-transparent pointer-events-none">
+      <div className="absolute top-0 left-0 right-0 z-30 flex justify-between items-start p-4 pt-6 bg-gradient-to-b from-primary-50 via-primary-50/90 to-transparent pointer-events-none">
+        <button
+          onClick={() => setAutoPlayAudio(!autoPlayAudio)}
+          className={`w-10 h-10 rounded-full backdrop-blur-md shadow-float border flex items-center justify-center transition-all pointer-events-auto active:scale-95 touch-manipulation ${
+            autoPlayAudio 
+              ? 'bg-blue-500/90 border-blue-400/50 text-white' 
+              : 'bg-white/80 border-white/50 text-gray-400 hover:text-gray-900 hover:bg-white'
+          }`}
+          aria-label={autoPlayAudio ? 'Disable auto audio' : 'Enable auto audio'}
+          title={autoPlayAudio ? 'Auto audio ON' : 'Auto audio OFF'}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"></path>
+            {autoPlayAudio && <path d="M16 9a5 5 0 0 1 0 6"></path>}
+            {autoPlayAudio && <path d="M19.364 18.364a9 9 0 0 0 0-12.728"></path>}
+          </svg>
+        </button>
         <button
           onClick={onBack}
-          className="w-10 h-10 rounded-full bg-white/80 backdrop-blur-md shadow-float border border-white/50 flex items-center justify-center text-gray-400 hover:text-gray-900 transition-all pointer-events-auto active:scale-95 hover:bg-white"
+          className="w-10 h-10 rounded-full bg-white/80 backdrop-blur-md shadow-float border border-white/50 flex items-center justify-center text-gray-400 hover:text-gray-900 transition-all pointer-events-auto active:scale-95 hover:bg-white touch-manipulation"
+          aria-label="Close dialogue"
         >
           <X size={20} strokeWidth={2} />
         </button>
@@ -654,70 +681,95 @@ export default function DialogueScreen({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Selection Menu - Mobile Optimized */}
+      {/* Enhanced Selection Menu - Notion Style */}
       {selectionMenu && !selectionResult && (
         <div
-          className={`fixed z-50 ${isMobile ? 'flex-col items-center' : 'flex-row items-center'} gap-1 p-1.5 bg-[#1D1D1D] rounded-2xl shadow-2xl animate-in zoom-in fade-in duration-200 backdrop-blur-sm border border-white/10`}
           style={{
-            left: isMobile ? '50%' : Math.min(Math.max(10, selectionMenu.x - (isMobile ? 0 : 70)), window.innerWidth - (isMobile ? 0 : 150)),
-            top: isMobile ? 'auto' : selectionMenu.y - 50,
-            bottom: isMobile ? '120px' : 'auto',
-            transform: isMobile ? 'translateX(-50%)' : 'none',
-            maxWidth: isMobile ? '90vw' : 'none',
+            position: 'fixed',
+            left: '50%',
+            top: Math.max(selectionMenu.y - 70, 60),
+            transform: 'translateX(-50%)',
+            zIndex: 50,
+            pointerEvents: 'none',
+            padding: '12px',
           }}
           onClick={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
         >
-          {selectionActionLoading ? (
-            <div className={`${isMobile ? 'w-full' : ''} px-4 py-2.5 flex items-center justify-center gap-2`}>
-              <Loader2 size={18} className="animate-spin text-white" />
-              <span className="text-white text-sm font-medium">Processing...</span>
-            </div>
-          ) : (
-            <>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleTranslate();
-                }}
-                onTouchStart={(e) => e.stopPropagation()}
-                className={`${isMobile ? 'w-full justify-center' : ''} p-3 text-white/90 active:text-white active:bg-white/15 rounded-xl transition-all flex items-center gap-2 touch-manipulation`}
-                title="Translate"
-              >
-                <Languages size={18} />
-                {isMobile && <span className="text-sm font-medium">Translate</span>}
-              </button>
-              {!isMobile && <div className="w-[1px] h-4 bg-white/20"></div>}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleOptimize();
-                }}
-                onTouchStart={(e) => e.stopPropagation()}
-                className={`${isMobile ? 'w-full justify-center' : ''} p-3 text-white/90 active:text-white active:bg-white/15 rounded-xl transition-all flex items-center gap-2 touch-manipulation`}
-                title="Optimize"
-              >
-                <Wand2 size={18} />
-                {isMobile && <span className="text-sm font-medium">Optimize</span>}
-              </button>
-              {!isMobile && <div className="w-[1px] h-4 bg-white/20"></div>}
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleAddToFlashcard();
-                }}
-                onTouchStart={(e) => e.stopPropagation()}
-                className={`${isMobile ? 'w-full justify-center' : ''} p-3 text-white/90 active:text-white active:bg-white/15 rounded-xl transition-all flex items-center gap-2 touch-manipulation`}
-                title="Add to Flashcard"
-              >
-                <Bookmark size={18} />
-                {isMobile && <span className="text-sm font-medium">Save</span>}
-              </button>
-            </>
-          )}
-          {!isMobile && (
-            <div className="absolute top-full left-1/2 -translate-x-1/2 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-[#1D1D1D]"></div>
-          )}
+          <div className="inline-flex items-stretch h-9 bg-white overflow-hidden text-sm rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.12)] pointer-events-auto border border-black/5 p-1">
+            {selectionActionLoading ? (
+              <div className="px-4 py-1 flex items-center justify-center gap-2">
+                <Loader2 size={16} className="animate-spin text-gray-600" />
+                <span className="text-gray-700 text-sm font-medium">Processing...</span>
+              </div>
+            ) : (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const utterance = new SpeechSynthesisUtterance(selectionMenu.text);
+                    utterance.lang = 'en-US';
+                    utterance.rate = 0.85;
+                    window.speechSynthesis.speak(utterance);
+                  }}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  className="px-2 py-1 hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center gap-1.5 rounded-md"
+                  title="Play audio"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-700">
+                    <path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"></path>
+                    <path d="M16 9a5 5 0 0 1 0 6"></path>
+                  </svg>
+                  <span className="text-gray-700 font-medium">Play</span>
+                </button>
+                
+                <div className="h-5 w-px bg-gray-200 my-auto"></div>
+                
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleTranslate();
+                  }}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  className="px-2 py-1 hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center gap-1.5 rounded-md"
+                  title="Translate"
+                >
+                  <Languages size={16} className="text-blue-600" />
+                  <span className="text-gray-700 font-medium">Translate</span>
+                </button>
+                
+                <div className="h-5 w-px bg-gray-200 my-auto"></div>
+                
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOptimize();
+                  }}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  className="px-2 py-1 hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center gap-1.5 rounded-md"
+                  title="AI Optimize"
+                >
+                  <Wand2 size={16} className="text-purple-600" />
+                  <span className="text-gray-700 font-medium">Optimize</span>
+                </button>
+                
+                <div className="h-5 w-px bg-gray-200 my-auto"></div>
+                
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddToFlashcard();
+                  }}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  className="px-2 py-1 hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center gap-1.5 rounded-md"
+                  title="Save to Flashcard"
+                >
+                  <Bookmark size={16} className="text-green-600" />
+                  <span className="text-gray-700 font-medium">Save</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
       )}
 
