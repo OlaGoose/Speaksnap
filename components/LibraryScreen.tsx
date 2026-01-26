@@ -148,7 +148,7 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
   }
 
   return (
-    <div className="min-h-screen bg-primary-50 flex flex-col overflow-hidden">
+    <div className="h-full bg-primary-50 flex flex-col overflow-hidden">
       {/* Header with safe area */}
       <div className="sticky top-0 z-30 px-4 pt-4 pb-2 bg-primary-50/95 backdrop-blur-sm border-b border-black/5 safe-top">
         <div className="flex items-center gap-3 mb-4">

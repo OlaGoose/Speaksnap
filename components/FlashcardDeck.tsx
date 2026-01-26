@@ -197,7 +197,7 @@ export default function FlashcardDeck() {
   return (
     <div className="flex-1 flex flex-col items-center justify-center relative perspective-[1200px] min-h-[500px]">
       <div
-        className="relative w-full aspect-[9/16] max-h-[520px] max-w-[360px]"
+        className="relative w-full h-full max-h-[calc(100vh-240px)]"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}

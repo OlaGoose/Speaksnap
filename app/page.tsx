@@ -203,10 +203,8 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[#E8E8E5] sm:p-4">
-      <div className="w-full h-[100dvh] sm:h-[800px] sm:max-w-[390px] bg-primary-50 sm:rounded-[40px] overflow-hidden relative shadow-[0_20px_40px_-10px_rgba(0,0,0,0.15)] ring-1 ring-black/5">
-        {renderScreen()}
-      </div>
+    <div className="h-[100dvh] w-full bg-primary-50 overflow-hidden">
+      {renderScreen()}
     </div>
   );
 }
