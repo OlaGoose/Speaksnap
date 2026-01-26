@@ -28,10 +28,17 @@ export default function FlashcardDeck() {
     } else {
       console.log('⚠️ No flashcards found in storage');
     }
+
+    // Cleanup: stop all videos when component unmounts
+    return () => {
+      setPlayingVideoId(null);
+    };
   }, []);
 
   useEffect(() => {
     setIsFlipped(false);
+    // Stop any playing video when switching cards
+    setPlayingVideoId(null);
     // Reset scroll position when switching cards
     Object.values(scrollRefs.current).forEach((el) => {
       if (el) el.scrollTop = 0;
@@ -48,6 +55,9 @@ export default function FlashcardDeck() {
           scrollEl.scrollTop = 0;
         }
       }
+    } else {
+      // Stop video when flipping to front
+      setPlayingVideoId(null);
     }
   }, [isFlipped, activeIndex, flashcards]);
 
@@ -81,13 +91,8 @@ export default function FlashcardDeck() {
     
     // Don't handle touch on iframe (back face video)
     if (isFlipped && target.closest('iframe')) return;
-    
-    // Don't handle touch if it's on the scrollable content area (back face)
-    if (isFlipped && target.closest('.flashcard-scroll')) {
-      touchStartRef.current = null;
-      return;
-    }
 
+    // Always initialize touch tracking
     touchStartRef.current = {
       x: e.touches[0].clientX,
       y: e.touches[0].clientY,
@@ -99,17 +104,40 @@ export default function FlashcardDeck() {
   const handleTouchMove = (e: React.TouchEvent) => {
     if (!touchStartRef.current) return;
 
+    const target = e.target as HTMLElement;
     const currentX = e.touches[0].clientX;
     const currentY = e.touches[0].clientY;
+    const deltaX = currentX - touchStartRef.current.x;
+    const deltaY = currentY - touchStartRef.current.y;
+    const absX = Math.abs(deltaX);
+    const absY = Math.abs(deltaY);
 
-    setDragOffset({
-      x: currentX - touchStartRef.current.x,
-      y: currentY - touchStartRef.current.y,
-    });
+    // If user is scrolling vertically on scrollable content, don't interfere
+    if (isFlipped && target.closest('.flashcard-scroll')) {
+      const scrollContainer = target.closest('.flashcard-scroll') as HTMLElement;
+      const isVerticalScroll = absY > absX && absY > 5;
+      
+      if (isVerticalScroll) {
+        // Allow native scroll
+        touchStartRef.current = null;
+        return;
+      }
+    }
+
+    // Only set drag offset for horizontal swipes
+    if (absX > absY || absX > 10) {
+      setDragOffset({
+        x: deltaX,
+        y: deltaY,
+      });
+    }
   };
 
   const handleTouchEnd = () => {
-    if (!touchStartRef.current) return;
+    if (!touchStartRef.current) {
+      setDragOffset({ x: 0, y: 0 });
+      return;
+    }
 
     const deltaX = dragOffset.x;
     const deltaY = dragOffset.y;
@@ -117,9 +145,8 @@ export default function FlashcardDeck() {
     const absY = Math.abs(deltaY);
     const timeDelta = Date.now() - (touchStartRef.current.time || 0);
 
-    const isHorizontalSwipe = absX > absY && absX > 50; // Slightly more sensitive
-    const isVerticalSwipe = absY > absX && absY > 50;
-    const isTap = absX < 15 && absY < 15 && timeDelta < 400; // More lenient tap detection
+    const isHorizontalSwipe = absX > absY && absX > 60; // Card swipe threshold
+    const isTap = absX < 10 && absY < 10 && timeDelta < 300;
 
     if (isHorizontalSwipe) {
       // Swipe left/right to change cards
@@ -128,32 +155,29 @@ export default function FlashcardDeck() {
       } else if (deltaX < 0 && activeIndex < flashcards.length - 1) {
         setActiveIndex((prev) => prev + 1);
       }
-    } else if (isVerticalSwipe && isFlipped) {
-      // Swipe up/down to change video (only on back face)
-      const currentCard = flashcards[activeIndex];
-      const videoIds = currentCard?.back?.video_ids || [];
-      if (videoIds.length > 1) {
-        if (deltaY < 0) {
-          nextVideo(currentCard.id, videoIds.length);
-        } else {
-          prevVideo(currentCard.id, videoIds.length);
-        }
-      }
     } else if (isTap) {
-      // Quick tap to flip - more lenient detection
+      // Quick tap to flip
       const target = document.elementFromPoint(
         touchStartRef.current?.x || 0,
         touchStartRef.current?.y || 0
       ) as HTMLElement;
       
-      // Don't flip if on button or scrollable area (when scrolling)
+      // Don't flip if on button, video thumbnail, or actively scrolling content
       const isOnButton = target && target.closest('button');
+      const isOnVideo = target && target.closest('[data-video-thumbnail]');
       const isOnScrollArea = target && target.closest('.flashcard-scroll');
       
-      // Allow flip on scrollable area if not actually scrolling
-      if (!isOnButton) {
-        console.log('📱 Mobile tap detected - flipping card', { isFlipped, willBecome: !isFlipped });
-        setIsFlipped(!isFlipped);
+      // Only flip if not on interactive elements
+      if (!isOnButton && !isOnVideo) {
+        // On scroll area, only flip if at top (not mid-scroll)
+        if (isOnScrollArea) {
+          const scrollEl = isOnScrollArea as HTMLElement;
+          if (scrollEl.scrollTop < 5) {
+            setIsFlipped(!isFlipped);
+          }
+        } else {
+          setIsFlipped(!isFlipped);
+        }
       }
     }
 
@@ -223,6 +247,10 @@ export default function FlashcardDeck() {
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        style={{
+          touchAction: 'pan-y pinch-zoom',
+          WebkitTapHighlightColor: 'transparent',
+        }}
       >
         {flashcards.map((card, index) => {
           if (index < activeIndex - 1 || index > activeIndex + 2) return null;
@@ -350,25 +378,34 @@ export default function FlashcardDeck() {
                     zIndex: 1
                   }}
                 >
-                  {/* Video Popup Overlay */}
-                  {playingVideoId && (
+                  {/* Video Popup Overlay - Only show on active card */}
+                  {isActive && playingVideoId && (
                     <div 
                       className="absolute inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
                       onClick={() => setPlayingVideoId(null)}
                     >
-                      <div className="relative w-full max-w-2xl aspect-video rounded-xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                      <div className="relative w-full max-w-2xl aspect-video rounded-xl overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
                         <iframe
-                          src={`https://www.youtube.com/embed/${playingVideoId}?autoplay=1&controls=1&modestbranding=1&rel=0&playsinline=1`}
+                          key={`${card.id}-${playingVideoId}`}
+                          src={`https://www.youtube.com/embed/${playingVideoId}?autoplay=1&controls=1&modestbranding=1&rel=0&playsinline=1&enablejsapi=1`}
                           title="Video"
                           frameBorder="0"
                           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          allowFullScreen
                           className="w-full h-full"
                         />
                         <button
-                          onClick={() => setPlayingVideoId(null)}
-                          className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/70 hover:bg-black/90 text-white flex items-center justify-center"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPlayingVideoId(null);
+                          }}
+                          className="absolute top-2 right-2 w-10 h-10 rounded-full bg-black/80 hover:bg-black text-white flex items-center justify-center transition-all active:scale-95"
+                          aria-label="Close video"
                         >
-                          ✕
+                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                          </svg>
                         </button>
                       </div>
                     </div>
@@ -389,11 +426,13 @@ export default function FlashcardDeck() {
                   </div>
 
                   {/* Scrollable Content Panel */}
-                  <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-4 bg-white flashcard-scroll"
-                    onTouchStart={(e) => e.stopPropagation()}
-                    onTouchMove={(e) => e.stopPropagation()}
-                    onTouchEnd={(e) => e.stopPropagation()}
-                    onClick={(e) => e.stopPropagation()}
+                  <div 
+                    ref={(el) => { scrollRefs.current[card.id] = el; }}
+                    className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-4 bg-white flashcard-scroll"
+                    style={{
+                      WebkitOverflowScrolling: 'touch',
+                      touchAction: 'pan-y',
+                    }}
                   >
                     {/* Phonetic & Audio */}
                     {back.phonetic && (
@@ -446,18 +485,35 @@ export default function FlashcardDeck() {
                           <Youtube size={14} className="text-red-500" />
                           <span className="text-xs font-semibold text-gray-500 uppercase">Usage Videos ({videoIds.length})</span>
                         </div>
-                        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2"
+                        <div 
+                          className="flex gap-2 overflow-x-auto scrollbar-hide pb-2 -mx-1 px-1"
+                          style={{
+                            WebkitOverflowScrolling: 'touch',
+                            scrollSnapType: 'x proximity',
+                            touchAction: 'pan-x',
+                          }}
                           onTouchStart={(e) => e.stopPropagation()}
                           onTouchMove={(e) => e.stopPropagation()}
+                          onTouchEnd={(e) => e.stopPropagation()}
                         >
                           {videoIds.map((vidId, idx) => (
                             <div
                               key={vidId}
-                              className="flex-shrink-0 relative rounded-lg overflow-hidden bg-gray-900 cursor-pointer hover:opacity-90 transition-opacity"
-                              style={{ width: '120px', height: '68px' }}
+                              data-video-thumbnail
+                              className="flex-shrink-0 relative rounded-lg overflow-hidden bg-gray-900 cursor-pointer hover:opacity-90 transition-all active:scale-95"
+                              style={{ 
+                                width: '120px', 
+                                height: '68px',
+                                scrollSnapAlign: 'start',
+                              }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setPlayingVideoId(vidId);
+                                if (isActive) {
+                                  setPlayingVideoId(vidId);
+                                }
+                              }}
+                              onTouchEnd={(e) => {
+                                e.stopPropagation();
                               }}
                             >
                               <img
