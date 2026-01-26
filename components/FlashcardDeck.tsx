@@ -13,6 +13,7 @@ export default function FlashcardDeck() {
   const [currentVideoIndices, setCurrentVideoIndices] = useState<{ [key: string]: number }>({});
   const [videoErrors, setVideoErrors] = useState<{ [key: string]: boolean }>({});
   const [videoLoaded, setVideoLoaded] = useState<{ [key: string]: boolean }>({});
+  const [playingVideoId, setPlayingVideoId] = useState<string | null>(null); // 当前播放的视频ID
   
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const iframeRefs = useRef<{ [key: string]: HTMLIFrameElement | null }>({});
@@ -262,15 +263,19 @@ export default function FlashcardDeck() {
           return (
             <div key={card.id} className="absolute inset-0 w-full h-full" style={style}>
               <div
-                className="relative w-full h-full shadow-2xl rounded-[24px] [transform-style:preserve-3d] select-none"
+                className="relative w-full h-full shadow-2xl rounded-[24px] select-none"
                 style={{ 
                   transform: isActive && isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
                   transition: 'transform 0.7s cubic-bezier(0.4, 0, 0.2, 1)',
+                  transformStyle: 'preserve-3d',
                   WebkitTapHighlightColor: 'transparent',
                 }}
               >
                 {/* Front Face - Simple Card */}
-                <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] rounded-[24px] overflow-hidden bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 flex flex-col items-center justify-center p-8">
+                <div 
+                  className="absolute inset-0 w-full h-full rounded-[24px] overflow-hidden bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 flex flex-col items-center justify-center p-8"
+                  style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
+                >
                   {/* Card counter */}
                   <div className="absolute top-4 right-4 z-10">
                     <div className="text-[10px] font-mono text-white/70 bg-black/30 px-2.5 py-1 rounded-full backdrop-blur-md">
@@ -330,92 +335,128 @@ export default function FlashcardDeck() {
 
                 {/* Back Face */}
                 <div
-                  className="absolute inset-0 w-full h-full [backface-visibility:hidden] rounded-[24px] overflow-hidden bg-white flex flex-col text-primary-900"
-                  style={{ transform: 'rotateY(180deg)' }}
+                  className="absolute inset-0 w-full h-full rounded-[24px] overflow-hidden bg-white flex flex-col text-primary-900"
+                  style={{ 
+                    transform: 'rotateY(180deg)',
+                    backfaceVisibility: 'hidden',
+                    WebkitBackfaceVisibility: 'hidden'
+                  }}
                 >
-                  {/* YouTube Video Section - Fixed at top */}
-                  <div className="flex-shrink-0 relative bg-black" style={{ height: '40%' }}>
-                    {currentVideoId && !hasVideoError ? (
-                      <>
-                        {/* Loading skeleton */}
-                        {!isVideoLoaded && (
-                          <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900 animate-pulse">
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="w-12 h-12 rounded-full border-4 border-white/20 border-t-white/80 animate-spin" />
-                            </div>
-                          </div>
-                        )}
-                        <iframe
-                          key={currentVideoId}
-                          ref={(el) => { iframeRefs.current[card.id] = el; }}
-                          width="100%"
-                          height="100%"
-                          src={`https://www.youtube.com/embed/${currentVideoId}?autoplay=${isActive && isFlipped ? 1 : 0}&controls=1&modestbranding=1&rel=0&playsinline=1&loop=1&playlist=${currentVideoId}&mute=${isActive && isFlipped ? 0 : 1}`}
-                          title="Context Video"
-                          frameBorder="0"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          className={`w-full h-full object-cover pointer-events-auto transition-opacity duration-300 ${isVideoLoaded ? 'opacity-100' : 'opacity-0'}`}
-                          onLoad={() => handleVideoLoad(card.id)}
-                          onError={() => handleVideoError(card.id)}
-                        />
-                      </>
-                    ) : (
-                      <div className="absolute inset-0 bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center flex-col gap-3">
-                        <Youtube size={40} className="text-white/30" />
-                        {hasVideoError && (
-                          <p className="text-white/50 text-xs px-4 text-center">
-                            Video unavailable
-                            {videoIds.length > 1 && <><br />Swipe to try another</>}
-                          </p>
-                        )}
-                        {!currentVideoId && !hasVideoError && (
-                          <p className="text-white/50 text-xs px-4 text-center">
-                            No videos found
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Video Navigation Indicators */}
-                    {videoIds.length > 1 && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-1 items-center pointer-events-none opacity-70 z-10">
-                        <ChevronUp size={18} className="text-white animate-bounce-subtle" />
-                        <div className="flex flex-col gap-0.5 py-1.5">
-                          {videoIds.map((_, idx) => (
-                            <div
-                              key={idx}
-                              className={`h-1.5 w-1.5 rounded-full transition-all ${
-                                idx === currentVidIndex
-                                  ? 'bg-white scale-125'
-                                  : 'bg-white/30'
-                              }`}
-                            />
-                          ))}
-                        </div>
-                        <ChevronDown size={18} className="text-white animate-bounce-subtle" />
-                      </div>
-                    )}
-
-                    {/* Video source indicator */}
-                    {currentVideoId && !hasVideoError && isActive && (
-                      <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2 py-1 rounded-full bg-red-600/90 backdrop-blur-md shadow-lg z-10">
-                        <Youtube size={11} className="text-white" />
-                        <span className="text-[9px] font-medium text-white uppercase tracking-wider">
-                          {currentVidIndex + 1}/{videoIds.length}
-                        </span>
-                      </div>
-                    )}
-
+                  {/* YouTube Video Gallery - Horizontal Scroll */}
+                  <div className="flex-shrink-0 relative bg-gradient-to-br from-gray-900 to-black" style={{ height: '240px' }}>
                     {/* Delete button */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         deleteCurrentCard(e);
                       }}
-                      className="absolute top-3 right-3 p-2 rounded-full bg-black/50 hover:bg-black/70 active:bg-black/60 text-white/80 hover:text-red-400 transition-all pointer-events-auto z-10 backdrop-blur-md"
+                      className="absolute top-3 right-3 p-2 rounded-full bg-black/50 hover:bg-black/70 active:bg-black/60 text-white/80 hover:text-red-400 transition-all pointer-events-auto z-20 backdrop-blur-md"
                     >
                       <Trash2 size={18} />
                     </button>
+
+                    {/* Gallery Header */}
+                    <div className="absolute top-3 left-3 z-20 flex items-center gap-2">
+                      <Youtube size={16} className="text-red-500" />
+                      <span className="text-xs font-semibold text-white/90">
+                        Usage Examples ({videoIds.length})
+                      </span>
+                    </div>
+
+                    {/* Horizontal Scroll Container */}
+                    {videoIds.length > 0 ? (
+                      <div 
+                        className="absolute inset-0 pt-12 pb-4 overflow-x-auto overflow-y-hidden scrollbar-hide"
+                        onTouchStart={(e) => e.stopPropagation()}
+                        onTouchMove={(e) => e.stopPropagation()}
+                        onTouchEnd={(e) => e.stopPropagation()}
+                        style={{
+                          scrollSnapType: 'x mandatory',
+                          WebkitOverflowScrolling: 'touch',
+                        }}
+                      >
+                        <div className="flex gap-3 px-4 h-full">
+                          {videoIds.map((vidId, idx) => (
+                            <div
+                              key={vidId}
+                              className="flex-shrink-0 relative rounded-xl overflow-hidden bg-gray-800 cursor-pointer group transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                              style={{
+                                width: '280px',
+                                scrollSnapAlign: 'start',
+                              }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPlayingVideoId(playingVideoId === vidId ? null : vidId);
+                                setCurrentVideoIndices(prev => ({ ...prev, [card.id]: idx }));
+                              }}
+                            >
+                              {/* Thumbnail or Playing Video */}
+                              {playingVideoId === vidId ? (
+                                <iframe
+                                  src={`https://www.youtube.com/embed/${vidId}?autoplay=1&controls=1&modestbranding=1&rel=0&playsinline=1`}
+                                  title={`Video ${idx + 1}`}
+                                  frameBorder="0"
+                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                  className="w-full h-full"
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              ) : (
+                                <>
+                                  {/* YouTube Thumbnail */}
+                                  <img
+                                    src={`https://img.youtube.com/vi/${vidId}/mqdefault.jpg`}
+                                    alt={`Video ${idx + 1}`}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${vidId}/default.jpg`;
+                                    }}
+                                  />
+                                  
+                                  {/* Play Overlay */}
+                                  <div className="absolute inset-0 bg-black/40 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                                    <div className="w-14 h-14 rounded-full bg-red-600 group-hover:bg-red-500 flex items-center justify-center shadow-2xl transition-all group-hover:scale-110">
+                                      <svg className="w-6 h-6 text-white ml-1" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M8 5v14l11-7z"/>
+                                      </svg>
+                                    </div>
+                                  </div>
+
+                                  {/* Video Index */}
+                                  <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-sm">
+                                    <span className="text-[10px] font-semibold text-white">
+                                      {idx + 1}/{videoIds.length}
+                                    </span>
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="text-center">
+                          <Youtube size={40} className="text-white/20 mx-auto mb-2" />
+                          <p className="text-white/40 text-xs">No videos found</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Scroll Indicators */}
+                    {videoIds.length > 1 && (
+                      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+                        {videoIds.map((_, idx) => (
+                          <div
+                            key={idx}
+                            className={`h-1 rounded-full transition-all ${
+                              idx === currentVidIndex
+                                ? 'w-6 bg-white'
+                                : 'w-1 bg-white/30'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Content Scroll - Scrollable with gradient indicators */}
