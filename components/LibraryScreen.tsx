@@ -211,7 +211,7 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
       </div>
 
       {/* Content with optimized scrolling */}
-      <div className="flex-1 px-4 pt-4 pb-24 overflow-y-auto scroll-container safe-bottom">
+      <div className={`flex-1 px-4 pt-4 pb-24 safe-bottom ${activeTab === 'flashcards' ? 'overflow-hidden' : 'overflow-y-auto scroll-container'}`}>
         {activeTab === 'scenarios' && (
           <div className="space-y-3 py-4 animate-in fade-in duration-300">
             {filteredScenarios.length === 0 ? (
@@ -430,7 +430,11 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
           </div>
         )}
 
-        {activeTab === 'flashcards' && <FlashcardDeck key={`flashcards-${activeTab}`} />}
+        {activeTab === 'flashcards' && (
+          <div className="flex flex-col h-full min-h-[calc(100vh-200px)]">
+            <FlashcardDeck key={`flashcards-${activeTab}`} />
+          </div>
+        )}
 
         {activeTab === 'diary' && (
           <div className="py-4 space-y-4 pb-32 safe-bottom">
