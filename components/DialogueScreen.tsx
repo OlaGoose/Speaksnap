@@ -37,6 +37,7 @@ export default function DialogueScreen({
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [autoPlayAudio, setAutoPlayAudio] = useState(false);
 
   // Selection State
   const [selectionMenu, setSelectionMenu] = useState<{
