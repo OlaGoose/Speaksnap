@@ -271,10 +271,15 @@ export default function FlashcardDeck() {
                   WebkitTapHighlightColor: 'transparent',
                 }}
               >
-                {/* Front Face - Simple Card */}
+                {/* Front Face - Apple Style Card */}
                 <div 
-                  className="absolute inset-0 w-full h-full rounded-[24px] overflow-hidden bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 flex flex-col items-center justify-center p-8"
-                  style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' }}
+                  className="absolute inset-0 w-full h-full rounded-[24px] overflow-hidden flex flex-col items-center justify-center p-8"
+                  style={{ 
+                    backfaceVisibility: 'hidden', 
+                    WebkitBackfaceVisibility: 'hidden',
+                    backgroundColor: '#007AFF',  // Apple 蓝色
+                    zIndex: 2
+                  }}
                 >
                   {/* Card counter */}
                   <div className="absolute top-4 right-4 z-10">
@@ -335,289 +340,185 @@ export default function FlashcardDeck() {
 
                 {/* Back Face */}
                 <div
-                  className="absolute inset-0 w-full h-full rounded-[24px] overflow-hidden bg-white flex flex-col text-primary-900"
+                  className="absolute inset-0 w-full h-full rounded-[24px] overflow-hidden flex flex-col text-primary-900"
                   style={{ 
                     transform: 'rotateY(180deg)',
                     backfaceVisibility: 'hidden',
-                    WebkitBackfaceVisibility: 'hidden'
+                    WebkitBackfaceVisibility: 'hidden',
+                    backgroundColor: '#FFFFFF',
+                    zIndex: 1
                   }}
                 >
-                  {/* YouTube Video Gallery - Horizontal Scroll */}
-                  <div className="flex-shrink-0 relative bg-gradient-to-br from-gray-900 to-black" style={{ height: '240px' }}>
-                    {/* Delete button */}
+                  {/* Video Popup Overlay */}
+                  {playingVideoId && (
+                    <div 
+                      className="absolute inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
+                      onClick={() => setPlayingVideoId(null)}
+                    >
+                      <div className="relative w-full max-w-2xl aspect-video rounded-xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                        <iframe
+                          src={`https://www.youtube.com/embed/${playingVideoId}?autoplay=1&controls=1&modestbranding=1&rel=0&playsinline=1`}
+                          title="Video"
+                          frameBorder="0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          className="w-full h-full"
+                        />
+                        <button
+                          onClick={() => setPlayingVideoId(null)}
+                          className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/70 hover:bg-black/90 text-white flex items-center justify-center"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Compact Header with Delete */}
+                  <div className="flex-shrink-0 px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-white">
+                    <h4 className="text-2xl font-bold text-gray-900 tracking-tight">{front}</h4>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         deleteCurrentCard(e);
                       }}
-                      className="absolute top-3 right-3 p-2 rounded-full bg-black/50 hover:bg-black/70 active:bg-black/60 text-white/80 hover:text-red-400 transition-all pointer-events-auto z-20 backdrop-blur-md"
+                      className="p-2 text-gray-300 hover:text-red-500 transition-colors pointer-events-auto"
                     >
                       <Trash2 size={18} />
                     </button>
+                  </div>
 
-                    {/* Gallery Header */}
-                    <div className="absolute top-3 left-3 z-20 flex items-center gap-2">
-                      <Youtube size={16} className="text-red-500" />
-                      <span className="text-xs font-semibold text-white/90">
-                        Usage Examples ({videoIds.length})
-                      </span>
+                  {/* Scrollable Content Panel */}
+                  <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-4 bg-white flashcard-scroll"
+                    onTouchStart={(e) => e.stopPropagation()}
+                    onTouchMove={(e) => e.stopPropagation()}
+                    onTouchEnd={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {/* Phonetic & Audio */}
+                    {back.phonetic && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-gray-600 font-mono text-sm">/{back.phonetic}/</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            playAudio(front, e);
+                          }}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          className="p-1.5 rounded-full bg-blue-50 hover:bg-blue-100 active:bg-blue-200 transition-colors pointer-events-auto"
+                        >
+                          <Volume2 size={14} className="text-blue-600" />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Translation */}
+                    <div>
+                      <p className="text-lg font-semibold text-gray-900">{back.translation}</p>
                     </div>
 
-                    {/* Horizontal Scroll Container */}
-                    {videoIds.length > 0 ? (
-                      <div 
-                        className="absolute inset-0 pt-12 pb-4 overflow-x-auto overflow-y-hidden scrollbar-hide"
-                        onTouchStart={(e) => e.stopPropagation()}
-                        onTouchMove={(e) => e.stopPropagation()}
-                        onTouchEnd={(e) => e.stopPropagation()}
-                        style={{
-                          scrollSnapType: 'x mandatory',
-                          WebkitOverflowScrolling: 'touch',
-                        }}
-                      >
-                        <div className="flex gap-3 px-4 h-full">
+                    {/* Definition - Condensed */}
+                    {back.definition && (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <BookOpen size={12} className="text-blue-600" />
+                          <span className="text-xs font-semibold text-gray-500 uppercase">Definition</span>
+                        </div>
+                        <p className="text-sm text-gray-700 leading-relaxed">{back.definition.slice(0, 120)}{back.definition.length > 120 ? '...' : ''}</p>
+                      </div>
+                    )}
+
+                    {/* Example - Condensed */}
+                    {back.example && (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <MessageCircle size={12} className="text-emerald-600" />
+                          <span className="text-xs font-semibold text-gray-500 uppercase">Example</span>
+                        </div>
+                        <p className="text-sm text-gray-700 leading-relaxed italic">"{back.example.slice(0, 100)}{back.example.length > 100 ? '...' : ''}"</p>
+                      </div>
+                    )}
+
+                    {/* Native Usage - Condensed */}
+                    {back.native_usage && (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-semibold text-gray-500 uppercase">💬 Native Tips</span>
+                        </div>
+                        <p className="text-sm text-gray-700 leading-relaxed">{back.native_usage.slice(0, 100)}{back.native_usage.length > 100 ? '...' : ''}</p>
+                      </div>
+                    )}
+
+                    {/* Context */}
+                    {card.context && (
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 rounded-full">
+                        <span className="text-xs text-gray-500 font-medium">From:</span>
+                        <span className="text-xs text-gray-700 font-semibold">{card.context}</span>
+                      </div>
+                    )}
+
+                    {/* YouTube Videos - Compact Row */}
+                    {videoIds.length > 0 && (
+                      <div className="space-y-2 pt-2 border-t border-gray-100">
+                        <div className="flex items-center gap-2">
+                          <Youtube size={14} className="text-red-500" />
+                          <span className="text-xs font-semibold text-gray-500 uppercase">Usage Videos ({videoIds.length})</span>
+                        </div>
+                        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-2"
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onTouchMove={(e) => e.stopPropagation()}
+                        >
                           {videoIds.map((vidId, idx) => (
                             <div
                               key={vidId}
-                              className="flex-shrink-0 relative rounded-xl overflow-hidden bg-gray-800 cursor-pointer group transition-transform hover:scale-[1.02] active:scale-[0.98]"
-                              style={{
-                                width: '280px',
-                                scrollSnapAlign: 'start',
-                              }}
+                              className="flex-shrink-0 relative rounded-lg overflow-hidden bg-gray-900 cursor-pointer hover:opacity-90 transition-opacity"
+                              style={{ width: '120px', height: '68px' }}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setPlayingVideoId(playingVideoId === vidId ? null : vidId);
-                                setCurrentVideoIndices(prev => ({ ...prev, [card.id]: idx }));
+                                setPlayingVideoId(vidId);
                               }}
                             >
-                              {/* Thumbnail or Playing Video */}
-                              {playingVideoId === vidId ? (
-                                <iframe
-                                  src={`https://www.youtube.com/embed/${vidId}?autoplay=1&controls=1&modestbranding=1&rel=0&playsinline=1`}
-                                  title={`Video ${idx + 1}`}
-                                  frameBorder="0"
-                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                  className="w-full h-full"
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                              ) : (
-                                <>
-                                  {/* YouTube Thumbnail */}
-                                  <img
-                                    src={`https://img.youtube.com/vi/${vidId}/mqdefault.jpg`}
-                                    alt={`Video ${idx + 1}`}
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => {
-                                      (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${vidId}/default.jpg`;
-                                    }}
-                                  />
-                                  
-                                  {/* Play Overlay */}
-                                  <div className="absolute inset-0 bg-black/40 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                                    <div className="w-14 h-14 rounded-full bg-red-600 group-hover:bg-red-500 flex items-center justify-center shadow-2xl transition-all group-hover:scale-110">
-                                      <svg className="w-6 h-6 text-white ml-1" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M8 5v14l11-7z"/>
-                                      </svg>
-                                    </div>
-                                  </div>
-
-                                  {/* Video Index */}
-                                  <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-sm">
-                                    <span className="text-[10px] font-semibold text-white">
-                                      {idx + 1}/{videoIds.length}
-                                    </span>
-                                  </div>
-                                </>
-                              )}
+                              <img
+                                src={`https://img.youtube.com/vi/${vidId}/mqdefault.jpg`}
+                                alt={`Video ${idx + 1}`}
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${vidId}/default.jpg`;
+                                }}
+                              />
+                              {/* Play Icon */}
+                              <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                                <div className="w-8 h-8 rounded-full bg-red-600 flex items-center justify-center">
+                                  <svg className="w-3 h-3 text-white ml-0.5" viewBox="0 0 24 24" fill="currentColor">
+                                    <path d="M8 5v14l11-7z"/>
+                                  </svg>
+                                </div>
+                              </div>
+                              {/* Index */}
+                              <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/70 backdrop-blur-sm">
+                                <span className="text-[9px] font-semibold text-white">{idx + 1}</span>
+                              </div>
                             </div>
                           ))}
                         </div>
                       </div>
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="text-center">
-                          <Youtube size={40} className="text-white/20 mx-auto mb-2" />
-                          <p className="text-white/40 text-xs">No videos found</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Scroll Indicators */}
-                    {videoIds.length > 1 && (
-                      <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
-                        {videoIds.map((_, idx) => (
-                          <div
-                            key={idx}
-                            className={`h-1 rounded-full transition-all ${
-                              idx === currentVidIndex
-                                ? 'w-6 bg-white'
-                                : 'w-1 bg-white/30'
-                            }`}
-                          />
-                        ))}
-                      </div>
                     )}
                   </div>
 
-                  {/* Content Scroll - Scrollable with gradient indicators */}
-                  <div className="relative flex-1 min-h-0 bg-white">
-                    {/* Top scroll gradient indicator */}
-                    <div 
-                      className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-white to-transparent pointer-events-none z-20 transition-opacity duration-200" 
-                      id={`scroll-top-indicator-${card.id}`}
-                      style={{ opacity: 0 }}
-                    />
-                    
-                    {/* Scrollable content */}
-                    <div 
-                      className="h-full overflow-y-auto overscroll-contain px-6 py-5 space-y-5 flashcard-scroll"
-                      style={{
-                        scrollbarWidth: 'thin',
-                        scrollbarColor: 'rgba(0, 0, 0, 0.2) transparent',
-                      }}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      onTouchMove={(e) => e.stopPropagation()}
-                      onTouchEnd={(e) => e.stopPropagation()}
-                      onClick={(e) => e.stopPropagation()}
-                      onScroll={(e) => {
-                        const target = e.currentTarget;
-                        const topIndicator = document.getElementById(`scroll-top-indicator-${card.id}`);
-                        const bottomIndicator = document.getElementById(`scroll-bottom-indicator-${card.id}`);
-                        
-                        // Show/hide top gradient
-                        if (topIndicator) {
-                          topIndicator.style.opacity = target.scrollTop > 10 ? '1' : '0';
-                        }
-                        
-                        // Show/hide bottom gradient
-                        if (bottomIndicator) {
-                          const isNearBottom = target.scrollHeight - target.scrollTop - target.clientHeight < 20;
-                          bottomIndicator.style.opacity = isNearBottom ? '0' : '1';
-                        }
-                      }}
-                      ref={(el) => {
-                        scrollRefs.current[card.id] = el;
-                        // Check initial scroll state
-                        if (el) {
-                          setTimeout(() => {
-                            const topIndicator = document.getElementById(`scroll-top-indicator-${card.id}`);
-                            const bottomIndicator = document.getElementById(`scroll-bottom-indicator-${card.id}`);
-                            
-                            if (topIndicator) topIndicator.style.opacity = '0';
-                            if (bottomIndicator) {
-                              const needsScroll = el.scrollHeight > el.clientHeight;
-                              bottomIndicator.style.opacity = needsScroll ? '1' : '0';
-                            }
-                          }, 100);
-                        }
-                      }}
-                    >
-                      {/* Word Title */}
-                      <div className="flex items-center justify-between pb-2">
-                        <h4 className="text-3xl font-black text-gray-900 tracking-tight">{front}</h4>
-                      </div>
-
-                      {/* Phonetic & Pronunciation */}
-                      {back.phonetic && (
-                        <div className="flex items-center gap-3 pb-2">
-                          <span className="text-gray-600 font-mono text-base">/{back.phonetic}/</span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              playAudio(front, e);
-                            }}
-                            onTouchStart={(e) => e.stopPropagation()}
-                            className="p-2 rounded-full bg-blue-50 hover:bg-blue-100 active:bg-blue-200 transition-colors pointer-events-auto"
-                            aria-label="Play pronunciation"
-                          >
-                            <Volume2 size={18} className="text-blue-600" />
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Translation - Primary meaning */}
-                      <div className="pb-3">
-                        <p className="text-xl font-bold text-gray-800 leading-tight">{back.translation}</p>
-                      </div>
-
-                      {/* Definition - Detailed explanation */}
-                      {back.definition && (
-                        <div className="space-y-2.5 pb-5">
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <BookOpen size={14} className="text-blue-600 flex-shrink-0" />
-                            <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Definition</span>
-                          </div>
-                          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-4 rounded-2xl border border-blue-100/60">
-                            <p className="text-[15px] text-gray-800 leading-relaxed">{back.definition}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Example - Usage in context */}
-                      {back.example && (
-                        <div className="space-y-2.5 pb-5">
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <MessageCircle size={14} className="text-emerald-600 flex-shrink-0" />
-                            <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider">Example</span>
-                          </div>
-                          <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-4 rounded-2xl border border-emerald-100/60">
-                            <p className="text-[15px] text-gray-800 leading-relaxed italic">"{back.example}"</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Native Usage - How natives say it */}
-                      {back.native_usage && (
-                        <div className="space-y-2.5 pb-5">
-                          <div className="flex items-center gap-2 mb-1.5">
-                            <span className="text-xs font-semibold text-gray-600 uppercase tracking-wider flex items-center gap-1.5">
-                              <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-purple-100 text-purple-600 text-[10px] font-bold">💬</span>
-                              Native Speaker Tips
-                            </span>
-                          </div>
-                          <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-4 rounded-2xl border border-purple-100/60">
-                            <p className="text-[15px] text-gray-800 leading-relaxed">{back.native_usage}</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Context tag */}
-                      {card.context && (
-                        <div className="pt-3 pb-2">
-                          <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 rounded-full">
-                            <span className="text-xs text-gray-500 font-medium">From:</span>
-                            <span className="text-xs text-gray-700 font-semibold">{card.context}</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Extra padding at bottom for better scroll experience */}
-                      <div className="h-6" />
-                    </div>
-
-                    {/* Bottom scroll gradient indicator */}
-                    <div 
-                      className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white to-transparent pointer-events-none z-20 transition-opacity duration-200" 
-                      id={`scroll-bottom-indicator-${card.id}`}
-                      style={{ opacity: 1 }}
-                    />
-                  </div>
-
-                  {/* Footer - Fixed - Click anywhere to flip back */}
+                  {/* Footer - Tap to flip */}
                   <div 
-                    className="flex-shrink-0 p-4 text-center border-t border-gray-50 bg-white z-10 cursor-pointer active:bg-gray-50 transition-colors"
+                    className="flex-shrink-0 p-3 text-center border-t border-gray-50 bg-white cursor-pointer active:bg-gray-50 transition-colors"
                     onClick={(e) => {
                       e.stopPropagation();
                       setIsFlipped(false);
                     }}
                   >
                     <div className="flex items-center justify-center gap-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
                         <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
                         <path d="M21 3v5h-5"></path>
                       </svg>
                       <span className="text-[10px] text-gray-400 uppercase tracking-widest font-medium">
-                        Tap to flip back
+                        Tap to flip
                       </span>
                     </div>
                   </div>

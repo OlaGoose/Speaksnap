@@ -587,27 +587,29 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
       </div>
 
       {/* FAB with safe area */}
-      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-30 safe-bottom">
-        {activeTab === 'diary' ? (
-          <button
-            onClick={() => setIsWritingDiary(true)}
-            className="bg-primary-900 text-white px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 touch-manipulation min-h-[44px]"
-            aria-label="Write diary"
-          >
-            <PenTool size={18} />
-            <span>Write Diary</span>
-          </button>
-        ) : (
-          <button
-            onClick={() => onNavigate(Screen.CAMERA)}
-            className="bg-primary-900 text-white px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 touch-manipulation min-h-[44px]"
-            aria-label="Create new scenario"
-          >
-            <Camera size={18} />
-            <span>New Scenario</span>
-          </button>
-        )}
-      </div>
+      {activeTab !== 'flashcards' && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-30 safe-bottom">
+          {activeTab === 'diary' ? (
+            <button
+              onClick={() => setIsWritingDiary(true)}
+              className="bg-primary-900 text-white px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 touch-manipulation min-h-[44px]"
+              aria-label="Write diary"
+            >
+              <PenTool size={18} />
+              <span>Write Diary</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => onNavigate(Screen.CAMERA)}
+              className="bg-primary-900 text-white px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 touch-manipulation min-h-[44px]"
+              aria-label="Create new scenario"
+            >
+              <Camera size={18} />
+              <span>New Scenario</span>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
