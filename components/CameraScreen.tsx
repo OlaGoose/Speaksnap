@@ -377,12 +377,12 @@ export default function CameraScreen({
 
               <div className="mt-[-20%] flex flex-col items-center gap-3">
                 <p className="text-white/90 text-2xl font-light tracking-tight drop-shadow-md text-center px-6">
-                  {isRecording ? 'Recording...' : 'Tap mic to start recording'}
+                  {isRecording ? '' : 'Tap mic to start recording'}
                 </p>
                 
                 {/* Recording Duration */}
                 {isRecording && (
-                  <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/20 backdrop-blur-md border border-red-500/30">
+                  <div className="flex items-center gap-2 px-4 py-2 mb-10 rounded-full bg-red-500/20 backdrop-blur-md border border-red-500/30">
                     <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
                     <span className="text-white font-mono text-sm font-medium">
                       {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')}
@@ -521,7 +521,7 @@ export default function CameraScreen({
                     }
                     ${
                       isActive && m.id === 'voice'
-                        ? 'border-[4px] border-red-500 bg-red-500/10'
+                        ? 'bg-red-500/10'
                         : ''
                     }
                     ${

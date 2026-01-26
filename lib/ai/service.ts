@@ -154,6 +154,55 @@ Return JSON:
 }
 
 /**
+ * Transcribe audio to text
+ */
+async function transcribeAudio(
+  base64Audio: string
+): Promise<string> {
+  // Extract base64 data (remove data URL prefix if present)
+  const base64Data = base64Audio.includes(',') 
+    ? base64Audio.split(',')[1] 
+    : base64Audio;
+
+  // Try OpenAI Whisper
+  if (openai) {
+    try {
+      console.log('🔄 Transcribing audio with OpenAI Whisper...');
+      const audioBuffer = Buffer.from(base64Data, 'base64');
+      
+      // Create a File object from the buffer for OpenAI SDK
+      const file = new File([audioBuffer], 'audio.webm', { 
+        type: 'audio/webm' 
+      });
+      
+      const transcription = await openai.audio.transcriptions.create({
+        file: file as any,
+        model: 'whisper-1',
+        language: 'en',
+      });
+
+      const text = transcription.text.trim();
+      if (text) {
+        console.log('✅ OpenAI Whisper transcription successful:', text);
+        return text;
+      }
+    } catch (error: any) {
+      if (error.message?.includes('API key') || error.message?.includes('401') || error.message?.includes('403')) {
+        console.log('ℹ️ OpenAI Whisper skipped (API key issue)');
+      } else {
+        console.warn('❌ OpenAI Whisper transcription failed:', error.message);
+        // Continue to fallback - don't throw, let analyzeAudio handle it
+      }
+    }
+  }
+
+  // Fallback: Cannot transcribe, return empty string
+  // The analyzeAudio function will handle this gracefully
+  console.warn('⚠️ Audio transcription unavailable');
+  return '';
+}
+
+/**
  * Analyze audio to create scenario
  */
 export async function analyzeAudio(
@@ -161,26 +210,132 @@ export async function analyzeAudio(
   level: UserLevel,
   location?: { lat: number; lng: number }
 ): Promise<AnalyzeImageResponse> {
-  // For now, use text-only analysis
-  // In production, you'd transcribe audio first using Whisper/etc
-  const prompt = `
-User spoke a request. Create a realistic scenario based on:
-- Level: ${level}
-- Location: ${location ? `Lat ${location.lat}, Lng ${location.lng}` : 'Unknown'}
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const dayPart =
+    now.getHours() >= 18 || now.getHours() < 6 ? 'Night/Evening' : 'Daytime';
 
-Return same JSON format as image analysis.
+  const locationContext = location
+    ? `User location: (Lat: ${location.lat}, Lng: ${location.lng}). Use this to identify landmarks or local context.`
+    : 'No GPS data available.';
+
+  let transcribedText = '';
+
+  // Try to transcribe audio
+  try {
+    transcribedText = await transcribeAudio(base64Audio);
+  } catch (error: any) {
+    console.warn('Transcription failed, proceeding with generic scenario:', error.message);
+  }
+
+  const prompt = `
+You are an English learning scenario generator. ${transcribedText 
+  ? `The user said: "${transcribedText}". Create a realistic scenario based on their request.`
+  : 'The user made a voice request. Create a realistic, immersive scenario.'}
+
+Context:
+- Student Level: ${level}
+- Current Time: ${timeStr} (${dayPart})
+- ${locationContext}
+${transcribedText ? `- User Request: "${transcribedText}"` : ''}
+
+Requirements:
+1. Be EXTREMELY realistic - if it's nighttime, suggest nighttime activities
+2. ${transcribedText ? 'Incorporate the user\'s request into the scenario naturally' : 'Create natural conversation starters appropriate for the time and place'}
+3. Create a clear conversation GOAL (e.g., order coffee, buy tickets, ask for directions)
+4. Make the scenario have a natural beginning, middle, and end
+5. Match difficulty to ${level} level
+
+Return JSON:
+{
+  "location": "Specific place name",
+  "situation": "Clear scenario goal - what needs to be accomplished in this conversation",
+  "difficulty": "A1/A2/B1/B2/C1/C2 based on ${level}",
+  "role_name": "Character role (e.g., Barista, Local, Clerk)",
+  "context": "Character personality, scene instructions, and GOAL: what needs to be accomplished (e.g., GOAL: Help customer complete their order and payment)",
+  "first_line": "AI's natural opening line that sets up the goal",
+  "user_hints": ["3 realistic response options that move towards the goal"]
+}
   `;
 
-  // Use same fallback logic as analyzeScene
-  // Implementation similar to above...
+  let lastError: any = null;
+
+  // Try Doubao
+  if ((AI_PROVIDER === 'doubao' || AI_PROVIDER === 'auto') && doubao) {
+    try {
+      console.log('🔥 Trying Doubao audio analysis...');
+      const response = await doubao.chat([
+        { role: 'system', content: 'You are a scenario generator. Always return valid JSON.' },
+        { role: 'user', content: prompt },
+      ]);
+      const text = response.choices[0]?.message?.content;
+      if (!text) throw new Error('Empty response from Doubao');
+      const parsed = DoubaoProvider.parseJSONResponse(text);
+      console.log('✅ Doubao audio analysis successful');
+      return validateAnalysisResponse(parsed);
+    } catch (error: any) {
+      lastError = error;
+      console.warn('❌ Doubao audio analysis failed:', error.message);
+    }
+  }
+
+  // Try OpenAI
+  if ((AI_PROVIDER === 'openai' || AI_PROVIDER === 'auto') && openai) {
+    try {
+      console.log('🔄 Trying OpenAI audio analysis...');
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: 'You are a scenario generator. Always return valid JSON.' },
+          { role: 'user', content: prompt },
+        ],
+        response_format: { type: 'json_object' },
+      });
+      const text = response.choices[0]?.message?.content;
+      if (!text) throw new Error('Empty response from OpenAI');
+      console.log('✅ OpenAI audio analysis successful');
+      return validateAnalysisResponse(JSON.parse(text));
+    } catch (error: any) {
+      lastError = error;
+      if (error.message?.includes('API key') || error.message?.includes('401') || error.message?.includes('403')) {
+        console.log('ℹ️ OpenAI skipped (API key issue)');
+      } else {
+        console.warn('❌ OpenAI audio analysis failed:', error.message);
+      }
+    }
+  }
+
+  // Try Gemini
+  if (gemini) {
+    try {
+      console.log('🔄 Trying Gemini audio analysis...');
+      const model = gemini.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('No JSON found');
+      console.log('✅ Gemini audio analysis successful');
+      return validateAnalysisResponse(JSON.parse(jsonMatch[0]));
+    } catch (error: any) {
+      lastError = error;
+      console.warn('❌ Gemini audio analysis failed:', error.message);
+    }
+  }
+
+  // Fallback scenario
+  console.warn('⚠️ All AI providers failed, using fallback scenario');
   return {
-    location: 'User Request',
-    situation: 'Practice conversation',
+    location: transcribedText || 'Practice Location',
+    situation: transcribedText 
+      ? `Practice conversation based on: ${transcribedText}`
+      : 'Practice conversation',
     difficulty: level === 'Beginner' ? 'A1' : level === 'Intermediate' ? 'B1' : 'C1',
     role_name: 'Practice Partner',
-    context: 'Be helpful and encouraging',
-    first_line: 'Hello! How can I help you practice today?',
-    user_hints: ['Start conversation', 'Ask a question', 'Tell me about yourself'],
+    context: 'Be helpful and encouraging. Guide the conversation naturally.',
+    first_line: transcribedText 
+      ? `I understand you'd like to practice: ${transcribedText}. Let's start!`
+      : 'Hello! How can I help you practice today?',
+    user_hints: ['Start conversation', 'Ask a question', 'Tell me more'],
   };
 }
 
