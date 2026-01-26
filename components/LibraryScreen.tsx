@@ -411,7 +411,7 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
                         )}
 
                         {/* Delete Scenario */}
-                        <div className="p-4 pt-2 border-t border-gray-100">
+                        <div className="px-2 border-t border-gray-100">
                           <button
                             onClick={(e) => handleDeleteScenario(scenario.id, e)}
                             className="text-xs text-red-500 hover:text-red-600 font-medium flex items-center gap-1 touch-manipulation min-h-[44px] px-3"
