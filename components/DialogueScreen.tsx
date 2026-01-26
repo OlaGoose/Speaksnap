@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Scenario, DialogueLine, UserLevel } from '@/lib/types';
 import { storage } from '@/lib/utils/storage';
+import { useVoiceRecorder } from '@/lib/hooks/useVoiceRecorder';
 
 interface DialogueScreenProps {
   scenario: Scenario;
@@ -34,9 +35,9 @@ export default function DialogueScreen({
   const [messages, setMessages] = useState<DialogueLine[]>([]);
   const [hints, setHints] = useState<string[]>([]);
   const [inputValue, setInputValue] = useState('');
+  const [interimText, setInterimText] = useState(''); // 实时识别的临时文本
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isListening, setIsListening] = useState(false);
   const [autoPlayAudio, setAutoPlayAudio] = useState(false);
   const [showAudioToast, setShowAudioToast] = useState(false);
 
@@ -247,6 +248,37 @@ export default function DialogueScreen({
     };
   }, [isMobile, selectionMenu]);
 
+  // 语音识别 Hook
+  const {
+    isRecording,
+    isSupported: isVoiceSupported,
+    startRecording,
+    stopRecording,
+    error: voiceError,
+  } = useVoiceRecorder({
+    onResult: (text, isFinal) => {
+      if (isFinal) {
+        // 最终结果：追加到输入框
+        setInputValue((prev) => {
+          const separator = prev && !prev.endsWith(' ') ? ' ' : '';
+          return prev + separator + text;
+        });
+        // 清空临时文本
+        setInterimText('');
+      }
+    },
+    onInterimResult: (text) => {
+      // 实时临时结果：显示在输入框中但不保存
+      setInterimText(text);
+    },
+    onError: (error) => {
+      console.error('Voice recognition error:', error);
+      setInterimText('');
+    },
+    language: 'en-US',
+    preventDuplicates: true,
+  });
+
   const handleToggleAutoPlay = () => {
     const newState = !autoPlayAudio;
     setAutoPlayAudio(newState);
@@ -257,28 +289,16 @@ export default function DialogueScreen({
   };
 
   const handleVoiceInput = () => {
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    if (!isVoiceSupported) {
       alert('Voice input is not supported in this browser.');
       return;
     }
 
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    recognition.onstart = () => setIsListening(true);
-    recognition.onend = () => setIsListening(false);
-    recognition.onerror = () => setIsListening(false);
-
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      setInputValue((prev) => prev + (prev ? ' ' : '') + transcript);
-    };
-
-    recognition.start();
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
   };
 
   const handleSend = async () => {
@@ -986,25 +1006,40 @@ export default function DialogueScreen({
         )}
 
         {/* Input Bar */}
-        <div className="w-full bg-white rounded-xl border border-gray-200 focus-within:border-gray-300 focus-within:shadow-sm transition-all flex items-center p-1.5 pl-4 gap-2">
-          <input
-            ref={textareaRef}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={isListening ? 'Listening...' : 'Ask the tutor...'}
-            className="flex-1 bg-transparent text-primary-900 placeholder:text-gray-400 text-[16px] outline-none min-w-0"
-          />
+        <div className={`w-full bg-white rounded-xl border transition-all flex items-center p-1.5 pl-4 gap-2 ${
+          isRecording 
+            ? 'border-blue-300 shadow-[0_0_0_3px_rgba(59,130,246,0.1)]' 
+            : 'border-gray-200 focus-within:border-gray-300 focus-within:shadow-sm'
+        }`}>
+          <div className="flex-1 relative">
+            <input
+              ref={textareaRef}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={isRecording ? 'Listening...' : 'Ask the tutor...'}
+              className="w-full bg-transparent text-primary-900 placeholder:text-gray-400 text-[16px] outline-none min-w-0"
+            />
+            {/* 实时识别文本叠加显示 */}
+            {interimText && (
+              <div className="absolute left-0 top-0 pointer-events-none text-[16px] text-gray-400 italic whitespace-nowrap overflow-hidden animate-in fade-in duration-200">
+                {inputValue && <span className="opacity-0">{inputValue}</span>}
+                {inputValue && ' '}
+                {interimText}
+              </div>
+            )}
+          </div>
 
           <button
             onClick={handleVoiceInput}
-            className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors ${
-              isListening
-                ? 'bg-red-50 text-red-500 animate-pulse'
-                : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+            disabled={!isVoiceSupported}
+            className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed ${
+              isRecording
+                ? 'bg-blue-500 text-white scale-110 shadow-lg shadow-blue-500/30'
+                : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 active:scale-95'
             }`}
           >
-            <Mic size={18} />
+            <Mic size={18} className={isRecording ? 'animate-pulse' : ''} />
           </button>
 
           <button

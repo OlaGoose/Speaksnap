@@ -40,6 +40,7 @@ export default function CameraScreen({
   const [showLevelMenu, setShowLevelMenu] = useState(false);
   const [activeMode, setActiveMode] = useState<Mode>('camera');
   const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
   const [isScrollInitialized, setIsScrollInitialized] = useState(false);
 
   // Location State
@@ -48,6 +49,7 @@ export default function CameraScreen({
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Initialize camera
   useEffect(() => {
@@ -72,6 +74,18 @@ export default function CameraScreen({
 
     return () => {
       if (stream) stream.getTracks().forEach((track) => track.stop());
+    };
+  }, []);
+
+  // Cleanup recording on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
     };
   }, []);
 
@@ -249,11 +263,18 @@ export default function CameraScreen({
 
   const toggleRecording = async () => {
     if (isRecording) {
+      // Stop recording
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop();
       }
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+        recordingTimerRef.current = null;
+      }
       setIsRecording(false);
+      setRecordingDuration(0);
     } else {
+      // Start recording
       try {
         const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         let options: MediaRecorderOptions | undefined = undefined;
@@ -289,6 +310,12 @@ export default function CameraScreen({
 
         mediaRecorder.start();
         setIsRecording(true);
+        setRecordingDuration(0);
+        
+        // Start timer
+        recordingTimerRef.current = setInterval(() => {
+          setRecordingDuration((prev) => prev + 1);
+        }, 1000);
       } catch (e) {
         console.error('MediaRecorder error:', e);
         alert('Microphone access failed.');
@@ -331,10 +358,40 @@ export default function CameraScreen({
                 activeMode === 'voice' ? 'opacity-100' : 'opacity-0'
               }`}
             >
-              <p className="text-white/90 mt-[-20%] text-2xl font-light tracking-tight drop-shadow-md text-center px-6">
-                {isRecording ? 'Listening...' : 'Tap to speak your request'}
-              </p>
-              {isLocationEnabled && (
+              {/* Recording Waveform Animation */}
+              {isRecording && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="flex items-center gap-1.5">
+                    {[0.1, 0.2, 0.15, 0.25, 0.18, 0.22, 0.12].map((delay, i) => (
+                      <div
+                        key={i}
+                        className="w-1.5 h-4 bg-red-500 rounded-full recording-wave"
+                        style={{
+                          animationDelay: `${delay}s`,
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-[-20%] flex flex-col items-center gap-3">
+                <p className="text-white/90 text-2xl font-light tracking-tight drop-shadow-md text-center px-6">
+                  {isRecording ? 'Recording...' : 'Tap mic to start recording'}
+                </p>
+                
+                {/* Recording Duration */}
+                {isRecording && (
+                  <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-red-500/20 backdrop-blur-md border border-red-500/30">
+                    <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                    <span className="text-white font-mono text-sm font-medium">
+                      {Math.floor(recordingDuration / 60)}:{(recordingDuration % 60).toString().padStart(2, '0')}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {isLocationEnabled && !isRecording && (
                 <div className="mt-4 flex items-center gap-2 text-white/50 text-sm">
                   <MapPin size={14} />
                   <span>Location context active</span>
@@ -483,17 +540,20 @@ export default function CameraScreen({
                     </div>
                   ) : m.id === 'voice' && isActive ? (
                     <div
-                      className={`rounded-full flex items-center justify-center ${
-                        isRecording ? 'w-8 h-8 bg-red-500 rounded-sm' : 'w-12 h-12 bg-red-500'
+                      className={`flex items-center justify-center transition-all duration-300 ${
+                        isRecording 
+                          ? 'w-10 h-10 bg-red-500 rounded-md' 
+                          : 'w-12 h-12 bg-red-500 rounded-full'
                       }`}
                     >
                       {isFetchingLocation && !isRecording ? (
                         <Loader2 size={24} className="text-white animate-spin" />
+                      ) : isRecording ? (
+                        // Stop icon (square)
+                        <div className="w-5 h-5 bg-white rounded-sm" />
                       ) : (
-                        <Mic
-                          size={isRecording ? 16 : 24}
-                          className="text-white"
-                        />
+                        // Microphone icon
+                        <Mic size={24} className="text-white" />
                       )}
                     </div>
                   ) : (
