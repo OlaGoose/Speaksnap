@@ -718,16 +718,47 @@ export default function DialogueScreen({
                   </svg>
                 </div>
                 {msg.feedback && (
-                  <div className="mt-2 mr-1 max-w-full bg-white/60 border border-black/5 rounded-xl p-2.5 text-xs text-gray-600 backdrop-blur-sm animate-in fade-in slide-in-from-top">
-                    <div className="flex items-center gap-2 mb-1">
-                      <div
-                        className={`w-1.5 h-1.5 rounded-full ${
-                          msg.feedback.score > 80 ? 'bg-green-500' : 'bg-orange-400'
-                        }`}
-                      />
-                      <span className="font-semibold text-gray-800">Feedback</span>
+                  <div className="mt-2 mr-1 max-w-full bg-white/60 border border-black/5 rounded-xl p-3 text-xs backdrop-blur-sm animate-in fade-in slide-in-from-top space-y-2">
+                    {/* Score and Title */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            msg.feedback.score > 80 ? 'bg-green-500' : 'bg-orange-400'
+                          }`}
+                        />
+                        <span className="font-semibold text-gray-800">AI Feedback</span>
+                      </div>
+                      <span className="text-[10px] font-medium text-gray-500">{msg.feedback.score}/100</span>
                     </div>
-                    <p>{msg.feedback.comment}</p>
+                    
+                    {/* Main Comment */}
+                    <p className="text-gray-700 leading-relaxed">{msg.feedback.comment}</p>
+                    
+                    {/* Grammar Analysis */}
+                    {msg.feedback.grammar && (
+                      <div className="pt-2 border-t border-gray-200/50">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
+                            <path d="M12 20h9"></path>
+                            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                          </svg>
+                          <span className="font-semibold text-gray-700 text-[10px] uppercase tracking-wide">Grammar</span>
+                        </div>
+                        <p className="text-gray-600">{msg.feedback.grammar}</p>
+                      </div>
+                    )}
+                    
+                    {/* Native Expression */}
+                    {msg.feedback.native_expression && (
+                      <div className="pt-2 border-t border-gray-200/50">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <span className="text-[10px]">💬</span>
+                          <span className="font-semibold text-gray-700 text-[10px] uppercase tracking-wide">Native Way</span>
+                        </div>
+                        <p className="text-gray-600 italic">"{msg.feedback.native_expression}"</p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -755,9 +786,9 @@ export default function DialogueScreen({
         <div
           style={{
             position: 'fixed',
-            left: '50%',
-            top: Math.max(selectionMenu.y - 54, 60),
-            transform: 'translateX(-50%)',
+            left: `${selectionMenu.x}px`,
+            top: `${Math.max(selectionMenu.y - 54, 60)}px`,
+            transform: 'translate(-50%, 0)',
             zIndex: 50,
             pointerEvents: 'none',
           }}

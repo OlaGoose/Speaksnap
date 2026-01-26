@@ -53,7 +53,7 @@ export async function analyzeScene(
     : 'No GPS data available.';
 
   const prompt = `
-You are an English learning scenario generator. Analyze this image and create a realistic, immersive scenario.
+You are an English learning scenario generator. Analyze this image and create a realistic, goal-oriented scenario.
 
 Context:
 - Student Level: ${level}
@@ -63,18 +63,19 @@ Context:
 Requirements:
 1. Be EXTREMELY realistic - if it's nighttime, suggest nighttime activities
 2. Identify specific elements in the image (signs, objects, lighting)
-3. Create natural conversation starters appropriate for the time and place
-4. Match difficulty to ${level} level
+3. Create a clear conversation GOAL (e.g., order coffee, buy tickets, ask for directions)
+4. Make the scenario have a natural beginning, middle, and end
+5. Match difficulty to ${level} level
 
 Return JSON:
 {
   "location": "Specific place name from image",
-  "situation": "Why would we be talking here?",
+  "situation": "Clear scenario goal - what needs to be accomplished in this conversation",
   "difficulty": "A1/A2/B1/B2/C1/C2 based on ${level}",
   "role_name": "Character role (e.g., Barista, Local, Clerk)",
-  "context": "Character personality and scene instructions",
-  "first_line": "AI's natural opening line",
-  "user_hints": ["3 realistic response options"]
+  "context": "Character personality, scene instructions, and GOAL: what needs to be accomplished (e.g., GOAL: Help customer complete their order and payment)",
+  "first_line": "AI's natural opening line that sets up the goal",
+  "user_hints": ["3 realistic response options that move towards the goal"]
 }
   `;
 
@@ -195,47 +196,42 @@ export async function continueDialogue(
   const systemPrompt = `
 You are an English conversation tutor conducting a roleplay dialogue exercise.
 
-📍 SCENARIO CONTEXT:
+📍 SCENARIO CONTEXT & GOAL:
 ${scenarioContext}
 
 🎯 YOUR ROLE:
 - You are the conversation partner in this scenario (e.g., shopkeeper, friend, colleague)
+- Guide the conversation towards achieving the scenario goal naturally
+- Each response should advance the conversation towards completion
 - Engage in natural, realistic conversation appropriate for the scenario
-- Keep responses conversational and authentic to the situation
 
 👤 STUDENT LEVEL: ${level}
 - Adapt language complexity to match their level
 - Be encouraging and supportive
-- Provide helpful feedback on their English
+- Provide detailed, constructive feedback
 
-📝 DIALOGUE FORMAT:
-When the conversation starts, establish your character role clearly. For example:
-- "Hi! Welcome to the coffee shop. What can I get you today?"
-- "Hey there! Nice weather today, isn't it?"
-- "Good morning! I see you're interested in this product."
-
-💬 EVALUATION CRITERIA:
-- Grammar accuracy
-- Vocabulary appropriateness
-- Natural expression
-- Scenario relevance
+💬 COMPREHENSIVE FEEDBACK:
+Evaluate each student response on:
+1. **Grammar** - Identify errors and explain corrections
+2. **Natural Expression** - Show how a native speaker would say it
+3. **Scenario Progress** - How well they're moving towards the goal
 
 ⚠️ IMPORTANT:
-- Respond as the character in the scenario
-- Keep the conversation flowing naturally
-- End the conversation when it reaches a natural conclusion
-- Provide 3 helpful suggestions for the student's next possible response
+- Keep the main storyline clear and guide towards the goal
+- Next hints should push the conversation towards goal completion
+- End when the scenario goal is naturally achieved
+- Provide actionable, specific suggestions
 
 Return JSON:
 {
   "feedback": {
     "score": 0-100,
-    "comment": "Brief, encouraging feedback",
-    "correction": "Grammar correction if needed",
-    "better_alternative": "More natural/native way to express the same idea"
+    "comment": "Overall assessment of their response",
+    "grammar": "Grammar analysis - point out errors and explain corrections (empty string if perfect)",
+    "native_expression": "How a native speaker would naturally express the same idea"
   },
-  "next_response": "Your character's natural reply in the scenario",
-  "next_hints": ["Suggestion 1", "Suggestion 2", "Suggestion 3"],
+  "next_response": "Your character's natural reply that advances the scenario",
+  "next_hints": ["Suggestion that moves towards goal", "Alternative that progresses conversation", "Option that addresses next step"],
   "is_finished": false
 }
   `;
@@ -467,6 +463,8 @@ function validateDialogueResponse(data: any): DialogueResponse {
     feedback: {
       score: typeof data?.feedback?.score === 'number' ? data.feedback.score : 50,
       comment: data?.feedback?.comment || 'Keep going!',
+      grammar: data?.feedback?.grammar || '',
+      native_expression: data?.feedback?.native_expression || '',
       correction: data?.feedback?.correction,
       better_alternative: data?.feedback?.better_alternative,
     },

@@ -17,8 +17,10 @@ export interface DialogueLine {
   text: string;
   feedback?: {
     score: number;
-    correction?: string;
     comment: string;
+    grammar?: string;
+    native_expression?: string;
+    correction?: string;
     better_alternative?: string;
   };
 }
@@ -115,6 +117,8 @@ export interface DialogueResponse {
   feedback: {
     score: number;
     comment: string;
+    grammar?: string;
+    native_expression?: string;
     correction?: string;
     better_alternative?: string;
   };

@@ -14,7 +14,6 @@ export default function FlashcardDeck() {
   const [videoErrors, setVideoErrors] = useState<{ [key: string]: boolean }>({});
   const [videoLoaded, setVideoLoaded] = useState<{ [key: string]: boolean }>({});
   const [playingVideoId, setPlayingVideoId] = useState<string | null>(null); // 当前播放的视频ID
-  const [scrollStates, setScrollStates] = useState<{ [key: string]: { isAtTop: boolean; isAtBottom: boolean; canScroll: boolean } }>({});
   
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const iframeRefs = useRef<{ [key: string]: HTMLIFrameElement | null }>({});
@@ -36,23 +35,6 @@ export default function FlashcardDeck() {
     };
   }, []);
 
-  const updateScrollState = useCallback((cardId: string, element: HTMLDivElement) => {
-    const { scrollTop, scrollHeight, clientHeight } = element;
-    const isAtTop = scrollTop < 5;
-    const isAtBottom = scrollTop + clientHeight >= scrollHeight - 5;
-    const canScroll = scrollHeight > clientHeight;
-
-    setScrollStates((prev) => ({
-      ...prev,
-      [cardId]: { isAtTop, isAtBottom, canScroll },
-    }));
-  }, []);
-
-  const handleScroll = useCallback((cardId: string, e: React.UIEvent<HTMLDivElement>) => {
-    const element = e.currentTarget;
-    updateScrollState(cardId, element);
-  }, [updateScrollState]);
-
   useEffect(() => {
     setIsFlipped(false);
     // Stop any playing video when switching cards
@@ -71,28 +53,13 @@ export default function FlashcardDeck() {
         const scrollEl = scrollRefs.current[currentCard.id];
         if (scrollEl) {
           scrollEl.scrollTop = 0;
-          // Update scroll state after reset
-          setTimeout(() => updateScrollState(currentCard.id, scrollEl), 0);
         }
       }
     } else {
       // Stop video when flipping to front
       setPlayingVideoId(null);
     }
-  }, [isFlipped, activeIndex, flashcards, updateScrollState]);
-
-  // Initialize scroll state for active card when flipped
-  useEffect(() => {
-    if (isFlipped) {
-      const currentCard = flashcards[activeIndex];
-      if (currentCard) {
-        const scrollEl = scrollRefs.current[currentCard.id];
-        if (scrollEl) {
-          updateScrollState(currentCard.id, scrollEl);
-        }
-      }
-    }
-  }, [isFlipped, activeIndex, flashcards, updateScrollState]);
+  }, [isFlipped, activeIndex, flashcards]);
 
   const playAudio = useCallback((text: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -335,7 +302,7 @@ export default function FlashcardDeck() {
               >
                 {/* Front Face - Apple Style Card */}
                 <div 
-                  className="absolute inset-0 w-full h-full rounded-[24px] overflow-hidden flex flex-col items-center justify-center p-8"
+                  className="absolute inset-0 w-full h-full rounded-[24px] overflow-hidden flex flex-col"
                   style={{ 
                     backfaceVisibility: 'hidden', 
                     WebkitBackfaceVisibility: 'hidden',
@@ -356,7 +323,7 @@ export default function FlashcardDeck() {
                     style={{ WebkitTapHighlightColor: 'transparent' }}
                     onClick={(e) => {
                       const target = e.target as HTMLElement;
-                      if (!target.closest('button') && isActive) {
+                      if (!target.closest('button') && !target.closest('.front-footer') && isActive) {
                         console.log('🖱️ Front card click - flipping to back');
                         setIsFlipped(!isFlipped);
                       }
@@ -364,36 +331,70 @@ export default function FlashcardDeck() {
                   ></div>
 
                   {/* Main Content */}
-                  <div className="relative z-10 flex flex-col items-center gap-6 max-w-md w-full">
-                    {/* Word */}
-                    <h3 className="text-5xl md:text-6xl font-black text-white text-center leading-none tracking-tight drop-shadow-2xl">
-                      {front}
-                    </h3>
+                  <div className="flex-1 flex items-center justify-center p-8 relative z-10">
+                    <div className="flex flex-col items-center gap-6 max-w-md w-full">
+                      {/* Word */}
+                      <h3 className="text-5xl md:text-6xl font-black text-white text-center leading-none tracking-tight drop-shadow-2xl">
+                        {front}
+                      </h3>
 
-                    {/* Phonetic */}
-                    {back.phonetic && (
-                      <p className="text-white/90 font-mono text-xl tracking-wide drop-shadow-lg">
-                        /{back.phonetic}/
-                      </p>
-                    )}
+                      {/* Phonetic */}
+                      {back.phonetic && (
+                        <p className="text-white/90 font-mono text-xl tracking-wide drop-shadow-lg">
+                          /{back.phonetic}/
+                        </p>
+                      )}
 
-                    {/* Play Button */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        playAudio(front, e);
-                      }}
-                      onTouchStart={(e) => e.stopPropagation()}
-                      className="h-14 w-14 rounded-full bg-white/20 hover:bg-white/30 active:bg-white/25 backdrop-blur-xl border-2 border-white/40 text-white flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 shadow-2xl pointer-events-auto group"
-                      aria-label="Play pronunciation"
-                    >
-                      <Volume2 size={24} className="opacity-90 group-hover:opacity-100 transition-opacity" />
-                    </button>
+                      {/* Play Button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          playAudio(front, e);
+                        }}
+                        onTouchStart={(e) => e.stopPropagation()}
+                        className="h-14 w-14 rounded-full bg-white/20 hover:bg-white/30 active:bg-white/25 backdrop-blur-xl border-2 border-white/40 text-white flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 shadow-2xl pointer-events-auto group"
+                        aria-label="Play pronunciation"
+                      >
+                        <Volume2 size={24} className="opacity-90 group-hover:opacity-100 transition-opacity" />
+                      </button>
+                    </div>
+                  </div>
 
-                    {/* Hint text */}
-                    <p className="text-white/60 text-xs text-center mt-4 font-medium tracking-wide">
-                      Tap to see details
-                    </p>
+                  {/* Footer - Tap to flip - Apple Frosted Glass */}
+                  <div 
+                    className="front-footer flex-shrink-0 py-5 px-4 text-center cursor-pointer transition-all pointer-events-auto relative overflow-hidden"
+                    style={{
+                      background: 'linear-gradient(to top, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.1) 25%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.05) 100%)',
+                      backdropFilter: 'blur(20px) saturate(180%)',
+                      WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                      boxShadow: '0 -1px 0 0 rgba(255, 255, 255, 0.1), inset 0 1px 0 0 rgba(255, 255, 255, 0.1)',
+                      maskImage: 'linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.2) 10%, rgba(0, 0, 0, 0.6) 25%, rgba(0, 0, 0, 1) 40%, rgba(0, 0, 0, 1) 100%)',
+                      WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.2) 10%, rgba(0, 0, 0, 0.6) 25%, rgba(0, 0, 0, 1) 40%, rgba(0, 0, 0, 1) 100%)',
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isActive) {
+                        setIsFlipped(!isFlipped);
+                      }
+                    }}
+                    onTouchStart={(e) => {
+                      const target = e.currentTarget;
+                      target.style.background = 'linear-gradient(to top, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0.18) 25%, rgba(255, 255, 255, 0.15) 50%, rgba(255, 255, 255, 0.1) 100%)';
+                    }}
+                    onTouchEnd={(e) => {
+                      const target = e.currentTarget;
+                      target.style.background = 'linear-gradient(to top, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.1) 25%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.05) 100%)';
+                    }}
+                  >
+                    <div className="flex items-center justify-center gap-2 relative z-10">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/80">
+                        <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
+                        <path d="M21 3v5h-5"></path>
+                      </svg>
+                      <span className="text-[10px] text-white/80 uppercase tracking-widest font-medium">
+                        Tap to flip
+                      </span>
+                    </div>
                   </div>
 
                   {/* Decorative gradient overlay */}
@@ -458,49 +459,15 @@ export default function FlashcardDeck() {
                     </button>
                   </div>
 
-                  {/* Scrollable Content Panel with gradient indicators */}
-                  <div className="relative flex-1 overflow-hidden bg-white">
-                    {/* Top gradient fade - shows when not at top */}
-                    {(() => {
-                      const scrollState = scrollStates[card.id];
-                      const showTopFade = scrollState?.canScroll && !scrollState?.isAtTop;
-                      return (
-                        <div 
-                          className={`absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-white to-transparent pointer-events-none z-10 transition-opacity duration-300 ${
-                            showTopFade ? 'opacity-100' : 'opacity-0'
-                          }`}
-                        />
-                      );
-                    })()}
-                    
-                    {/* Bottom gradient fade - shows when not at bottom */}
-                    {(() => {
-                      const scrollState = scrollStates[card.id];
-                      const showBottomFade = scrollState?.canScroll && !scrollState?.isAtBottom;
-                      return (
-                        <div 
-                          className={`absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white to-transparent pointer-events-none z-10 transition-opacity duration-300 ${
-                            showBottomFade ? 'opacity-100' : 'opacity-0'
-                          }`}
-                        />
-                      );
-                    })()}
-
-                    <div 
-                      ref={(el) => { 
-                        scrollRefs.current[card.id] = el;
-                        if (el && isActive && isFlipped) {
-                          // Initialize scroll state
-                          updateScrollState(card.id, el);
-                        }
-                      }}
-                      onScroll={(e) => handleScroll(card.id, e)}
-                      className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-4 bg-white flashcard-scroll"
-                      style={{
-                        WebkitOverflowScrolling: 'touch',
-                        touchAction: 'pan-y',
-                      }}
-                    >
+                  {/* Scrollable Content Panel */}
+                  <div 
+                    ref={(el) => { scrollRefs.current[card.id] = el; }}
+                    className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-4 bg-white flashcard-scroll"
+                    style={{
+                      WebkitOverflowScrolling: 'touch',
+                      touchAction: 'pan-y',
+                    }}
+                  >
                     {/* Phonetic & Audio */}
                     {back.phonetic && (
                       <div className="flex items-center gap-3">
@@ -619,23 +586,38 @@ export default function FlashcardDeck() {
                       </div>
                     )}
 
-                    </div>
                   </div>
 
-                  {/* Footer - Tap to flip */}
+                  {/* Footer - Tap to flip - Apple Frosted Glass */}
                   <div 
-                    className="flex-shrink-0 p-3 text-center border-t border-gray-50 bg-white cursor-pointer active:bg-gray-50 transition-colors"
+                    className="flex-shrink-0 py-5 px-4 text-center cursor-pointer transition-all relative overflow-hidden"
+                    style={{
+                      background: 'linear-gradient(to top, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.88) 25%, rgba(255, 255, 255, 0.85) 50%, rgba(255, 255, 255, 0.75) 100%)',
+                      backdropFilter: 'blur(20px) saturate(180%)',
+                      WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                      boxShadow: '0 -1px 0 0 rgba(0, 0, 0, 0.05), inset 0 1px 0 0 rgba(255, 255, 255, 0.8)',
+                      maskImage: 'linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.2) 10%, rgba(0, 0, 0, 0.6) 25%, rgba(0, 0, 0, 1) 40%, rgba(0, 0, 0, 1) 100%)',
+                      WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.2) 10%, rgba(0, 0, 0, 0.6) 25%, rgba(0, 0, 0, 1) 40%, rgba(0, 0, 0, 1) 100%)',
+                    }}
                     onClick={(e) => {
                       e.stopPropagation();
                       setIsFlipped(false);
                     }}
+                    onTouchStart={(e) => {
+                      const target = e.currentTarget;
+                      target.style.background = 'linear-gradient(to top, rgba(240, 240, 240, 0.98) 0%, rgba(243, 243, 243, 0.96) 25%, rgba(245, 245, 245, 0.95) 50%, rgba(250, 250, 250, 0.9) 100%)';
+                    }}
+                    onTouchEnd={(e) => {
+                      const target = e.currentTarget;
+                      target.style.background = 'linear-gradient(to top, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.88) 25%, rgba(255, 255, 255, 0.85) 50%, rgba(255, 255, 255, 0.75) 100%)';
+                    }}
                   >
-                    <div className="flex items-center justify-center gap-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+                    <div className="flex items-center justify-center gap-2 relative z-10">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
                         <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
                         <path d="M21 3v5h-5"></path>
                       </svg>
-                      <span className="text-[10px] text-gray-400 uppercase tracking-widest font-medium">
+                      <span className="text-[10px] text-gray-500 uppercase tracking-widest font-medium">
                         Tap to flip
                       </span>
                     </div>
