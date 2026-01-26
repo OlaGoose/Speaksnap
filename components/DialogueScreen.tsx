@@ -687,20 +687,18 @@ export default function DialogueScreen({
           style={{
             position: 'fixed',
             left: '50%',
-            top: Math.max(selectionMenu.y - 70, 60),
+            top: Math.max(selectionMenu.y - 55, 60),
             transform: 'translateX(-50%)',
             zIndex: 50,
             pointerEvents: 'none',
-            padding: '12px',
           }}
           onClick={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
         >
-          <div className="inline-flex items-center gap-1.5 bg-white/95 backdrop-blur-xl rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.08),0_1px_2px_rgba(0,0,0,0.06)] pointer-events-auto border border-gray-200/60 p-1.5">
+          <div className="inline-flex items-center gap-1 bg-white/98 backdrop-blur-xl rounded-full shadow-[0_4px_24px_rgba(0,0,0,0.12),0_1px_3px_rgba(0,0,0,0.08)] pointer-events-auto border border-gray-200/80 p-1">
             {selectionActionLoading ? (
-              <div className="px-4 py-2 flex items-center justify-center gap-2.5">
+              <div className="px-3 py-2 flex items-center justify-center gap-2">
                 <Loader2 size={16} className="animate-spin text-gray-500" />
-                <span className="text-gray-700 text-sm font-medium">Processing...</span>
               </div>
             ) : (
               <>
@@ -713,17 +711,17 @@ export default function DialogueScreen({
                     window.speechSynthesis.speak(utterance);
                   }}
                   onTouchStart={(e) => e.stopPropagation()}
-                  className="group px-3 py-2 hover:bg-gray-100/80 active:bg-gray-200/80 transition-all flex items-center gap-2 rounded-lg touch-manipulation min-h-[36px]"
+                  className="group p-2 hover:bg-gray-100 active:bg-gray-200 transition-all rounded-full touch-manipulation"
                   title="Play audio"
+                  aria-label="Play audio"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600 group-hover:text-gray-900 transition-colors">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-700 group-hover:text-gray-900 transition-colors">
                     <path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"></path>
                     <path d="M16 9a5 5 0 0 1 0 6"></path>
                   </svg>
-                  <span className="text-gray-700 font-medium text-sm group-hover:text-gray-900">Play</span>
                 </button>
                 
-                <div className="h-6 w-px bg-gray-200"></div>
+                <div className="h-4 w-px bg-gray-200"></div>
                 
                 <button
                   onClick={(e) => {
@@ -731,14 +729,14 @@ export default function DialogueScreen({
                     handleTranslate();
                   }}
                   onTouchStart={(e) => e.stopPropagation()}
-                  className="group px-3 py-2 hover:bg-blue-50/80 active:bg-blue-100/80 transition-all flex items-center gap-2 rounded-lg touch-manipulation min-h-[36px]"
+                  className="group p-2 hover:bg-blue-50 active:bg-blue-100 transition-all rounded-full touch-manipulation"
                   title="Translate"
+                  aria-label="Translate"
                 >
                   <Languages size={18} className="text-blue-600 group-hover:text-blue-700 transition-colors" />
-                  <span className="text-gray-700 font-medium text-sm group-hover:text-blue-700">Translate</span>
                 </button>
                 
-                <div className="h-6 w-px bg-gray-200"></div>
+                <div className="h-4 w-px bg-gray-200"></div>
                 
                 <button
                   onClick={(e) => {
@@ -746,14 +744,14 @@ export default function DialogueScreen({
                     handleOptimize();
                   }}
                   onTouchStart={(e) => e.stopPropagation()}
-                  className="group px-3 py-2 hover:bg-purple-50/80 active:bg-purple-100/80 transition-all flex items-center gap-2 rounded-lg touch-manipulation min-h-[36px]"
+                  className="group p-2 hover:bg-purple-50 active:bg-purple-100 transition-all rounded-full touch-manipulation"
                   title="AI Optimize"
+                  aria-label="AI Optimize"
                 >
                   <Wand2 size={18} className="text-purple-600 group-hover:text-purple-700 transition-colors" />
-                  <span className="text-gray-700 font-medium text-sm group-hover:text-purple-700">Optimize</span>
                 </button>
                 
-                <div className="h-6 w-px bg-gray-200"></div>
+                <div className="h-4 w-px bg-gray-200"></div>
                 
                 <button
                   onClick={(e) => {
@@ -761,11 +759,11 @@ export default function DialogueScreen({
                     handleAddToFlashcard();
                   }}
                   onTouchStart={(e) => e.stopPropagation()}
-                  className="group px-3 py-2 hover:bg-green-50/80 active:bg-green-100/80 transition-all flex items-center gap-2 rounded-lg touch-manipulation min-h-[36px]"
+                  className="group p-2 hover:bg-green-50 active:bg-green-100 transition-all rounded-full touch-manipulation"
                   title="Save to Flashcard"
+                  aria-label="Save to Flashcard"
                 >
                   <Bookmark size={18} className="text-green-600 group-hover:text-green-700 transition-colors" />
-                  <span className="text-gray-700 font-medium text-sm group-hover:text-green-700">Save</span>
                 </button>
               </>
             )}

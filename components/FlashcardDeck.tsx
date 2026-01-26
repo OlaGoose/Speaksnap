@@ -300,21 +300,21 @@ export default function FlashcardDeck() {
                   </div>
 
                   {/* Gradient Overlay */}
-                  <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/10 via-transparent to-black/85 pointer-events-none"></div>
+                  <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/20 via-transparent to-black/90 pointer-events-none"></div>
 
                   {/* Touch Layer */}
                   <div className="absolute inset-0 z-20"></div>
 
                   {/* Top Metadata */}
-                  <div className="absolute top-4 right-4 z-30 flex justify-end items-start pointer-events-none">
-                    <div className="text-[10px] font-mono text-white/50 bg-black/30 px-2 py-1 rounded-full backdrop-blur-md">
+                  <div className="absolute top-4 right-4 z-40 flex justify-end items-start pointer-events-none">
+                    <div className="text-[10px] font-mono text-white/60 bg-black/40 px-2 py-1 rounded-full backdrop-blur-md">
                       {index + 1} / {flashcards.length}
                     </div>
                   </div>
 
                   {/* Video Navigation Indicators */}
                   {videoIds.length > 1 && !isFlipped && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-1 items-center pointer-events-none opacity-60">
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-1 items-center pointer-events-none opacity-60">
                       <ChevronUp size={20} className="text-white animate-bounce-subtle" />
                       <div className="flex flex-col gap-0.5 py-2">
                         {videoIds.map((_, idx) => (
@@ -334,7 +334,7 @@ export default function FlashcardDeck() {
 
                   {/* Video source indicator */}
                   {currentVideoId && !hasVideoError && isActive && (
-                    <div className="absolute top-4 left-4 z-30 flex items-center gap-1.5 px-2 py-1 rounded-full bg-red-600/80 backdrop-blur-sm pointer-events-none">
+                    <div className="absolute top-4 left-4 z-40 flex items-center gap-1.5 px-2 py-1 rounded-full bg-red-600/80 backdrop-blur-sm pointer-events-none">
                       <Youtube size={12} className="text-white" />
                       <span className="text-[9px] font-medium text-white uppercase tracking-wider">
                         {currentVidIndex + 1}/{videoIds.length}
@@ -343,11 +343,11 @@ export default function FlashcardDeck() {
                   )}
 
                   {/* Bottom Content */}
-                  <div className="absolute bottom-0 left-0 right-0 z-30 p-5 pb-6">
+                  <div className="absolute bottom-0 left-0 right-0 z-40 p-5 pb-6 pointer-events-none">
                     <div className="flex items-start gap-3">
                       <div className="flex-1">
                         <div className="flex items-baseline gap-2.5 mb-1">
-                          <h3 className="text-3xl font-black text-white leading-none tracking-tight drop-shadow-xl">
+                          <h3 className="text-3xl font-black text-white leading-none tracking-tight drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]">
                             {front}
                           </h3>
                           <button
