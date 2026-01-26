@@ -20,7 +20,13 @@ export default function FlashcardDeck() {
 
   useEffect(() => {
     const savedCards = storage.getItem<Flashcard[]>('speakSnapFlashcards');
-    if (savedCards) setFlashcards(savedCards);
+    console.log('📚 Loading flashcards:', savedCards?.length || 0, 'cards');
+    if (savedCards && savedCards.length > 0) {
+      console.log('First card:', savedCards[0]);
+      setFlashcards(savedCards);
+    } else {
+      console.log('⚠️ No flashcards found in storage');
+    }
   }, []);
 
   useEffect(() => {
@@ -181,6 +187,7 @@ export default function FlashcardDeck() {
   }, []);
 
   if (flashcards.length === 0) {
+    console.log('🚫 Flashcards empty, showing empty state');
     return (
       <div className="flex-1 flex flex-col items-center justify-center relative min-h-[500px]">
         <div className="bg-white rounded-2xl p-8 text-center shadow-float border border-gray-100/50 w-full animate-in fade-in">
@@ -193,6 +200,8 @@ export default function FlashcardDeck() {
       </div>
     );
   }
+
+  console.log('✅ Rendering', flashcards.length, 'flashcards, active:', activeIndex);
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center relative perspective-[1200px] min-h-[500px]">
