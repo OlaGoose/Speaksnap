@@ -76,7 +76,10 @@ export default function FlashcardDeck() {
     const target = e.target as HTMLElement;
     
     // Don't handle touch on interactive elements
-    if (target.closest('button') || target.closest('iframe')) return;
+    if (target.closest('button')) return;
+    
+    // Don't handle touch on iframe (back face video)
+    if (isFlipped && target.closest('iframe')) return;
     
     // Don't handle touch if it's on the scrollable content area (back face)
     if (isFlipped && target.closest('.flashcard-scroll')) {
@@ -124,8 +127,8 @@ export default function FlashcardDeck() {
       } else if (deltaX < 0 && activeIndex < flashcards.length - 1) {
         setActiveIndex((prev) => prev + 1);
       }
-    } else if (isVerticalSwipe && !isFlipped) {
-      // Swipe up/down to change video
+    } else if (isVerticalSwipe && isFlipped) {
+      // Swipe up/down to change video (only on back face)
       const currentCard = flashcards[activeIndex];
       const videoIds = currentCard?.back?.video_ids || [];
       if (videoIds.length > 1) {
@@ -266,17 +269,79 @@ export default function FlashcardDeck() {
                   WebkitTapHighlightColor: 'transparent',
                 }}
               >
-                {/* Front Face */}
-                <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] rounded-[24px] overflow-hidden bg-black flex flex-col">
-                  {/* Video Layer */}
-                  <div className="absolute inset-0 z-0">
+                {/* Front Face - Simple Card */}
+                <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] rounded-[24px] overflow-hidden bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 flex flex-col items-center justify-center p-8">
+                  {/* Card counter */}
+                  <div className="absolute top-4 right-4 z-10">
+                    <div className="text-[10px] font-mono text-white/70 bg-black/30 px-2.5 py-1 rounded-full backdrop-blur-md">
+                      {index + 1} / {flashcards.length}
+                    </div>
+                  </div>
+
+                  {/* Touch Layer - Click to flip */}
+                  <div 
+                    className="absolute inset-0 cursor-pointer touch-manipulation"
+                    style={{ WebkitTapHighlightColor: 'transparent' }}
+                    onClick={(e) => {
+                      const target = e.target as HTMLElement;
+                      if (!target.closest('button') && isActive) {
+                        console.log('🖱️ Front card click - flipping to back');
+                        setIsFlipped(!isFlipped);
+                      }
+                    }}
+                  ></div>
+
+                  {/* Main Content */}
+                  <div className="relative z-10 flex flex-col items-center gap-6 max-w-md w-full">
+                    {/* Word */}
+                    <h3 className="text-5xl md:text-6xl font-black text-white text-center leading-none tracking-tight drop-shadow-2xl">
+                      {front}
+                    </h3>
+
+                    {/* Phonetic */}
+                    {back.phonetic && (
+                      <p className="text-white/90 font-mono text-xl tracking-wide drop-shadow-lg">
+                        /{back.phonetic}/
+                      </p>
+                    )}
+
+                    {/* Play Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        playAudio(front, e);
+                      }}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      className="h-14 w-14 rounded-full bg-white/20 hover:bg-white/30 active:bg-white/25 backdrop-blur-xl border-2 border-white/40 text-white flex items-center justify-center transition-all duration-300 hover:scale-110 active:scale-95 shadow-2xl pointer-events-auto group"
+                      aria-label="Play pronunciation"
+                    >
+                      <Volume2 size={24} className="opacity-90 group-hover:opacity-100 transition-opacity" />
+                    </button>
+
+                    {/* Hint text */}
+                    <p className="text-white/60 text-xs text-center mt-4 font-medium tracking-wide">
+                      Tap to see details
+                    </p>
+                  </div>
+
+                  {/* Decorative gradient overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent pointer-events-none"></div>
+                </div>
+
+                {/* Back Face */}
+                <div
+                  className="absolute inset-0 w-full h-full [backface-visibility:hidden] rounded-[24px] overflow-hidden bg-white flex flex-col text-primary-900"
+                  style={{ transform: 'rotateY(180deg)' }}
+                >
+                  {/* YouTube Video Section - Fixed at top */}
+                  <div className="flex-shrink-0 relative bg-black" style={{ height: '40%' }}>
                     {currentVideoId && !hasVideoError ? (
                       <>
                         {/* Loading skeleton */}
                         {!isVideoLoaded && (
                           <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900 animate-pulse">
                             <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="w-16 h-16 rounded-full border-4 border-white/20 border-t-white/80 animate-spin" />
+                              <div className="w-12 h-12 rounded-full border-4 border-white/20 border-t-white/80 animate-spin" />
                             </div>
                           </div>
                         )}
@@ -285,146 +350,76 @@ export default function FlashcardDeck() {
                           ref={(el) => { iframeRefs.current[card.id] = el; }}
                           width="100%"
                           height="100%"
-                          src={`https://www.youtube.com/embed/${currentVideoId}?autoplay=${isActive && !isFlipped ? 1 : 0}&controls=1&modestbranding=1&rel=0&playsinline=1&loop=1&playlist=${currentVideoId}&mute=${isActive && !isFlipped ? 0 : 1}`}
+                          src={`https://www.youtube.com/embed/${currentVideoId}?autoplay=${isActive && isFlipped ? 1 : 0}&controls=1&modestbranding=1&rel=0&playsinline=1&loop=1&playlist=${currentVideoId}&mute=${isActive && isFlipped ? 0 : 1}`}
                           title="Context Video"
                           frameBorder="0"
                           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          className={`w-full h-full object-cover pointer-events-auto scale-[1.35] transition-opacity duration-300 ${isVideoLoaded ? 'opacity-100' : 'opacity-0'}`}
+                          className={`w-full h-full object-cover pointer-events-auto transition-opacity duration-300 ${isVideoLoaded ? 'opacity-100' : 'opacity-0'}`}
                           onLoad={() => handleVideoLoad(card.id)}
                           onError={() => handleVideoError(card.id)}
                         />
                       </>
                     ) : (
-                      <>
-                        {card.image_url ? (
-                          <img src={card.image_url} alt="fallback" className="w-full h-full object-cover opacity-60" />
-                        ) : (
-                          <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 opacity-60" />
+                      <div className="absolute inset-0 bg-gradient-to-br from-gray-700 to-gray-900 flex items-center justify-center flex-col gap-3">
+                        <Youtube size={40} className="text-white/30" />
+                        {hasVideoError && (
+                          <p className="text-white/50 text-xs px-4 text-center">
+                            Video unavailable
+                            {videoIds.length > 1 && <><br />Swipe to try another</>}
+                          </p>
                         )}
-                        <div className="absolute inset-0 flex items-center justify-center flex-col gap-3">
-                          <Youtube size={48} className="text-white/30" />
-                          {hasVideoError && (
-                            <p className="text-white/50 text-xs px-4 text-center">
-                              Video unavailable
-                              {videoIds.length > 1 && <br />}
-                              {videoIds.length > 1 && 'Swipe to try another'}
-                            </p>
-                          )}
-                          {!currentVideoId && !hasVideoError && (
-                            <p className="text-white/50 text-xs px-4 text-center">
-                              No videos found
-                            </p>
-                          )}
-                        </div>
-                      </>
+                        {!currentVideoId && !hasVideoError && (
+                          <p className="text-white/50 text-xs px-4 text-center">
+                            No videos found
+                          </p>
+                        )}
+                      </div>
                     )}
-                  </div>
 
-                  {/* Gradient Overlay */}
-                  <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/30 via-transparent to-black/95 pointer-events-none"></div>
-
-                  {/* Touch Layer - Desktop click support */}
-                  <div 
-                    className="absolute inset-0 z-20 cursor-pointer active:scale-[0.99] transition-transform touch-manipulation"
-                    style={{ WebkitTapHighlightColor: 'transparent' }}
-                    onClick={(e) => {
-                      // Desktop only - mobile uses touch events
-                      const target = e.target as HTMLElement;
-                      if (!target.closest('iframe') && isActive) {
-                        console.log('🖱️ Desktop click - flipping card');
-                        setIsFlipped(!isFlipped);
-                      }
-                    }}
-                  ></div>
-
-                  {/* Top Metadata */}
-                  <div className="absolute top-4 right-4 z-30 flex justify-end items-start pointer-events-none">
-                    <div className="text-[10px] font-mono text-white/70 bg-black/50 px-2.5 py-1 rounded-full backdrop-blur-md shadow-lg">
-                      {index + 1} / {flashcards.length}
-                    </div>
-                  </div>
-
-                  {/* Video Navigation Indicators */}
-                  {videoIds.length > 1 && !isFlipped && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 z-30 flex flex-col gap-1 items-center pointer-events-none opacity-70">
-                      <ChevronUp size={20} className="text-white animate-bounce-subtle" />
-                      <div className="flex flex-col gap-0.5 py-2">
-                        {videoIds.map((_, idx) => (
-                          <div
-                            key={idx}
-                            className={`h-1.5 w-1.5 rounded-full transition-all ${
-                              idx === currentVidIndex
-                                ? 'bg-white scale-125'
-                                : 'bg-white/30'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <ChevronDown size={20} className="text-white animate-bounce-subtle" />
-                    </div>
-                  )}
-
-                  {/* Video source indicator */}
-                  {currentVideoId && !hasVideoError && isActive && !isFlipped && (
-                    <div className="absolute top-4 left-4 z-30 flex items-center gap-1.5 px-2 py-1 rounded-full bg-red-600/90 backdrop-blur-md pointer-events-none shadow-lg">
-                      <Youtube size={12} className="text-white" />
-                      <span className="text-[9px] font-medium text-white uppercase tracking-wider">
-                        {currentVidIndex + 1}/{videoIds.length}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Bottom Content */}
-                  <div className="absolute bottom-0 left-0 right-0 z-30 p-5 pb-6 pointer-events-none">
-                    <div className="flex items-start gap-3">
-                      <div className="flex-1">
-                        <div className="flex items-baseline gap-2.5 mb-1">
-                          <h3 className="text-3xl font-black text-white leading-none tracking-tight drop-shadow-[0_4px_16px_rgba(0,0,0,0.9)]">
-                            {front}
-                          </h3>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              playAudio(front, e);
-                            }}
-                            onTouchStart={(e) => e.stopPropagation()}
-                            className="h-8 w-8 rounded-full bg-white/20 hover:bg-white/30 active:bg-white/25 backdrop-blur-md border border-white/30 text-white flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg pointer-events-auto flex-shrink-0"
-                            aria-label="Play pronunciation"
-                          >
-                            <Volume2 size={14} className="opacity-90" />
-                          </button>
+                    {/* Video Navigation Indicators */}
+                    {videoIds.length > 1 && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-1 items-center pointer-events-none opacity-70 z-10">
+                        <ChevronUp size={18} className="text-white animate-bounce-subtle" />
+                        <div className="flex flex-col gap-0.5 py-1.5">
+                          {videoIds.map((_, idx) => (
+                            <div
+                              key={idx}
+                              className={`h-1.5 w-1.5 rounded-full transition-all ${
+                                idx === currentVidIndex
+                                  ? 'bg-white scale-125'
+                                  : 'bg-white/30'
+                              }`}
+                            />
+                          ))}
                         </div>
-                        {back.phonetic && (
-                          <p className="text-white/80 font-mono text-sm tracking-wide ml-0.5 drop-shadow-md">/{back.phonetic}/</p>
-                        )}
+                        <ChevronDown size={18} className="text-white animate-bounce-subtle" />
                       </div>
-                    </div>
-                  </div>
-                </div>
+                    )}
 
-                {/* Back Face */}
-                <div
-                  className="absolute inset-0 w-full h-full [backface-visibility:hidden] rounded-[24px] overflow-hidden bg-white flex flex-col text-primary-900"
-                  style={{ transform: 'rotateY(180deg)' }}
-                >
-                  {/* Header - Fixed */}
-                  <div 
-                    className="flex-shrink-0 px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-white z-10"
-                  >
-                    <h4 className="text-2xl font-bold tracking-tight flex-1 pr-2">{front}</h4>
+                    {/* Video source indicator */}
+                    {currentVideoId && !hasVideoError && isActive && (
+                      <div className="absolute top-3 left-3 flex items-center gap-1.5 px-2 py-1 rounded-full bg-red-600/90 backdrop-blur-md shadow-lg z-10">
+                        <Youtube size={11} className="text-white" />
+                        <span className="text-[9px] font-medium text-white uppercase tracking-wider">
+                          {currentVidIndex + 1}/{videoIds.length}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Delete button */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         deleteCurrentCard(e);
                       }}
-                      className="p-2 text-gray-300 hover:text-red-500 transition-colors pointer-events-auto flex-shrink-0"
+                      className="absolute top-3 right-3 p-2 rounded-full bg-black/50 hover:bg-black/70 active:bg-black/60 text-white/80 hover:text-red-400 transition-all pointer-events-auto z-10 backdrop-blur-md"
                     >
-                      <Trash2 size={20} />
+                      <Trash2 size={18} />
                     </button>
                   </div>
 
                   {/* Content Scroll - Scrollable with gradient indicators */}
-                  <div className="relative flex-1 min-h-0">
+                  <div className="relative flex-1 min-h-0 bg-white">
                     {/* Top scroll gradient indicator */}
                     <div 
                       className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-white to-transparent pointer-events-none z-20 transition-opacity duration-200" 
@@ -434,7 +429,7 @@ export default function FlashcardDeck() {
                     
                     {/* Scrollable content */}
                     <div 
-                      className="h-full overflow-y-auto overscroll-contain px-6 py-6 space-y-6 flashcard-scroll"
+                      className="h-full overflow-y-auto overscroll-contain px-6 py-5 space-y-5 flashcard-scroll"
                       style={{
                         scrollbarWidth: 'thin',
                         scrollbarColor: 'rgba(0, 0, 0, 0.2) transparent',
@@ -476,28 +471,32 @@ export default function FlashcardDeck() {
                         }
                       }}
                     >
+                      {/* Word Title */}
+                      <div className="flex items-center justify-between pb-2">
+                        <h4 className="text-3xl font-black text-gray-900 tracking-tight">{front}</h4>
+                      </div>
+
                       {/* Phonetic & Pronunciation */}
                       {back.phonetic && (
-                        <div className="flex items-center justify-between pb-3">
-                          <div className="flex items-center gap-3">
-                            <span className="text-gray-500 font-mono text-sm">/{back.phonetic}/</span>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                playAudio(front, e);
-                              }}
-                              className="p-1.5 rounded-full hover:bg-gray-100 active:bg-gray-200 transition-colors"
-                              aria-label="Play pronunciation"
-                            >
-                              <Volume2 size={16} className="text-blue-600" />
-                            </button>
-                          </div>
+                        <div className="flex items-center gap-3 pb-2">
+                          <span className="text-gray-600 font-mono text-base">/{back.phonetic}/</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              playAudio(front, e);
+                            }}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            className="p-2 rounded-full bg-blue-50 hover:bg-blue-100 active:bg-blue-200 transition-colors pointer-events-auto"
+                            aria-label="Play pronunciation"
+                          >
+                            <Volume2 size={18} className="text-blue-600" />
+                          </button>
                         </div>
                       )}
 
                       {/* Translation - Primary meaning */}
-                      <div className="pb-4">
-                        <p className="text-2xl font-bold text-gray-900 leading-tight">{back.translation}</p>
+                      <div className="pb-3">
+                        <p className="text-xl font-bold text-gray-800 leading-tight">{back.translation}</p>
                       </div>
 
                       {/* Definition - Detailed explanation */}
