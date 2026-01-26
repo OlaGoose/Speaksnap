@@ -569,18 +569,17 @@ export default function DialogueScreen({
       <div className="absolute top-0 left-0 right-0 z-30 flex justify-between items-start p-4 pt-6 bg-gradient-to-b from-primary-50 via-primary-50/90 to-transparent pointer-events-none">
         <button
           onClick={() => setAutoPlayAudio(!autoPlayAudio)}
-          className={`w-10 h-10 rounded-full backdrop-blur-md shadow-float border flex items-center justify-center transition-all pointer-events-auto active:scale-95 touch-manipulation ${
+          className={`w-9 h-9 rounded-full flex items-center justify-center transition-all pointer-events-auto active:scale-95 touch-manipulation ${
             autoPlayAudio 
-              ? 'bg-blue-500/90 border-blue-400/50 text-white' 
-              : 'bg-white/80 border-white/50 text-gray-400 hover:text-gray-900 hover:bg-white'
+              ? 'bg-black text-white shadow-lg' 
+              : 'bg-white/90 text-gray-400 hover:text-gray-700 hover:bg-white shadow-md'
           }`}
           aria-label={autoPlayAudio ? 'Disable auto audio' : 'Enable auto audio'}
           title={autoPlayAudio ? 'Auto audio ON' : 'Auto audio OFF'}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"></path>
             {autoPlayAudio && <path d="M16 9a5 5 0 0 1 0 6"></path>}
-            {autoPlayAudio && <path d="M19.364 18.364a9 9 0 0 0 0-12.728"></path>}
           </svg>
         </button>
         <button
@@ -697,10 +696,10 @@ export default function DialogueScreen({
           onClick={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
         >
-          <div className="inline-flex items-stretch h-9 bg-white overflow-hidden text-sm rounded-lg shadow-[0_8px_32px_rgba(0,0,0,0.12)] pointer-events-auto border border-black/5 p-1">
+          <div className="inline-flex items-center gap-1.5 bg-white/95 backdrop-blur-xl rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.08),0_1px_2px_rgba(0,0,0,0.06)] pointer-events-auto border border-gray-200/60 p-1.5">
             {selectionActionLoading ? (
-              <div className="px-4 py-1 flex items-center justify-center gap-2">
-                <Loader2 size={16} className="animate-spin text-gray-600" />
+              <div className="px-4 py-2 flex items-center justify-center gap-2.5">
+                <Loader2 size={16} className="animate-spin text-gray-500" />
                 <span className="text-gray-700 text-sm font-medium">Processing...</span>
               </div>
             ) : (
@@ -714,17 +713,17 @@ export default function DialogueScreen({
                     window.speechSynthesis.speak(utterance);
                   }}
                   onTouchStart={(e) => e.stopPropagation()}
-                  className="px-2 py-1 hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center gap-1.5 rounded-md"
+                  className="group px-3 py-2 hover:bg-gray-100/80 active:bg-gray-200/80 transition-all flex items-center gap-2 rounded-lg touch-manipulation min-h-[36px]"
                   title="Play audio"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-600 group-hover:text-gray-900 transition-colors">
                     <path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"></path>
                     <path d="M16 9a5 5 0 0 1 0 6"></path>
                   </svg>
-                  <span className="text-gray-700 font-medium">Play</span>
+                  <span className="text-gray-700 font-medium text-sm group-hover:text-gray-900">Play</span>
                 </button>
                 
-                <div className="h-5 w-px bg-gray-200 my-auto"></div>
+                <div className="h-6 w-px bg-gray-200"></div>
                 
                 <button
                   onClick={(e) => {
@@ -732,14 +731,14 @@ export default function DialogueScreen({
                     handleTranslate();
                   }}
                   onTouchStart={(e) => e.stopPropagation()}
-                  className="px-2 py-1 hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center gap-1.5 rounded-md"
+                  className="group px-3 py-2 hover:bg-blue-50/80 active:bg-blue-100/80 transition-all flex items-center gap-2 rounded-lg touch-manipulation min-h-[36px]"
                   title="Translate"
                 >
-                  <Languages size={16} className="text-blue-600" />
-                  <span className="text-gray-700 font-medium">Translate</span>
+                  <Languages size={18} className="text-blue-600 group-hover:text-blue-700 transition-colors" />
+                  <span className="text-gray-700 font-medium text-sm group-hover:text-blue-700">Translate</span>
                 </button>
                 
-                <div className="h-5 w-px bg-gray-200 my-auto"></div>
+                <div className="h-6 w-px bg-gray-200"></div>
                 
                 <button
                   onClick={(e) => {
@@ -747,14 +746,14 @@ export default function DialogueScreen({
                     handleOptimize();
                   }}
                   onTouchStart={(e) => e.stopPropagation()}
-                  className="px-2 py-1 hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center gap-1.5 rounded-md"
+                  className="group px-3 py-2 hover:bg-purple-50/80 active:bg-purple-100/80 transition-all flex items-center gap-2 rounded-lg touch-manipulation min-h-[36px]"
                   title="AI Optimize"
                 >
-                  <Wand2 size={16} className="text-purple-600" />
-                  <span className="text-gray-700 font-medium">Optimize</span>
+                  <Wand2 size={18} className="text-purple-600 group-hover:text-purple-700 transition-colors" />
+                  <span className="text-gray-700 font-medium text-sm group-hover:text-purple-700">Optimize</span>
                 </button>
                 
-                <div className="h-5 w-px bg-gray-200 my-auto"></div>
+                <div className="h-6 w-px bg-gray-200"></div>
                 
                 <button
                   onClick={(e) => {
@@ -762,11 +761,11 @@ export default function DialogueScreen({
                     handleAddToFlashcard();
                   }}
                   onTouchStart={(e) => e.stopPropagation()}
-                  className="px-2 py-1 hover:bg-gray-50 active:bg-gray-100 transition-colors flex items-center gap-1.5 rounded-md"
+                  className="group px-3 py-2 hover:bg-green-50/80 active:bg-green-100/80 transition-all flex items-center gap-2 rounded-lg touch-manipulation min-h-[36px]"
                   title="Save to Flashcard"
                 >
-                  <Bookmark size={16} className="text-green-600" />
-                  <span className="text-gray-700 font-medium">Save</span>
+                  <Bookmark size={18} className="text-green-600 group-hover:text-green-700 transition-colors" />
+                  <span className="text-gray-700 font-medium text-sm group-hover:text-green-700">Save</span>
                 </button>
               </>
             )}

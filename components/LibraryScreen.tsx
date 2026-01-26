@@ -430,7 +430,7 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
           </div>
         )}
 
-        {activeTab === 'flashcards' && <FlashcardDeck />}
+        {activeTab === 'flashcards' && <FlashcardDeck key={`flashcards-${activeTab}`} />}
 
         {activeTab === 'diary' && (
           <div className="py-4 space-y-4 pb-32 safe-bottom">

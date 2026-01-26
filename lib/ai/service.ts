@@ -80,30 +80,13 @@ Return JSON:
 
   let lastError: any = null;
 
-  // Try Doubao first
-  if ((AI_PROVIDER === 'doubao' || AI_PROVIDER === 'auto') && doubao) {
+  // Skip Doubao for image analysis - it doesn't support vision API
+  // Doubao will be skipped in favor of OpenAI and Gemini which have proper vision support
+
+  // Try OpenAI (prioritize for image analysis)
+  if ((AI_PROVIDER === 'openai' || AI_PROVIDER === 'auto') && openai) {
     try {
-      console.log('🔥 Analyzing with Doubao...');
-      const response = await doubao.chat([
-        { role: 'system', content: 'You are a scenario generator. Always return valid JSON.' },
-        { role: 'user', content: `${prompt}\n\nImage: data:image/jpeg;base64,${cleanBase64.substring(0, 100)}...` },
-      ]);
-
-      const text = response.choices[0]?.message?.content;
-      if (!text) throw new Error('Empty response');
-
-      const parsed = DoubaoProvider.parseJSONResponse(text);
-      return validateAnalysisResponse(parsed);
-    } catch (error: any) {
-      lastError = error;
-      console.warn('❌ Doubao analysis failed:', error.message);
-    }
-  }
-
-  // Try OpenAI
-  if (AI_PROVIDER === 'auto' && openai) {
-    try {
-      console.log('🔄 Trying OpenAI...');
+      console.log('🔄 Analyzing image with OpenAI Vision...');
       const response = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [
@@ -125,10 +108,15 @@ Return JSON:
       const text = response.choices[0]?.message?.content;
       if (!text) throw new Error('Empty response');
 
+      console.log('✅ OpenAI Vision analysis successful');
       return validateAnalysisResponse(JSON.parse(text));
     } catch (error: any) {
       lastError = error;
-      console.warn('❌ OpenAI analysis failed:', error.message);
+      if (error.message?.includes('API key') || error.message?.includes('401')) {
+        console.log('ℹ️ OpenAI skipped (API key issue)');
+      } else {
+        console.warn('❌ OpenAI analysis failed:', error.message);
+      }
     }
   }
 
