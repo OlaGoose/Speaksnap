@@ -147,7 +147,7 @@ export default function FlashcardDeck() {
       
       if (!isOnScrollArea) {
         // Tap anywhere (except scroll area) to flip
-        console.log('📱 Mobile tap detected - flipping card');
+        console.log('📱 Mobile tap detected - flipping card', { isFlipped, willBecome: !isFlipped });
         setIsFlipped(!isFlipped);
       }
     }
@@ -259,10 +259,11 @@ export default function FlashcardDeck() {
           return (
             <div key={card.id} className="absolute inset-0 w-full h-full" style={style}>
               <div
-                className="relative w-full h-full duration-700 shadow-2xl rounded-[24px] [transform-style:preserve-3d]"
+                className="relative w-full h-full shadow-2xl rounded-[24px] [transform-style:preserve-3d] select-none"
                 style={{ 
                   transform: isActive && isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
                   transition: 'transform 0.7s cubic-bezier(0.4, 0, 0.2, 1)',
+                  WebkitTapHighlightColor: 'transparent',
                 }}
               >
                 {/* Front Face */}
@@ -324,7 +325,8 @@ export default function FlashcardDeck() {
 
                   {/* Touch Layer - Desktop click support */}
                   <div 
-                    className="absolute inset-0 z-20 cursor-pointer active:scale-[0.99] transition-transform"
+                    className="absolute inset-0 z-20 cursor-pointer active:scale-[0.99] transition-transform touch-manipulation"
+                    style={{ WebkitTapHighlightColor: 'transparent' }}
                     onClick={(e) => {
                       // Desktop only - mobile uses touch events
                       const target = e.target as HTMLElement;
