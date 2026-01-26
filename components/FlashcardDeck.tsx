@@ -129,18 +129,21 @@ export default function FlashcardDeck() {
           prevVideo(currentCard.id, videoIds.length);
         }
       }
-    } else if (isTap && !isFlipped) {
-      // Only allow tap to flip when on front face
-      setIsFlipped((prev) => !prev);
-    } else if (isTap && isFlipped) {
-      // On back face, tap outside scroll area to flip back
-      const target = (document.activeElement || document.elementFromPoint(
-        touchStartRef.current?.x || 0,
-        touchStartRef.current?.y || 0
-      )) as HTMLElement;
-      
-      if (target && !target.closest('.flashcard-scroll')) {
-        setIsFlipped(false);
+    } else if (isTap) {
+      // Tap to flip - but check if tapping on scrollable area
+      if (isFlipped) {
+        const target = (document.activeElement || document.elementFromPoint(
+          touchStartRef.current?.x || 0,
+          touchStartRef.current?.y || 0
+        )) as HTMLElement;
+        
+        // Only flip if not tapping on scroll area
+        if (target && !target.closest('.flashcard-scroll')) {
+          setIsFlipped(!isFlipped);
+        }
+      } else {
+        // On front, always allow flip
+        setIsFlipped(!isFlipped);
       }
     }
 
@@ -251,11 +254,14 @@ export default function FlashcardDeck() {
           return (
             <div key={card.id} className="absolute inset-0 w-full h-full" style={style}>
               <div
-                className="relative w-full h-full duration-500 shadow-2xl rounded-[24px] overflow-hidden [transform-style:preserve-3d] bg-black"
-                style={{ transform: isActive && isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}
+                className="relative w-full h-full duration-700 shadow-2xl rounded-[24px] [transform-style:preserve-3d]"
+                style={{ 
+                  transform: isActive && isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+                  transition: 'transform 0.7s cubic-bezier(0.4, 0, 0.2, 1)',
+                }}
               >
                 {/* Front Face */}
-                <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] rounded-[24px] overflow-visible bg-black flex flex-col">
+                <div className="absolute inset-0 w-full h-full [backface-visibility:hidden] rounded-[24px] overflow-hidden bg-black flex flex-col">
                   {/* Video Layer */}
                   <div className="absolute inset-0 z-0">
                     {currentVideoId && !hasVideoError ? (
@@ -311,12 +317,16 @@ export default function FlashcardDeck() {
                   {/* Gradient Overlay */}
                   <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/20 via-transparent to-black/90 pointer-events-none"></div>
 
-                  {/* Touch Layer - Click outside video to flip */}
+                  {/* Touch Layer - Click anywhere to flip */}
                   <div 
-                    className="absolute inset-0 z-20 cursor-pointer"
-                    onClick={() => {
-                      if (isActive && !isFlipped) {
-                        setIsFlipped(true);
+                    className="absolute inset-0 z-20 cursor-pointer active:scale-[0.99] transition-transform"
+                    onClick={(e) => {
+                      // Don't flip if clicking on video controls
+                      const target = e.target as HTMLElement;
+                      if (!target.closest('iframe')) {
+                        if (isActive) {
+                          setIsFlipped(!isFlipped);
+                        }
                       }
                     }}
                   ></div>
@@ -359,11 +369,11 @@ export default function FlashcardDeck() {
                   )}
 
                   {/* Bottom Content */}
-                  <div className="absolute bottom-0 left-0 right-0 z-40 p-5 pb-6 pointer-events-none">
+                  <div className="absolute bottom-0 left-0 right-0 z-30 p-5 pb-6 pointer-events-none">
                     <div className="flex items-start gap-3">
                       <div className="flex-1">
                         <div className="flex items-baseline gap-2.5 mb-1">
-                          <h3 className="text-3xl font-black text-white leading-none tracking-tight drop-shadow-[0_4px_12px_rgba(0,0,0,0.8)]">
+                          <h3 className="text-3xl font-black text-white leading-none tracking-tight drop-shadow-[0_4px_16px_rgba(0,0,0,0.9)]">
                             {front}
                           </h3>
                           <button
@@ -372,14 +382,14 @@ export default function FlashcardDeck() {
                               playAudio(front, e);
                             }}
                             onTouchStart={(e) => e.stopPropagation()}
-                            className="h-8 w-8 rounded-full bg-white/15 hover:bg-white/25 active:bg-white/20 backdrop-blur-sm border border-white/20 text-white flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 shadow-md pointer-events-auto flex-shrink-0"
+                            className="h-8 w-8 rounded-full bg-white/20 hover:bg-white/30 active:bg-white/25 backdrop-blur-md border border-white/30 text-white flex items-center justify-center transition-all duration-200 hover:scale-110 active:scale-95 shadow-lg pointer-events-auto flex-shrink-0"
                             aria-label="Play pronunciation"
                           >
                             <Volume2 size={14} className="opacity-90" />
                           </button>
                         </div>
                         {back.phonetic && (
-                          <p className="text-white/70 font-mono text-xs tracking-wide ml-0.5">/{back.phonetic}/</p>
+                          <p className="text-white/80 font-mono text-sm tracking-wide ml-0.5 drop-shadow-md">/{back.phonetic}/</p>
                         )}
                       </div>
                     </div>
@@ -393,12 +403,14 @@ export default function FlashcardDeck() {
                 >
                   {/* Header - Fixed */}
                   <div 
-                    className="flex-shrink-0 px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-white z-10 cursor-pointer"
-                    onClick={() => setIsFlipped(false)}
+                    className="flex-shrink-0 px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-white z-10"
                   >
                     <h4 className="text-2xl font-bold tracking-tight flex-1 pr-2">{front}</h4>
                     <button
-                      onClick={deleteCurrentCard}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteCurrentCard(e);
+                      }}
                       className="p-2 text-gray-300 hover:text-red-500 transition-colors pointer-events-auto flex-shrink-0"
                     >
                       <Trash2 size={20} />
@@ -545,14 +557,23 @@ export default function FlashcardDeck() {
                     />
                   </div>
 
-                  {/* Footer - Fixed */}
+                  {/* Footer - Fixed - Click anywhere to flip back */}
                   <div 
-                    className="flex-shrink-0 p-4 text-center border-t border-gray-50 bg-white z-10 cursor-pointer"
-                    onClick={() => setIsFlipped(false)}
+                    className="flex-shrink-0 p-4 text-center border-t border-gray-50 bg-white z-10 cursor-pointer active:bg-gray-50 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsFlipped(false);
+                    }}
                   >
-                    <span className="text-[10px] text-gray-300 uppercase tracking-widest font-medium">
-                      Tap to return to video
-                    </span>
+                    <div className="flex items-center justify-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400">
+                        <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"></path>
+                        <path d="M21 3v5h-5"></path>
+                      </svg>
+                      <span className="text-[10px] text-gray-400 uppercase tracking-widest font-medium">
+                        Tap to flip back
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
