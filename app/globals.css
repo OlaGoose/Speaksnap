@@ -215,8 +215,22 @@ body {
 /* Smooth scrolling with momentum */
 .flashcard-scroll {
   scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
+  -webkit-overflow-scrolling: touch !important;
   overscroll-behavior-y: contain;
+  /* Ensure touch scrolling works */
+  touch-action: pan-y !important;
+  /* Ensure overflow is enabled */
+  overflow-y: auto !important;
+  /* Force GPU acceleration for smoother scrolling */
+  transform: translateZ(0);
+  will-change: scroll-position;
+}
+
+/* Ensure buttons inside flashcard-scroll don't block scrolling */
+.flashcard-scroll button,
+.flashcard-scroll a,
+.flashcard-scroll [role="button"] {
+  touch-action: auto !important;
 }
 
 /* Mobile scrollbar - thinner and more subtle */
@@ -265,16 +279,14 @@ body {
   }
 
   /* Optimize touch targets - minimum 44x44px */
-  button, a, [role="button"] {
+  /* Exclude elements inside scrollable containers to avoid touch-action conflicts */
+  button:not(.flashcard-scroll button):not(.flashcard-scroll *), 
+  a:not(.flashcard-scroll a):not(.flashcard-scroll *), 
+  [role="button"]:not(.flashcard-scroll [role="button"]):not(.flashcard-scroll *) {
     -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
     touch-action: manipulation;
     min-height: 44px;
     min-width: 44px;
-  }
-
-  /* Smooth scrolling on iOS */
-  * {
-    -webkit-overflow-scrolling: touch;
   }
 
   /* Prevent zoom on input focus */
