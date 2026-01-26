@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X,
   Lightbulb,
@@ -13,6 +13,7 @@ import {
   Copy,
 } from 'lucide-react';
 import { Scenario, DialogueLine, UserLevel } from '@/lib/types';
+import { storage } from '@/lib/utils/storage';
 
 interface DialogueScreenProps {
   scenario: Scenario;
@@ -49,6 +50,8 @@ export default function DialogueScreen({
     type: 'translate' | 'optimize';
     text: string;
   } | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const selectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -58,7 +61,7 @@ export default function DialogueScreen({
   useEffect(() => {
     if (dialogueId) {
       // Load existing dialogue
-      const scenarios = JSON.parse(localStorage.getItem('speakSnapScenarios') || '[]');
+      const scenarios = storage.getItem<Scenario[]>('speakSnapScenarios') || [];
       const currentScenario = scenarios.find((s: Scenario) => s.id === scenario.id);
       const existingDialogue = currentScenario?.dialogues?.find((d: any) => d.id === dialogueId);
       
@@ -83,14 +86,30 @@ export default function DialogueScreen({
     saveDialogueProgress(initialMessages, false);
   }, [scenario, dialogueId]);
 
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 
+        (typeof window !== 'undefined' && window.innerWidth < 768));
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   // Auto-scroll
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isProcessing]);
 
-  // Handle text selection with context
+  // Handle text selection with context - Mobile optimized
   useEffect(() => {
     const handleSelectionChange = () => {
+      // Clear any pending timeout
+      if (selectionTimeoutRef.current) {
+        clearTimeout(selectionTimeoutRef.current);
+      }
+
       const selection = window.getSelection();
       if (!selection || selection.isCollapsed || !selection.toString().trim()) {
         setSelectionMenu(null);
@@ -98,7 +117,10 @@ export default function DialogueScreen({
       }
 
       const text = selection.toString().trim();
-      if (text.length === 0) return;
+      if (text.length === 0) {
+        setSelectionMenu(null);
+        return;
+      }
 
       const range = selection.getRangeAt(0);
       const rect = range.getBoundingClientRect();
@@ -122,18 +144,106 @@ export default function DialogueScreen({
           context = text; // Fallback to selected text
         }
 
-        setSelectionMenu({
-          x: rect.left + rect.width / 2,
-          y: rect.top,
-          text: text,
-          context: context,
-        });
+        // On mobile, delay menu display to allow selection to complete
+        const delay = isMobile ? 300 : 0;
+        
+        selectionTimeoutRef.current = setTimeout(() => {
+          // Re-check selection is still valid
+          const currentSelection = window.getSelection();
+          if (!currentSelection || currentSelection.isCollapsed || 
+              currentSelection.toString().trim() !== text) {
+            return;
+          }
+
+          // Calculate menu position - optimized for mobile
+          const viewportWidth = window.innerWidth;
+          const viewportHeight = window.innerHeight;
+          const safeAreaTop = typeof window !== 'undefined' && 'visualViewport' in window 
+            ? (window.visualViewport?.offsetTop || 0) 
+            : 0;
+          const safeAreaBottom = typeof window !== 'undefined' && 'visualViewport' in window
+            ? (window.visualViewport?.height || viewportHeight)
+            : viewportHeight;
+
+          let menuX = rect.left + rect.width / 2;
+          let menuY = rect.top;
+
+          // Mobile-specific positioning
+          if (isMobile) {
+            // Center horizontally on mobile
+            menuX = viewportWidth / 2;
+            
+            // Position above selection if there's space, otherwise below
+            const menuHeight = 200; // Approximate menu height for vertical layout
+            const spaceAbove = rect.top - safeAreaTop;
+            const spaceBelow = safeAreaBottom - rect.bottom;
+            
+            if (spaceAbove > menuHeight + 20) {
+              // Position above
+              menuY = rect.top - menuHeight - 10;
+            } else if (spaceBelow > menuHeight + 20) {
+              // Position below
+              menuY = rect.bottom + 10;
+            } else {
+              // Center vertically if no space
+              menuY = (rect.top + rect.bottom) / 2 - menuHeight / 2;
+            }
+          } else {
+            // Desktop positioning
+            menuX = Math.min(Math.max(70, menuX), viewportWidth - 150);
+            menuY = Math.max(10, rect.top - 50);
+          }
+
+          setSelectionMenu({
+            x: menuX,
+            y: menuY,
+            text: text,
+            context: context,
+          });
+        }, delay);
+      }
+    };
+
+    // Handle touch events for mobile
+    const handleTouchEnd = (e: TouchEvent) => {
+      // Small delay to allow selection to complete
+      setTimeout(() => {
+        handleSelectionChange();
+      }, 100);
+    };
+
+    // Close menu when clicking outside
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as HTMLElement;
+      if (selectionMenu && 
+          !target.closest('[class*="selection"]') && 
+          !target.closest('.message-text') &&
+          !target.closest('button')) {
+        // Clear selection if clicking outside
+        window.getSelection()?.removeAllRanges();
+        setSelectionMenu(null);
       }
     };
 
     document.addEventListener('selectionchange', handleSelectionChange);
-    return () => document.removeEventListener('selectionchange', handleSelectionChange);
-  }, []);
+    if (isMobile) {
+      document.addEventListener('touchend', handleTouchEnd, { passive: true });
+    }
+    document.addEventListener('click', handleClickOutside);
+    document.addEventListener('touchend', handleClickOutside, { passive: true });
+
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionChange);
+      if (isMobile) {
+        document.removeEventListener('touchend', handleTouchEnd);
+      }
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('touchend', handleClickOutside);
+      if (selectionTimeoutRef.current) {
+        clearTimeout(selectionTimeoutRef.current);
+      }
+    };
+  }, [isMobile, selectionMenu]);
 
   const handleVoiceInput = () => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -246,9 +356,9 @@ export default function DialogueScreen({
   };
 
   // Real-time save function
-  const saveDialogueProgress = (currentMessages: DialogueLine[], isCompleted: boolean = false) => {
+  const saveDialogueProgress = useCallback((currentMessages: DialogueLine[], isCompleted: boolean = false) => {
     try {
-      const scenarios = JSON.parse(localStorage.getItem('speakSnapScenarios') || '[]');
+      const scenarios = storage.getItem<Scenario[]>('speakSnapScenarios') || [];
       const scenarioIndex = scenarios.findIndex((s: Scenario) => s.id === scenario.id);
       
       if (scenarioIndex === -1) {
@@ -292,12 +402,12 @@ export default function DialogueScreen({
       );
       scenarios[scenarioIndex].last_practiced = Date.now();
       
-      localStorage.setItem('speakSnapScenarios', JSON.stringify(scenarios));
+      storage.setItem('speakSnapScenarios', scenarios);
       console.log('✅ Real-time save:', isCompleted ? 'Completed' : 'In progress');
     } catch (error) {
       console.error('❌ Failed to save dialogue:', error);
     }
-  };
+  }, [scenario.id, currentDialogueId, userLevel]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -402,9 +512,8 @@ export default function DialogueScreen({
         source: 'dialogue',
       };
 
-      const existing = localStorage.getItem('speakSnapFlashcards');
-      const cards = existing ? JSON.parse(existing) : [];
-      localStorage.setItem('speakSnapFlashcards', JSON.stringify([newCard, ...cards]));
+      const cards = storage.getItem('speakSnapFlashcards') || [];
+      storage.setItem('speakSnapFlashcards', [newCard, ...cards]);
 
       // Update toast to success
       processingToast.textContent = '✅ Flashcard saved!';
@@ -429,9 +538,8 @@ export default function DialogueScreen({
         source: 'dialogue',
       };
 
-      const existing = localStorage.getItem('speakSnapFlashcards');
-      const cards = existing ? JSON.parse(existing) : [];
-      localStorage.setItem('speakSnapFlashcards', JSON.stringify([basicCard, ...cards]));
+      const cards = storage.getItem('speakSnapFlashcards') || [];
+      storage.setItem('speakSnapFlashcards', [basicCard, ...cards]);
 
       processingToast.textContent = '✅ Basic card saved!';
       setTimeout(() => {
@@ -542,63 +650,89 @@ export default function DialogueScreen({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Selection Menu */}
+      {/* Selection Menu - Mobile Optimized */}
       {selectionMenu && !selectionResult && (
         <div
-          className="fixed z-40 flex items-center gap-1 p-1 bg-[#1D1D1D] rounded-xl shadow-xl animate-in zoom-in fade-in duration-200"
+          className={`fixed z-50 ${isMobile ? 'flex-col items-center' : 'flex-row items-center'} gap-1 p-1.5 bg-[#1D1D1D] rounded-2xl shadow-2xl animate-in zoom-in fade-in duration-200 backdrop-blur-sm border border-white/10`}
           style={{
-            left: Math.min(Math.max(10, selectionMenu.x - 70), window.innerWidth - 150),
-            top: selectionMenu.y - 50,
+            left: isMobile ? '50%' : Math.min(Math.max(10, selectionMenu.x - (isMobile ? 0 : 70)), window.innerWidth - (isMobile ? 0 : 150)),
+            top: isMobile ? 'auto' : selectionMenu.y - 50,
+            bottom: isMobile ? '120px' : 'auto',
+            transform: isMobile ? 'translateX(-50%)' : 'none',
+            maxWidth: isMobile ? '90vw' : 'none',
           }}
+          onClick={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
         >
           {selectionActionLoading ? (
-            <div className="px-3 py-1.5 flex items-center gap-2">
-              <Loader2 size={16} className="animate-spin text-white" />
-              <span className="text-white text-xs font-medium">Processing...</span>
+            <div className={`${isMobile ? 'w-full' : ''} px-4 py-2.5 flex items-center justify-center gap-2`}>
+              <Loader2 size={18} className="animate-spin text-white" />
+              <span className="text-white text-sm font-medium">Processing...</span>
             </div>
           ) : (
             <>
               <button
-                onClick={handleTranslate}
-                className="p-2 text-white/90 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleTranslate();
+                }}
+                onTouchStart={(e) => e.stopPropagation()}
+                className={`${isMobile ? 'w-full justify-center' : ''} p-3 text-white/90 active:text-white active:bg-white/15 rounded-xl transition-all flex items-center gap-2 touch-manipulation`}
                 title="Translate"
               >
-                <Languages size={16} />
+                <Languages size={18} />
+                {isMobile && <span className="text-sm font-medium">Translate</span>}
               </button>
-              <div className="w-[1px] h-4 bg-white/20"></div>
+              {!isMobile && <div className="w-[1px] h-4 bg-white/20"></div>}
               <button
-                onClick={handleOptimize}
-                className="p-2 text-white/90 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOptimize();
+                }}
+                onTouchStart={(e) => e.stopPropagation()}
+                className={`${isMobile ? 'w-full justify-center' : ''} p-3 text-white/90 active:text-white active:bg-white/15 rounded-xl transition-all flex items-center gap-2 touch-manipulation`}
                 title="Optimize"
               >
-                <Wand2 size={16} />
+                <Wand2 size={18} />
+                {isMobile && <span className="text-sm font-medium">Optimize</span>}
               </button>
-              <div className="w-[1px] h-4 bg-white/20"></div>
+              {!isMobile && <div className="w-[1px] h-4 bg-white/20"></div>}
               <button
-                onClick={handleAddToFlashcard}
-                className="p-2 text-white/90 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddToFlashcard();
+                }}
+                onTouchStart={(e) => e.stopPropagation()}
+                className={`${isMobile ? 'w-full justify-center' : ''} p-3 text-white/90 active:text-white active:bg-white/15 rounded-xl transition-all flex items-center gap-2 touch-manipulation`}
                 title="Add to Flashcard"
               >
-                <Bookmark size={16} />
+                <Bookmark size={18} />
+                {isMobile && <span className="text-sm font-medium">Save</span>}
               </button>
             </>
           )}
-          <div className="absolute top-full left-1/2 -translate-x-1/2 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-[#1D1D1D]"></div>
+          {!isMobile && (
+            <div className="absolute top-full left-1/2 -translate-x-1/2 border-l-8 border-r-8 border-t-8 border-l-transparent border-r-transparent border-t-[#1D1D1D]"></div>
+          )}
         </div>
       )}
 
-      {/* Selection Result Popup */}
+      {/* Selection Result Popup - Mobile Optimized */}
       {selectionResult && (
-        <div className="fixed bottom-24 left-4 right-4 z-40 bg-white/95 backdrop-blur-xl border border-gray-200 shadow-2xl rounded-2xl p-4 animate-in slide-in-from-bottom">
-          <div className="flex justify-between items-start mb-2">
+        <div 
+          className={`fixed ${isMobile ? 'bottom-20 left-4 right-4' : 'bottom-24 left-4 right-4'} z-50 bg-white/95 backdrop-blur-xl border border-gray-200 shadow-2xl rounded-2xl p-4 animate-in slide-in-from-bottom max-h-[60vh] overflow-y-auto`}
+          onClick={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+        >
+          <div className="flex justify-between items-start mb-3">
             <div className="flex items-center gap-2">
               {selectionResult.type === 'translate' ? (
-                <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
-                  <Languages size={14} />
+                <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0">
+                  <Languages size={16} />
                 </div>
               ) : (
-                <div className="w-6 h-6 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center">
-                  <Wand2 size={14} />
+                <div className="w-7 h-7 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
+                  <Wand2 size={16} />
                 </div>
               )}
               <span className="text-sm font-bold text-gray-800">
@@ -606,27 +740,48 @@ export default function DialogueScreen({
               </span>
             </div>
             <button
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 setSelectionResult(null);
                 setSelectionMenu(null);
               }}
-              className="text-gray-400 hover:text-gray-800"
+              onTouchStart={(e) => e.stopPropagation()}
+              className="p-1.5 text-gray-400 active:text-gray-800 active:bg-gray-100 rounded-lg transition-colors touch-manipulation"
             >
-              <X size={16} />
+              <X size={18} />
             </button>
           </div>
-          <p className="text-primary-900 text-[15px] leading-relaxed">
+          <p className="text-primary-900 text-[15px] leading-relaxed mb-3 break-words">
             {selectionResult.text}
           </p>
-          <div className="mt-3 flex gap-2">
+          <div className="flex gap-2">
             <button
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 navigator.clipboard.writeText(selectionResult.text);
-                alert('Copied!');
+                // Mobile-friendly feedback
+                if (isMobile) {
+                  const btn = e.currentTarget;
+                  const originalText = btn.innerHTML;
+                  btn.innerHTML = '<span class="text-green-600">✓</span>';
+                  setTimeout(() => {
+                    btn.innerHTML = originalText;
+                  }, 1000);
+                } else {
+                  alert('Copied!');
+                }
               }}
-              className="w-10 flex items-center justify-center bg-gray-100 rounded-lg text-gray-600 hover:bg-gray-200"
+              onTouchStart={(e) => e.stopPropagation()}
+              className={`${isMobile ? 'flex-1' : 'w-10'} h-10 flex items-center justify-center bg-gray-100 rounded-xl text-gray-600 active:bg-gray-200 transition-colors touch-manipulation`}
             >
-              <Copy size={16} />
+              {isMobile ? (
+                <span className="text-sm font-medium flex items-center gap-2">
+                  <Copy size={16} />
+                  Copy
+                </span>
+              ) : (
+                <Copy size={16} />
+              )}
             </button>
           </div>
         </div>

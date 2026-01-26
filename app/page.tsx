@@ -1,11 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import CameraScreen from '@/components/CameraScreen';
-import DialogueScreen from '@/components/DialogueScreen';
-import LibraryScreen from '@/components/LibraryScreen';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Screen, Scenario, UserLevel } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
+import { storage } from '@/lib/utils/storage';
+
+// Lazy load heavy components for better initial load performance
+const CameraScreen = lazy(() => import('@/components/CameraScreen'));
+const DialogueScreen = lazy(() => import('@/components/DialogueScreen'));
+const LibraryScreen = lazy(() => import('@/components/LibraryScreen'));
 
 export default function Home() {
   const [currentScreen, setCurrentScreen] = useState<Screen>(Screen.CAMERA);
@@ -17,15 +20,15 @@ export default function Home() {
   // Initial setup
   useEffect(() => {
     // Load user level from localStorage
-    const savedLevel = localStorage.getItem('speakSnapLevel');
+    const savedLevel = storage.getItem<UserLevel>('speakSnapLevel');
     if (savedLevel) {
-      setUserLevel(savedLevel as UserLevel);
+      setUserLevel(savedLevel);
     }
   }, []);
 
   useEffect(() => {
     // Save user level
-    localStorage.setItem('speakSnapLevel', userLevel);
+    storage.setItem('speakSnapLevel', userLevel);
   }, [userLevel]);
 
   const handleCapture = async (imageSrc: string, location?: { lat: number; lng: number }) => {
@@ -64,13 +67,8 @@ export default function Home() {
       };
 
       // Save new scenario immediately
-      try {
-        const existing = localStorage.getItem('speakSnapScenarios');
-        const scenarios = existing ? JSON.parse(existing) : [];
-        localStorage.setItem('speakSnapScenarios', JSON.stringify([newScenario, ...scenarios]));
-      } catch (e) {
-        console.error('Failed to save scenario', e);
-      }
+      const scenarios = storage.getItem<Scenario[]>('speakSnapScenarios') || [];
+      storage.setItem('speakSnapScenarios', [newScenario, ...scenarios]);
 
       setCurrentScenario(newScenario);
       setCurrentDialogueId(undefined); // New dialogue
@@ -118,13 +116,8 @@ export default function Home() {
       };
 
       // Save new scenario immediately
-      try {
-        const existing = localStorage.getItem('speakSnapScenarios');
-        const scenarios = existing ? JSON.parse(existing) : [];
-        localStorage.setItem('speakSnapScenarios', JSON.stringify([newScenario, ...scenarios]));
-      } catch (e) {
-        console.error('Failed to save scenario', e);
-      }
+      const scenarios = storage.getItem<Scenario[]>('speakSnapScenarios') || [];
+      storage.setItem('speakSnapScenarios', [newScenario, ...scenarios]);
 
       setCurrentScenario(newScenario);
       setCurrentDialogueId(undefined); // New dialogue
@@ -138,17 +131,30 @@ export default function Home() {
     }
   };
 
+  // Loading fallback component
+  const LoadingFallback = () => (
+    <div className="h-full w-full bg-primary-50 text-primary-900 flex flex-col items-center justify-center p-8 text-center">
+      <div className="relative mb-8">
+        <div className="absolute inset-0 bg-blue-100 rounded-full blur-xl opacity-50 animate-pulse"></div>
+        <Loader2 size={48} className="text-primary-900 animate-spin relative z-10" />
+      </div>
+      <h2 className="text-xl font-bold mb-2">Loading...</h2>
+    </div>
+  );
+
   const renderScreen = () => {
     switch (currentScreen) {
       case Screen.CAMERA:
         return (
-          <CameraScreen
-            onCapture={handleCapture}
-            onVoiceCapture={handleVoiceCapture}
-            onNavigate={setCurrentScreen}
-            userLevel={userLevel}
-            setUserLevel={setUserLevel}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <CameraScreen
+              onCapture={handleCapture}
+              onVoiceCapture={handleVoiceCapture}
+              onNavigate={setCurrentScreen}
+              userLevel={userLevel}
+              setUserLevel={setUserLevel}
+            />
+          </Suspense>
         );
 
       case Screen.ANALYSIS:
@@ -166,25 +172,29 @@ export default function Home() {
       case Screen.DIALOGUE:
         if (!currentScenario) return null;
         return (
-          <DialogueScreen
-            scenario={currentScenario}
-            userLevel={userLevel}
-            dialogueId={currentDialogueId}
-            onBack={() => setCurrentScreen(Screen.LIBRARY)}
-            onFinish={() => setCurrentScreen(Screen.LIBRARY)}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <DialogueScreen
+              scenario={currentScenario}
+              userLevel={userLevel}
+              dialogueId={currentDialogueId}
+              onBack={() => setCurrentScreen(Screen.LIBRARY)}
+              onFinish={() => setCurrentScreen(Screen.LIBRARY)}
+            />
+          </Suspense>
         );
 
       case Screen.LIBRARY:
         return (
-          <LibraryScreen
-            onNavigate={setCurrentScreen}
-            onSelectScenario={(scenario, dialogueId) => {
-              setCurrentScenario(scenario);
-              setCurrentDialogueId(dialogueId);
-              setCurrentScreen(Screen.DIALOGUE);
-            }}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <LibraryScreen
+              onNavigate={setCurrentScreen}
+              onSelectScenario={(scenario, dialogueId) => {
+                setCurrentScenario(scenario);
+                setCurrentDialogueId(dialogueId);
+                setCurrentScreen(Screen.DIALOGUE);
+              }}
+            />
+          </Suspense>
         );
 
       default:

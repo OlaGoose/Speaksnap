@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { ArrowLeft, Sparkles, BookOpen, TrendingUp, Target, Volume2 } from 'lucide-react';
+import { storage } from '@/lib/utils/storage';
 
 interface DiaryEditorProps {
   isOpen: boolean;
@@ -120,9 +121,8 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
           })
         );
 
-        const existingCards = localStorage.getItem('speakSnapFlashcards');
-        const cards = existingCards ? JSON.parse(existingCards) : [];
-        localStorage.setItem('speakSnapFlashcards', JSON.stringify([...flashcardsWithVideos, ...cards]));
+        const cards = storage.getItem('speakSnapFlashcards') || [];
+        storage.setItem('speakSnapFlashcards', [...flashcardsWithVideos, ...cards]);
       }
 
       // Save diary entry
@@ -134,9 +134,8 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
         timestamp: Date.now(),
       };
 
-      const existing = localStorage.getItem('speakSnapDiary');
-      const entries = existing ? JSON.parse(existing) : [];
-      localStorage.setItem('speakSnapDiary', JSON.stringify([entry, ...entries]));
+      const entries = storage.getItem('speakSnapDiary') || [];
+      storage.setItem('speakSnapDiary', [entry, ...entries]);
     } catch (error: any) {
       console.error('Analysis error:', error);
       const errorMessage = error.message || 'Failed to analyze diary. Please try again.';
@@ -154,11 +153,11 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
     }
   };
 
-  const playAudio = (text: string) => {
+  const playAudio = useCallback((text: string) => {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'en-US';
     window.speechSynthesis.speak(utterance);
-  };
+  }, []);
 
   if (!isOpen) return null;
 

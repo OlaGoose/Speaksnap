@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Screen, Scenario, DialogueRecord } from '@/lib/types';
 import {
   Camera,
@@ -19,10 +19,19 @@ import {
 } from 'lucide-react';
 import FlashcardDeck from './FlashcardDeck';
 import DiaryEditor from './DiaryEditor';
+import { storage } from '@/lib/utils/storage';
 
 interface LibraryScreenProps {
   onNavigate: (screen: Screen) => void;
   onSelectScenario: (scenario: Scenario, dialogueId?: string) => void;
+}
+
+interface DiaryEntry {
+  id: string;
+  original?: string;
+  optimized?: string;
+  upgraded?: string;
+  timestamp: number;
 }
 
 export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryScreenProps) {
@@ -31,36 +40,66 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
   const [expandedScenarioId, setExpandedScenarioId] = useState<string | null>(null);
   const [isWritingDiary, setIsWritingDiary] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [diaryEntries, setDiaryEntries] = useState<DiaryEntry[]>([]);
+  const [expandedDiaryId, setExpandedDiaryId] = useState<string | null>(null);
 
   useEffect(() => {
     loadScenarios();
+    if (activeTab === 'diary') {
+      loadDiaries();
+    }
   }, [activeTab]);
 
-  const loadScenarios = () => {
-    try {
-      const saved = localStorage.getItem('speakSnapScenarios');
-      if (saved) {
-        const scenarios = JSON.parse(saved);
-        // Sort by last practiced
-        scenarios.sort((a: Scenario, b: Scenario) => b.last_practiced - a.last_practiced);
-        setSavedScenarios(scenarios);
-      }
-    } catch (e) {
-      console.error('Failed to load scenarios', e);
+  const loadScenarios = useCallback(() => {
+    const scenarios = storage.getItem<Scenario[]>('speakSnapScenarios');
+    if (scenarios) {
+      // Sort by last practiced
+      scenarios.sort((a: Scenario, b: Scenario) => b.last_practiced - a.last_practiced);
+      setSavedScenarios(scenarios);
     }
-  };
+  }, []);
 
-  const handleDeleteScenario = (scenarioId: string, e: React.MouseEvent) => {
+  const loadDiaries = useCallback(() => {
+    const entries = storage.getItem<DiaryEntry[]>('speakSnapDiary');
+    if (entries && Array.isArray(entries)) {
+      // Filter and validate entries to ensure they have required fields
+      const validEntries = entries.filter((entry) => {
+        return (
+          entry &&
+          typeof entry.id === 'string' &&
+          typeof entry.timestamp === 'number' &&
+          (typeof entry.original === 'string' || typeof entry.optimized === 'string')
+        );
+      });
+      setDiaryEntries(validEntries);
+    } else {
+      setDiaryEntries([]);
+    }
+  }, []);
+
+  const handleDeleteDiary = useCallback((diaryId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!confirm('Delete this diary entry?')) return;
+    
+    const updated = diaryEntries.filter((d) => d.id !== diaryId);
+    setDiaryEntries(updated);
+    storage.setItem('speakSnapDiary', updated);
+    if (expandedDiaryId === diaryId) {
+      setExpandedDiaryId(null);
+    }
+  }, [diaryEntries, expandedDiaryId]);
+
+  const handleDeleteScenario = useCallback((scenarioId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm('Delete this scenario and all its dialogues?')) return;
     
     const updated = savedScenarios.filter((s) => s.id !== scenarioId);
     setSavedScenarios(updated);
-    localStorage.setItem('speakSnapScenarios', JSON.stringify(updated));
+    storage.setItem('speakSnapScenarios', updated);
     if (expandedScenarioId === scenarioId) {
       setExpandedScenarioId(null);
     }
-  };
+  }, [savedScenarios, expandedScenarioId]);
 
   const handleDeleteDialogue = (scenario: Scenario, dialogueId: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -94,7 +133,18 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
   );
 
   if (isWritingDiary) {
-    return <DiaryEditor isOpen={isWritingDiary} onClose={() => setIsWritingDiary(false)} />;
+    return (
+      <DiaryEditor 
+        isOpen={isWritingDiary} 
+        onClose={() => {
+          setIsWritingDiary(false);
+          // Reload diaries when closing editor
+          if (activeTab === 'diary') {
+            loadDiaries();
+          }
+        }} 
+      />
+    );
   }
 
   return (
@@ -368,20 +418,145 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
         {activeTab === 'flashcards' && <FlashcardDeck />}
 
         {activeTab === 'diary' && (
-          <div className="py-4">
-            <div className="bg-white rounded-2xl p-8 text-center shadow-float">
-              <PenTool className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-              <h3 className="font-semibold text-gray-900">Your English Diary</h3>
-              <p className="text-gray-500 text-sm mt-1 mb-6">
-                Write daily reflections and improve your English writing skills.
-              </p>
-              <button
-                onClick={() => setIsWritingDiary(true)}
-                className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium shadow-lg active:scale-95 transition-transform"
-              >
-                Start Writing
-              </button>
-            </div>
+          <div className="py-4 space-y-4 pb-32">
+            {diaryEntries.length === 0 ? (
+              <div className="bg-white rounded-2xl p-8 text-center shadow-float">
+                <PenTool className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <h3 className="font-semibold text-gray-900">Your English Diary</h3>
+                <p className="text-gray-500 text-sm mt-1 mb-6">
+                  Write daily reflections and improve your English writing skills.
+                </p>
+                <button
+                  onClick={() => setIsWritingDiary(true)}
+                  className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium shadow-lg active:scale-95 transition-transform"
+                >
+                  Start Writing
+                </button>
+              </div>
+            ) : (
+              diaryEntries.map((entry) => {
+                const isExpanded = expandedDiaryId === entry.id;
+                const originalText = (entry.original ?? entry.optimized ?? 'No content available');
+                const previewText = originalText.length > 120 
+                  ? originalText.slice(0, 120) + '...' 
+                  : originalText;
+
+                return (
+                  <div
+                    key={entry.id}
+                    className="bg-white rounded-2xl shadow-float border border-transparent hover:border-gray-200 transition-all overflow-hidden"
+                  >
+                    <div
+                      onClick={() => setExpandedDiaryId(isExpanded ? null : entry.id)}
+                      className="p-4 cursor-pointer active:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-2">
+                            <PenTool size={14} className="text-gray-400 flex-shrink-0" />
+                            <span className="text-xs text-gray-500 font-medium">
+                              {new Date(entry.timestamp).toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric',
+                              })}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-700 leading-relaxed">
+                            {isExpanded ? originalText : previewText}
+                          </p>
+                        </div>
+                        <div className="flex-shrink-0">
+                          {isExpanded ? (
+                            <ChevronDown size={20} className="text-gray-400" />
+                          ) : (
+                            <ChevronRight size={20} className="text-gray-400" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="border-t border-gray-100 bg-gray-50/50 animate-in slide-in-from-top duration-200">
+                        <div className="p-4 space-y-4">
+                          {/* Original Version */}
+                          {entry.original && (
+                            <div>
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full" />
+                                <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                                  Original Version
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-700 leading-relaxed bg-white p-3 rounded-xl border border-gray-200 whitespace-pre-wrap">
+                                {entry.original}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Optimized Version */}
+                          {entry.optimized && (
+                            <div>
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="w-1.5 h-1.5 bg-green-500 rounded-full" />
+                                <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                                  Corrected Version
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-700 leading-relaxed bg-white p-3 rounded-xl border border-gray-200 whitespace-pre-wrap">
+                                {entry.optimized}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Upgraded Version */}
+                          {entry.upgraded && (
+                            <div>
+                              <div className="flex items-center gap-2 mb-2">
+                                <div className="w-1.5 h-1.5 bg-purple-500 rounded-full" />
+                                <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
+                                  Advanced Version
+                                </span>
+                              </div>
+                              <p className="text-sm text-gray-700 leading-relaxed bg-white p-3 rounded-xl border border-gray-200 whitespace-pre-wrap">
+                                {entry.upgraded}
+                              </p>
+                            </div>
+                          )}
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-3 pt-2">
+                            {entry.optimized && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const textToCopy = entry.optimized ?? '';
+                                  if (textToCopy) {
+                                    navigator.clipboard.writeText(textToCopy);
+                                    alert('Corrected version copied!');
+                                  }
+                                }}
+                                className="text-xs text-gray-600 hover:text-gray-900 font-medium flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors"
+                              >
+                                <Eye size={12} />
+                                Copy Corrected
+                              </button>
+                            )}
+                            <button
+                              onClick={(e) => handleDeleteDiary(entry.id, e)}
+                              className="text-xs text-red-500 hover:text-red-600 font-medium flex items-center gap-1.5 ml-auto"
+                            >
+                              <Trash2 size={12} />
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
           </div>
         )}
       </div>
