@@ -219,16 +219,32 @@ body {
   overscroll-behavior-y: contain;
 }
 
-/* Hide scrollbar on mobile but keep functionality */
+/* Mobile scrollbar - visible but subtle */
 @media (max-width: 768px) {
   .flashcard-scroll::-webkit-scrollbar {
-    width: 0;
-    display: none;
+    width: 3px;
+    display: block;
   }
   
+  .flashcard-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  .flashcard-scroll::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 1.5px;
+    transition: background 0.3s, opacity 0.3s;
+  }
+  
+  /* Show scrollbar thumb on scroll, fade when idle */
+  .flashcard-scroll:not(:hover)::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+  }
+  
+  /* For Firefox mobile */
   .flashcard-scroll {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
   }
 }
 

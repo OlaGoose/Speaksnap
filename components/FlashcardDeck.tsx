@@ -14,6 +14,7 @@ export default function FlashcardDeck() {
   const [videoErrors, setVideoErrors] = useState<{ [key: string]: boolean }>({});
   const [videoLoaded, setVideoLoaded] = useState<{ [key: string]: boolean }>({});
   const [playingVideoId, setPlayingVideoId] = useState<string | null>(null); // 当前播放的视频ID
+  const [scrollStates, setScrollStates] = useState<{ [key: string]: { isAtTop: boolean; isAtBottom: boolean; canScroll: boolean } }>({});
   
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const iframeRefs = useRef<{ [key: string]: HTMLIFrameElement | null }>({});
@@ -35,6 +36,23 @@ export default function FlashcardDeck() {
     };
   }, []);
 
+  const updateScrollState = useCallback((cardId: string, element: HTMLDivElement) => {
+    const { scrollTop, scrollHeight, clientHeight } = element;
+    const isAtTop = scrollTop < 5;
+    const isAtBottom = scrollTop + clientHeight >= scrollHeight - 5;
+    const canScroll = scrollHeight > clientHeight;
+
+    setScrollStates((prev) => ({
+      ...prev,
+      [cardId]: { isAtTop, isAtBottom, canScroll },
+    }));
+  }, []);
+
+  const handleScroll = useCallback((cardId: string, e: React.UIEvent<HTMLDivElement>) => {
+    const element = e.currentTarget;
+    updateScrollState(cardId, element);
+  }, [updateScrollState]);
+
   useEffect(() => {
     setIsFlipped(false);
     // Stop any playing video when switching cards
@@ -53,13 +71,28 @@ export default function FlashcardDeck() {
         const scrollEl = scrollRefs.current[currentCard.id];
         if (scrollEl) {
           scrollEl.scrollTop = 0;
+          // Update scroll state after reset
+          setTimeout(() => updateScrollState(currentCard.id, scrollEl), 0);
         }
       }
     } else {
       // Stop video when flipping to front
       setPlayingVideoId(null);
     }
-  }, [isFlipped, activeIndex, flashcards]);
+  }, [isFlipped, activeIndex, flashcards, updateScrollState]);
+
+  // Initialize scroll state for active card when flipped
+  useEffect(() => {
+    if (isFlipped) {
+      const currentCard = flashcards[activeIndex];
+      if (currentCard) {
+        const scrollEl = scrollRefs.current[currentCard.id];
+        if (scrollEl) {
+          updateScrollState(currentCard.id, scrollEl);
+        }
+      }
+    }
+  }, [isFlipped, activeIndex, flashcards, updateScrollState]);
 
   const playAudio = useCallback((text: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -425,15 +458,49 @@ export default function FlashcardDeck() {
                     </button>
                   </div>
 
-                  {/* Scrollable Content Panel */}
-                  <div 
-                    ref={(el) => { scrollRefs.current[card.id] = el; }}
-                    className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-4 bg-white flashcard-scroll"
-                    style={{
-                      WebkitOverflowScrolling: 'touch',
-                      touchAction: 'pan-y',
-                    }}
-                  >
+                  {/* Scrollable Content Panel with gradient indicators */}
+                  <div className="relative flex-1 overflow-hidden bg-white">
+                    {/* Top gradient fade - shows when not at top */}
+                    {(() => {
+                      const scrollState = scrollStates[card.id];
+                      const showTopFade = scrollState?.canScroll && !scrollState?.isAtTop;
+                      return (
+                        <div 
+                          className={`absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-white to-transparent pointer-events-none z-10 transition-opacity duration-300 ${
+                            showTopFade ? 'opacity-100' : 'opacity-0'
+                          }`}
+                        />
+                      );
+                    })()}
+                    
+                    {/* Bottom gradient fade - shows when not at bottom */}
+                    {(() => {
+                      const scrollState = scrollStates[card.id];
+                      const showBottomFade = scrollState?.canScroll && !scrollState?.isAtBottom;
+                      return (
+                        <div 
+                          className={`absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white to-transparent pointer-events-none z-10 transition-opacity duration-300 ${
+                            showBottomFade ? 'opacity-100' : 'opacity-0'
+                          }`}
+                        />
+                      );
+                    })()}
+
+                    <div 
+                      ref={(el) => { 
+                        scrollRefs.current[card.id] = el;
+                        if (el && isActive && isFlipped) {
+                          // Initialize scroll state
+                          updateScrollState(card.id, el);
+                        }
+                      }}
+                      onScroll={(e) => handleScroll(card.id, e)}
+                      className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-4 bg-white flashcard-scroll"
+                      style={{
+                        WebkitOverflowScrolling: 'touch',
+                        touchAction: 'pan-y',
+                      }}
+                    >
                     {/* Phonetic & Audio */}
                     {back.phonetic && (
                       <div className="flex items-center gap-3">
@@ -552,6 +619,7 @@ export default function FlashcardDeck() {
                       </div>
                     )}
 
+                    </div>
                   </div>
 
                   {/* Footer - Tap to flip */}
