@@ -38,6 +38,7 @@ export default function DialogueScreen({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [autoPlayAudio, setAutoPlayAudio] = useState(false);
+  const [showAudioToast, setShowAudioToast] = useState(false);
 
   // Selection State
   const [selectionMenu, setSelectionMenu] = useState<{
@@ -245,6 +246,15 @@ export default function DialogueScreen({
       }
     };
   }, [isMobile, selectionMenu]);
+
+  const handleToggleAutoPlay = () => {
+    const newState = !autoPlayAudio;
+    setAutoPlayAudio(newState);
+    
+    // Show toast feedback
+    setShowAudioToast(true);
+    setTimeout(() => setShowAudioToast(false), 2000);
+  };
 
   const handleVoiceInput = () => {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
@@ -567,21 +577,54 @@ export default function DialogueScreen({
     <div className="flex flex-col h-full w-full bg-primary-50 relative overflow-hidden">
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-30 flex justify-between items-start p-4 pt-6 bg-gradient-to-b from-primary-50 via-primary-50/90 to-transparent pointer-events-none">
+        {/* Auto-play Audio Toggle - Enhanced UI */}
         <button
-          onClick={() => setAutoPlayAudio(!autoPlayAudio)}
-          className={`w-9 h-9 rounded-full flex items-center justify-center transition-all pointer-events-auto active:scale-95 touch-manipulation ${
+          onClick={handleToggleAutoPlay}
+          className={`relative group h-9 rounded-full flex items-center gap-2 transition-all duration-300 pointer-events-auto active:scale-95 touch-manipulation overflow-hidden ${
             autoPlayAudio 
-              ? 'bg-black text-white shadow-lg' 
-              : 'bg-white/90 text-gray-400 hover:text-gray-700 hover:bg-white shadow-md'
+              ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30 pr-3 pl-2.5' 
+              : 'bg-white/95 text-gray-500 hover:text-gray-700 hover:bg-white shadow-md hover:shadow-lg pr-3 pl-2.5 border border-gray-200/50'
           }`}
           aria-label={autoPlayAudio ? 'Disable auto audio' : 'Enable auto audio'}
-          title={autoPlayAudio ? 'Auto audio ON' : 'Auto audio OFF'}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"></path>
-            {autoPlayAudio && <path d="M16 9a5 5 0 0 1 0 6"></path>}
-          </svg>
+          {/* Background pulse effect when ON */}
+          {autoPlayAudio && (
+            <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+          )}
+          
+          {/* Icon with animation */}
+          <div className="relative z-10 flex items-center justify-center w-5 h-5">
+            <svg 
+              xmlns="http://www.w3.org/2000/svg" 
+              width="18" 
+              height="18" 
+              viewBox="0 0 24 24" 
+              fill="none" 
+              stroke="currentColor" 
+              strokeWidth="2.5" 
+              strokeLinecap="round" 
+              strokeLinejoin="round"
+              className="transition-transform duration-300"
+            >
+              <path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"></path>
+              {autoPlayAudio && (
+                <>
+                  <path d="M16 9a5 5 0 0 1 0 6" className="animate-pulse"></path>
+                  <path d="M19 7a9 9 0 0 1 0 10" className="animate-pulse" style={{ animationDelay: '0.15s' }}></path>
+                </>
+              )}
+              {!autoPlayAudio && <path d="M23 9l-6 6m0-6l6 6" strokeWidth="2"></path>}
+            </svg>
+          </div>
+          
+          {/* Text label */}
+          <span className={`relative z-10 text-xs font-bold tracking-wide transition-all duration-300 ${
+            autoPlayAudio ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'
+          }`}>
+            {autoPlayAudio ? 'Auto ON' : 'Auto OFF'}
+          </span>
         </button>
+
         <button
           onClick={onBack}
           className="w-10 h-10 rounded-full bg-white/80 backdrop-blur-md shadow-float border border-white/50 flex items-center justify-center text-gray-400 hover:text-gray-900 transition-all pointer-events-auto active:scale-95 hover:bg-white touch-manipulation"
@@ -590,6 +633,32 @@ export default function DialogueScreen({
           <X size={20} strokeWidth={2} />
         </button>
       </div>
+      
+      {/* Toast notification for auto-play toggle */}
+      {showAudioToast && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top fade-in duration-300">
+          <div className={`px-4 py-2.5 rounded-full shadow-2xl backdrop-blur-xl flex items-center gap-2 ${
+            autoPlayAudio 
+              ? 'bg-emerald-600 text-white' 
+              : 'bg-gray-800 text-white'
+          }`}>
+            <div className="w-5 h-5 flex items-center justify-center">
+              {autoPlayAudio ? (
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6L9 17l-5-5"></path>
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 6L6 18M6 6l12 12"></path>
+                </svg>
+              )}
+            </div>
+            <span className="text-sm font-semibold whitespace-nowrap">
+              {autoPlayAudio ? 'Auto-play enabled' : 'Auto-play disabled'}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Chat Area */}
       <div

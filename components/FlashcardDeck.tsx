@@ -217,7 +217,7 @@ export default function FlashcardDeck() {
   console.log('✅ Rendering', flashcards.length, 'flashcards, active:', activeIndex);
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center relative perspective-[1200px] min-h-[500px] w-full">
+    <div className="flex-1 flex flex-col items-center relative perspective-[1200px] min-h-[500px] w-full">
       <div
         className="relative w-full flex-1 max-h-[calc(100vh-240px)]"
         onTouchStart={handleTouchStart}
@@ -405,9 +405,9 @@ export default function FlashcardDeck() {
                             playAudio(front, e);
                           }}
                           onTouchStart={(e) => e.stopPropagation()}
-                          className="p-1.5 rounded-full bg-blue-50 hover:bg-blue-100 active:bg-blue-200 transition-colors pointer-events-auto"
+                          className="flashcard-audio-btn rounded-full bg-blue-50 transition-colors pointer-events-auto flex items-center justify-center"
                         >
-                          <Volume2 size={14} className="text-blue-600" />
+                          <Volume2 size={16} className="text-blue-600" />
                         </button>
                       </div>
                     )}
@@ -496,13 +496,6 @@ export default function FlashcardDeck() {
                       </div>
                     )}
 
-                    {/* Context */}
-                    {card.context && (
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 rounded-full">
-                        <span className="text-xs text-gray-500 font-medium">From:</span>
-                        <span className="text-xs text-gray-700 font-semibold">{card.context}</span>
-                      </div>
-                    )}
                   </div>
 
                   {/* Footer - Tap to flip */}

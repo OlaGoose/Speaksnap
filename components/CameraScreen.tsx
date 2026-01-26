@@ -40,6 +40,7 @@ export default function CameraScreen({
   const [showLevelMenu, setShowLevelMenu] = useState(false);
   const [activeMode, setActiveMode] = useState<Mode>('camera');
   const [isRecording, setIsRecording] = useState(false);
+  const [isScrollInitialized, setIsScrollInitialized] = useState(false);
 
   // Location State
   const [isLocationEnabled, setIsLocationEnabled] = useState(false);
@@ -116,25 +117,36 @@ export default function CameraScreen({
 
   // Auto-scroll to camera on mount - ensure immediate centering
   useEffect(() => {
-    // Use requestAnimationFrame to ensure DOM is fully rendered
     const scrollToCenter = () => {
       if (scrollContainerRef.current) {
         const container = scrollContainerRef.current;
         const cameraEl = container.querySelector('[data-mode="camera"]') as HTMLElement;
-        if (cameraEl) {
+        if (cameraEl && cameraEl.offsetWidth > 0) {
+          // Disable smooth scrolling for instant positioning
+          container.style.scrollBehavior = 'auto';
+          
           const scrollLeft = cameraEl.offsetLeft - container.offsetWidth / 2 + cameraEl.offsetWidth / 2;
-          // Use direct property assignment for instant, no-animation scroll
           container.scrollLeft = scrollLeft;
+          
+          // Restore smooth scrolling and show the container
+          container.style.scrollBehavior = 'smooth';
+          setIsScrollInitialized(true);
+          return true;
         }
       }
+      return false;
     };
 
-    // Execute immediately
-    scrollToCenter();
-    
-    // Also execute in next frame to catch any layout changes
-    requestAnimationFrame(scrollToCenter);
-  }, []);
+    // Try multiple times with increasing delays to ensure DOM is ready
+    const attempts = [0, 10, 50, 100];
+    attempts.forEach((delay) => {
+      setTimeout(() => {
+        if (!isScrollInitialized) {
+          scrollToCenter();
+        }
+      }, delay);
+    });
+  }, [isScrollInitialized]);
 
   const getCurrentPosition = (): Promise<{ lat: number; lng: number } | undefined> => {
     return new Promise((resolve) => {
@@ -404,8 +416,11 @@ export default function CameraScreen({
       <div className="absolute bottom-0 left-0 right-0 z-30 flex flex-col justify-end pb-8 bg-gradient-to-t from-black/70 via-black/20 to-transparent pt-20">
         <div
           ref={scrollContainerRef}
-          className="flex items-center w-full overflow-x-auto snap-x snap-mandatory no-scrollbar"
-          style={{ scrollBehavior: 'smooth' }}
+          className="flex items-center w-full overflow-x-auto snap-x snap-mandatory no-scrollbar transition-opacity duration-300"
+          style={{ 
+            scrollBehavior: 'smooth',
+            opacity: isScrollInitialized ? 1 : 0
+          }}
         >
           {/* Spacers */}
           <div className="min-w-[calc(50vw-40px)] spacer snap-none shrink-0" />

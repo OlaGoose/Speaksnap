@@ -68,6 +68,17 @@ body {
   }
 }
 
+@keyframes slide-in-from-top {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 @keyframes slide-in-from-right {
   from {
     transform: translateX(100%);
@@ -106,6 +117,10 @@ body {
 
 .slide-in-from-bottom {
   animation-name: slide-in-from-bottom;
+}
+
+.slide-in-from-top {
+  animation-name: slide-in-from-top;
 }
 
 .slide-in-from-right {
@@ -201,6 +216,19 @@ body {
 .flashcard-scroll {
   scroll-behavior: smooth;
   -webkit-overflow-scrolling: touch;
+}
+
+/* Flashcard audio button - mobile padding optimization */
+.flashcard-audio-btn {
+  padding: 6px !important; /* 移动端：2px (p-1 的 50%) */
+  min-height: auto !important; /* 覆盖全局的 44px 限制 */
+  min-width: auto !important; /* 覆盖全局的 44px 限制 */
+}
+
+@media (min-width: 768px) {
+  .flashcard-audio-btn {
+    padding: 8px !important; /* 桌面端：4px (p-1) */
+  }
 }
 
 /* Mobile text selection optimization */
