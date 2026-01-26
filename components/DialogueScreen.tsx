@@ -512,8 +512,12 @@ export default function DialogueScreen({
         source: 'dialogue',
       };
 
-      const cards = storage.getItem('speakSnapFlashcards') || [];
+      const cards = storage.getItem<any[]>('speakSnapFlashcards') || [];
       storage.setItem('speakSnapFlashcards', [newCard, ...cards]);
+
+      // Log for debugging
+      console.log('✅ Flashcard saved:', newCard);
+      console.log('Total flashcards:', cards.length + 1);
 
       // Update toast to success
       processingToast.textContent = '✅ Flashcard saved!';
