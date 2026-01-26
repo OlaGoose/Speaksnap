@@ -117,9 +117,9 @@ export default function FlashcardDeck() {
     const absY = Math.abs(deltaY);
     const timeDelta = Date.now() - (touchStartRef.current.time || 0);
 
-    const isHorizontalSwipe = absX > absY && absX > 60;
-    const isVerticalSwipe = absY > absX && absY > 60;
-    const isTap = absX < 10 && absY < 10 && timeDelta < 300; // Quick tap
+    const isHorizontalSwipe = absX > absY && absX > 50; // Slightly more sensitive
+    const isVerticalSwipe = absY > absX && absY > 50;
+    const isTap = absX < 15 && absY < 15 && timeDelta < 400; // More lenient tap detection
 
     if (isHorizontalSwipe) {
       // Swipe left/right to change cards
@@ -140,17 +140,18 @@ export default function FlashcardDeck() {
         }
       }
     } else if (isTap) {
-      // Quick tap to flip
+      // Quick tap to flip - more lenient detection
       const target = document.elementFromPoint(
         touchStartRef.current?.x || 0,
         touchStartRef.current?.y || 0
       ) as HTMLElement;
       
-      // Check if tapping on scrollable area (back face only)
+      // Don't flip if on button or scrollable area (when scrolling)
+      const isOnButton = target && target.closest('button');
       const isOnScrollArea = target && target.closest('.flashcard-scroll');
       
-      if (!isOnScrollArea) {
-        // Tap anywhere (except scroll area) to flip
+      // Allow flip on scrollable area if not actually scrolling
+      if (!isOnButton) {
         console.log('📱 Mobile tap detected - flipping card', { isFlipped, willBecome: !isFlipped });
         setIsFlipped(!isFlipped);
       }
@@ -416,47 +417,29 @@ export default function FlashcardDeck() {
                       <p className="text-lg font-semibold text-gray-900">{back.translation}</p>
                     </div>
 
-                    {/* Definition - Condensed */}
+                    {/* Definition - Full */}
                     {back.definition && (
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-1.5">
                           <BookOpen size={12} className="text-blue-600" />
                           <span className="text-xs font-semibold text-gray-500 uppercase">Definition</span>
                         </div>
-                        <p className="text-sm text-gray-700 leading-relaxed">{back.definition.slice(0, 120)}{back.definition.length > 120 ? '...' : ''}</p>
+                        <p className="text-sm text-gray-700 leading-relaxed">{back.definition}</p>
                       </div>
                     )}
 
-                    {/* Example - Condensed */}
+                    {/* Example - Full */}
                     {back.example && (
                       <div className="space-y-1.5">
                         <div className="flex items-center gap-1.5">
                           <MessageCircle size={12} className="text-emerald-600" />
                           <span className="text-xs font-semibold text-gray-500 uppercase">Example</span>
                         </div>
-                        <p className="text-sm text-gray-700 leading-relaxed italic">"{back.example.slice(0, 100)}{back.example.length > 100 ? '...' : ''}"</p>
+                        <p className="text-sm text-gray-700 leading-relaxed italic">"{back.example}"</p>
                       </div>
                     )}
 
-                    {/* Native Usage - Condensed */}
-                    {back.native_usage && (
-                      <div className="space-y-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-semibold text-gray-500 uppercase">💬 Native Tips</span>
-                        </div>
-                        <p className="text-sm text-gray-700 leading-relaxed">{back.native_usage.slice(0, 100)}{back.native_usage.length > 100 ? '...' : ''}</p>
-                      </div>
-                    )}
-
-                    {/* Context */}
-                    {card.context && (
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 rounded-full">
-                        <span className="text-xs text-gray-500 font-medium">From:</span>
-                        <span className="text-xs text-gray-700 font-semibold">{card.context}</span>
-                      </div>
-                    )}
-
-                    {/* YouTube Videos - Compact Row */}
+                    {/* YouTube Videos - Compact Row (moved before Native Tips) */}
                     {videoIds.length > 0 && (
                       <div className="space-y-2 pt-2 border-t border-gray-100">
                         <div className="flex items-center gap-2">
@@ -500,6 +483,24 @@ export default function FlashcardDeck() {
                             </div>
                           ))}
                         </div>
+                      </div>
+                    )}
+
+                    {/* Native Usage - Full */}
+                    {back.native_usage && (
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-semibold text-gray-500 uppercase">💬 Native Tips</span>
+                        </div>
+                        <p className="text-sm text-gray-700 leading-relaxed">{back.native_usage}</p>
+                      </div>
+                    )}
+
+                    {/* Context */}
+                    {card.context && (
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-100 rounded-full">
+                        <span className="text-xs text-gray-500 font-medium">From:</span>
+                        <span className="text-xs text-gray-700 font-semibold">{card.context}</span>
                       </div>
                     )}
                   </div>

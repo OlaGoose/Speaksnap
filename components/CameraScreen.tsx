@@ -114,34 +114,26 @@ export default function CameraScreen({
     return () => container?.removeEventListener('scroll', handleScroll);
   }, [activeMode]);
 
-  // Auto-scroll to camera on mount - ensure it's centered immediately
+  // Auto-scroll to camera on mount - ensure immediate centering
   useEffect(() => {
-    const scrollToCamera = () => {
-      const container = scrollContainerRef.current;
-      if (!container) return;
-
-      const cameraEl = container.querySelector('[data-mode="camera"]') as HTMLElement;
-      if (!cameraEl) return;
-
-      // Calculate center position
-      const scrollLeft = cameraEl.offsetLeft - container.offsetWidth / 2 + cameraEl.offsetWidth / 2;
-      
-      // Set scroll position immediately (no animation)
-      container.scrollLeft = scrollLeft;
+    // Use requestAnimationFrame to ensure DOM is fully rendered
+    const scrollToCenter = () => {
+      if (scrollContainerRef.current) {
+        const container = scrollContainerRef.current;
+        const cameraEl = container.querySelector('[data-mode="camera"]') as HTMLElement;
+        if (cameraEl) {
+          const scrollLeft = cameraEl.offsetLeft - container.offsetWidth / 2 + cameraEl.offsetWidth / 2;
+          // Use direct property assignment for instant, no-animation scroll
+          container.scrollLeft = scrollLeft;
+        }
+      }
     };
 
-    // Try immediately
-    scrollToCamera();
-
-    // Also try after a short delay to ensure DOM is fully rendered
-    const timeoutId = setTimeout(scrollToCamera, 0);
+    // Execute immediately
+    scrollToCenter();
     
-    // Use requestAnimationFrame as backup
-    requestAnimationFrame(() => {
-      requestAnimationFrame(scrollToCamera);
-    });
-
-    return () => clearTimeout(timeoutId);
+    // Also execute in next frame to catch any layout changes
+    requestAnimationFrame(scrollToCenter);
   }, []);
 
   const getCurrentPosition = (): Promise<{ lat: number; lng: number } | undefined> => {
