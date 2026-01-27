@@ -10,6 +10,12 @@ interface DiaryEditorProps {
 }
 
 interface AnalysisResult {
+  dimensions: {
+    contentExpression: { score: number; comment: string };
+    grammarAccuracy: { score: number; comment: string };
+    vocabularyNaturalness: { score: number; comment: string };
+    englishThinking: { score: number; comment: string };
+  };
   overallScore: number;
   overallLevel: string;
   summary: string;
@@ -24,13 +30,16 @@ interface AnalysisResult {
   grammarFocus?: string[];
   sentenceAnalysis: Array<{
     original: string;
-    score: number;
-    errors: Array<{
-      error: string;
+    isCorrect: boolean;
+    issues: Array<{
+      errorText: string;
+      errorType: string;
       reason: string;
       correction: string;
+      explanation: string;
     }>;
-    corrected: string;
+    naturalExpression: string;
+    thinkingTips?: string;
   }>;
   optimized: string;
   upgradedVersion: string;
@@ -226,6 +235,56 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
             )}
           </div>
 
+          {/* Dimensions Scoring */}
+          {result.dimensions && (
+            <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 shadow-sm border border-black/5 animate-in fade-in">
+              <h3 className="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <span>🧮</span> 总体评分（按真实英语能力维度）
+              </h3>
+              <div className="space-y-4">
+                {[
+                  { key: 'contentExpression', label: '内容表达', color: 'blue' },
+                  { key: 'grammarAccuracy', label: '语法准确度', color: 'red' },
+                  { key: 'vocabularyNaturalness', label: '用词自然度', color: 'yellow' },
+                  { key: 'englishThinking', label: '英语思维', color: 'purple' },
+                ].map(({ key, label, color }) => {
+                  const dimension = result.dimensions[key as keyof typeof result.dimensions];
+                  return (
+                    <div key={key} className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-32">
+                        <div className="text-xs font-semibold text-gray-700 mb-1">{label}</div>
+                        <div className="flex items-center gap-2">
+                          <div className={`text-lg font-black ${
+                            color === 'blue' ? 'text-blue-600' :
+                            color === 'red' ? 'text-red-600' :
+                            color === 'yellow' ? 'text-yellow-600' :
+                            'text-purple-600'
+                          }`}>
+                            {dimension.score}/10
+                          </div>
+                          <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full transition-all ${
+                                color === 'blue' ? 'bg-blue-500' :
+                                color === 'red' ? 'bg-red-500' :
+                                color === 'yellow' ? 'bg-yellow-500' :
+                                'bg-purple-500'
+                              }`}
+                              style={{ width: `${dimension.score * 10}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex-1 text-xs text-gray-600 leading-relaxed bg-gray-50/70 p-2.5 rounded-lg">
+                        {dimension.comment}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Strengths & Improvements */}
           {((result.strengths && result.strengths.length > 0) || (result.improvements && result.improvements.length > 0)) && (
             <div className="grid grid-cols-1 gap-3">
@@ -285,64 +344,72 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
           {result.sentenceAnalysis && result.sentenceAnalysis.length > 0 && (
             <div className="space-y-3">
               <h3 className="text-sm font-semibold text-gray-800 px-1 flex items-center gap-2">
-                <span>📝</span> Sentence-by-Sentence Analysis
+                <span>✍️</span> 逐句分析
               </h3>
               {result.sentenceAnalysis.map((sentence, idx) => (
                 <div key={idx} className="bg-white/70 backdrop-blur-md rounded-2xl p-4 shadow-sm border border-black/5 animate-in fade-in">
                   {/* Original Sentence */}
                   <div className="mb-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Sentence {idx + 1}</span>
-                      <span className={`text-sm font-bold px-2.5 py-1 rounded-full shadow-sm ${
-                        sentence.score >= 8 ? 'bg-green-100 text-green-700 border border-green-200' :
-                        sentence.score >= 6 ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' :
-                        sentence.score >= 4 ? 'bg-orange-100 text-orange-700 border border-orange-200' :
-                        'bg-red-100 text-red-700 border border-red-200'
-                      }`}>
-                        {sentence.score}/10
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className={`text-lg font-bold ${sentence.isCorrect ? '✅' : '❌'}`}>
+                        {sentence.isCorrect ? '✅' : '❌'}
                       </span>
+                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">句 {idx + 1}</span>
                     </div>
-                    <p className="text-sm text-gray-700 bg-gray-50/70 p-3 rounded-xl border border-gray-200/50 leading-relaxed">
+                    <p className="text-sm text-gray-800 p-3 rounded-xl border border-gray-200/50 leading-relaxed bg-gray-50/70">
                       {sentence.original}
                     </p>
                   </div>
 
-                  {/* Errors Table */}
-                  {sentence.errors && sentence.errors.length > 0 && (
-                    <div className="mb-3">
-                      <p className="text-xs font-semibold text-red-600 mb-2 flex items-center gap-1">
-                        <span>⚠️</span> Issues Found:
-                      </p>
-                      <div className="overflow-x-auto rounded-lg border border-gray-200/50">
-                        <table className="w-full text-xs">
-                          <thead className="bg-gray-50/70">
-                            <tr>
-                              <th className="text-left py-2 px-3 font-semibold text-gray-700">Error</th>
-                              <th className="text-left py-2 px-3 font-semibold text-gray-700">Reason</th>
-                              <th className="text-left py-2 px-3 font-semibold text-gray-700">Correction</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white/50">
-                            {sentence.errors.map((err, errIdx) => (
-                              <tr key={errIdx} className="border-t border-gray-100">
-                                <td className="py-2 px-3 text-red-600 font-medium">{err.error}</td>
-                                <td className="py-2 px-3 text-gray-600">{err.reason}</td>
-                                <td className="py-2 px-3 text-green-600 font-medium">{err.correction}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                  {/* Issues Detail */}
+                  {sentence.issues && sentence.issues.length > 0 && (
+                    <div className="mb-3 space-y-3">
+                      <p className="text-xs font-semibold text-red-600 mb-2">问题：</p>
+                      {sentence.issues.map((issue, issueIdx) => (
+                        <div key={issueIdx} className="bg-red-50/70 p-3 rounded-xl border border-red-200/50 space-y-2">
+                          <div className="flex items-start gap-2">
+                            <span className="flex-shrink-0 px-2 py-0.5 bg-red-100 text-red-700 rounded text-[10px] font-bold uppercase">
+                              {issue.errorType}
+                            </span>
+                            <span className="text-sm text-red-700 font-medium">{issue.errorText}</span>
+                          </div>
+                          <div className="text-xs text-gray-700 leading-relaxed">
+                            <span className="font-semibold text-gray-800">原因：</span>
+                            {issue.reason}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs">
+                            <span className="text-gray-600">❌</span>
+                            <span className="text-red-600 font-mono">{issue.errorText}</span>
+                            <span className="text-gray-400">→</span>
+                            <span className="text-green-600 font-mono font-semibold">✓ {issue.correction}</span>
+                          </div>
+                          {issue.explanation && (
+                            <div className="text-xs text-gray-600 leading-relaxed pt-2 border-t border-red-200/30">
+                              💡 {issue.explanation}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
 
-                  {/* Corrected Sentence */}
+                  {/* Natural Expression */}
                   <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-3 rounded-xl border border-green-200/50 shadow-sm">
                     <p className="text-xs font-semibold text-green-700 mb-1.5 flex items-center gap-1">
-                      <span>✅</span> Corrected:
+                      <span>✅</span> 自然表达：
                     </p>
-                    <p className="text-sm text-gray-900 font-medium leading-relaxed">{sentence.corrected}</p>
+                    <p className="text-sm text-gray-900 font-medium leading-relaxed">{sentence.naturalExpression}</p>
                   </div>
+
+                  {/* Thinking Tips */}
+                  {sentence.thinkingTips && (
+                    <div className="mt-3 bg-blue-50/70 p-3 rounded-xl border border-blue-200/50">
+                      <p className="text-xs font-semibold text-blue-700 mb-1.5 flex items-center gap-1">
+                        <span>💡</span> 思维提示：
+                      </p>
+                      <p className="text-xs text-gray-700 leading-relaxed">{sentence.thinkingTips}</p>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
