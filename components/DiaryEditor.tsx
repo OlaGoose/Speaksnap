@@ -901,7 +901,7 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
           onClick={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()}
         >
-          <div className="inline-flex items-center gap-1 bg-white/98 backdrop-blur-xl rounded-full shadow-[0_4px_24px_rgba(0,0,0,0.12),0_1px_3px_rgba(0,0,0,0.08)] pointer-events-auto border border-gray-200/80 p-1">
+          <div className="inline-flex items-center gap-1 bg-white/98 backdrop-blur-xl rounded-full shadow-[0_4px_24px_rgba(0,0,0,0.12),0_1px_3px_rgba(0,0,0,0.08)] pointer-events-auto border border-gray-200/80 py-1 px-2">
             {selectionActionLoading ? (
               <div className="px-3 py-2 flex items-center justify-center gap-2">
                 <Loader2 size={16} className="animate-spin text-gray-500" />
@@ -917,7 +917,7 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
                     window.speechSynthesis.speak(utterance);
                   }}
                   onTouchStart={(e) => e.stopPropagation()}
-                  className="group p-2 hover:bg-gray-100 active:bg-gray-200 transition-all rounded-full touch-manipulation"
+                  className="group p-1 hover:bg-gray-100 active:bg-gray-200 transition-all rounded-full touch-manipulation"
                   title="Play audio"
                   aria-label="Play audio"
                 >
@@ -935,7 +935,7 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
                     handleTranslate();
                   }}
                   onTouchStart={(e) => e.stopPropagation()}
-                  className="group p-2 hover:bg-blue-50 active:bg-blue-100 transition-all rounded-full touch-manipulation"
+                  className="group p-1 hover:bg-blue-50 active:bg-blue-100 transition-all rounded-full touch-manipulation"
                   title="Translate"
                   aria-label="Translate"
                 >
@@ -950,7 +950,7 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
                     handleOptimize();
                   }}
                   onTouchStart={(e) => e.stopPropagation()}
-                  className="group p-2 hover:bg-purple-50 active:bg-purple-100 transition-all rounded-full touch-manipulation"
+                  className="group p-1 hover:bg-purple-50 active:bg-purple-100 transition-all rounded-full touch-manipulation"
                   title="AI Optimize"
                   aria-label="AI Optimize"
                 >
@@ -965,7 +965,7 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
                     handleAddToFlashcard();
                   }}
                   onTouchStart={(e) => e.stopPropagation()}
-                  className="group p-2 hover:bg-green-50 active:bg-green-100 transition-all rounded-full touch-manipulation"
+                  className="group p-1 hover:bg-green-50 active:bg-green-100 transition-all rounded-full touch-manipulation"
                   title="Save to Flashcard"
                   aria-label="Save to Flashcard"
                 >
