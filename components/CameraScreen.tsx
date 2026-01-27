@@ -42,6 +42,8 @@ export default function CameraScreen({
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [isScrollInitialized, setIsScrollInitialized] = useState(false);
+  const [isCameraReady, setIsCameraReady] = useState(false);
+  const [cameraRetryCount, setCameraRetryCount] = useState(0);
 
   // Location State
   const [isLocationEnabled, setIsLocationEnabled] = useState(false);
@@ -51,31 +53,143 @@ export default function CameraScreen({
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Initialize camera
+  // Initialize camera with retry and error handling
   useEffect(() => {
     let stream: MediaStream | null = null;
+    let retryTimeout: NodeJS.Timeout | null = null;
+    const maxRetries = 3;
 
-    const startCamera = async () => {
+    const startCamera = async (retryAttempt = 0) => {
       try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' },
-          audio: false,
-        });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+        // Stop any existing stream first
+        if (stream) {
+          stream.getTracks().forEach((track) => track.stop());
+          stream = null;
         }
-      } catch (err) {
-        console.error('Camera access denied:', err);
-        setError('Camera unavailable');
+
+        // Wait for video element to be ready
+        if (!videoRef.current) {
+          if (retryAttempt < maxRetries) {
+            retryTimeout = setTimeout(() => startCamera(retryAttempt + 1), 100);
+            return;
+          }
+          setError('Camera element not ready');
+          return;
+        }
+
+        // Request camera access
+        const constraints: MediaStreamConstraints = {
+          video: {
+            facingMode: 'environment',
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+          },
+          audio: false,
+        };
+
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+
+        if (!videoRef.current) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+
+        // Set stream to video element
+        videoRef.current.srcObject = stream;
+        setIsCameraReady(false);
+        setError(null);
+
+        // Wait for video metadata to load
+        const handleLoadedMetadata = () => {
+          if (videoRef.current) {
+            videoRef.current.play().catch((err) => {
+              console.warn('Video play error:', err);
+            });
+            setIsCameraReady(true);
+          }
+        };
+
+        // Wait for video to be ready
+        if (videoRef.current.readyState >= 2) {
+          // HAVE_CURRENT_DATA or higher
+          handleLoadedMetadata();
+        } else {
+          videoRef.current.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true });
+        }
+
+        // Handle video errors
+        const handleError = () => {
+          console.error('Video element error');
+          setError('Camera stream error');
+          setIsCameraReady(false);
+        };
+
+        videoRef.current.addEventListener('error', handleError);
+
+        // Cleanup error listener on unmount
+        return () => {
+          if (videoRef.current) {
+            videoRef.current.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            videoRef.current.removeEventListener('error', handleError);
+          }
+        };
+      } catch (err: any) {
+        console.error('Camera access error:', err);
+        
+        // Handle specific error types
+        let errorMessage = 'Camera unavailable';
+        if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+          errorMessage = 'Camera permission denied. Please enable camera access in settings.';
+        } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+          errorMessage = 'No camera found on this device.';
+        } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+          errorMessage = 'Camera is being used by another app. Please close it and try again.';
+        } else if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
+          // Try with simpler constraints
+          if (retryAttempt < maxRetries) {
+            console.log(`Retrying with simpler constraints (attempt ${retryAttempt + 1})`);
+            retryTimeout = setTimeout(() => {
+              startCamera(retryAttempt + 1);
+            }, 500);
+            return;
+          }
+          errorMessage = 'Camera constraints not supported.';
+        } else if (err.name === 'AbortError') {
+          errorMessage = 'Camera initialization was aborted.';
+        }
+
+        setError(errorMessage);
+        setIsCameraReady(false);
+
+        // Retry for certain errors
+        if (
+          (err.name === 'NotReadableError' || err.name === 'TrackStartError') &&
+          retryAttempt < maxRetries
+        ) {
+          console.log(`Retrying camera access (attempt ${retryAttempt + 1}/${maxRetries})`);
+          retryTimeout = setTimeout(() => {
+            startCamera(retryAttempt + 1);
+          }, 1000 * (retryAttempt + 1)); // Exponential backoff
+        }
       }
     };
 
+    // Start camera initialization
     startCamera();
 
     return () => {
-      if (stream) stream.getTracks().forEach((track) => track.stop());
+      if (retryTimeout) {
+        clearTimeout(retryTimeout);
+      }
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+      }
+      // Clean up video element
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
     };
-  }, []);
+  }, [cameraRetryCount]);
 
   // Cleanup recording on unmount
   useEffect(() => {
@@ -186,7 +300,19 @@ export default function CameraScreen({
   };
 
   const handleSnap = async () => {
+    // Check if camera is ready
+    if (!isCameraReady || error) {
+      console.warn('Camera not ready, cannot take photo');
+      return;
+    }
+
     if (videoRef.current && canvasRef.current) {
+      // Ensure video has valid dimensions
+      if (videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0) {
+        console.warn('Video dimensions not ready');
+        return;
+      }
+
       const location = await getCurrentPosition();
       const context = canvasRef.current.getContext('2d');
 
@@ -330,6 +456,13 @@ export default function CameraScreen({
     else if (activeMode === 'upload') fileInputRef.current?.click();
   };
 
+  const handleRetryCamera = () => {
+    setError(null);
+    setIsCameraReady(false);
+    setCameraRetryCount((prev) => prev + 1);
+    // Trigger re-initialization by updating a dependency
+  };
+
   const modes = [
     { id: 'voice', icon: Mic, label: 'Voice' },
     { id: 'camera', icon: Sparkles, label: 'Camera' },
@@ -342,6 +475,16 @@ export default function CameraScreen({
       <div className="absolute inset-0 z-0 bg-black">
         {!error ? (
           <>
+            {/* Loading overlay */}
+            {!isCameraReady && (
+              <div className="absolute inset-0 z-20 bg-black/80 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 size={32} className="text-white animate-spin" />
+                  <p className="text-white/80 text-sm font-medium">Initializing camera...</p>
+                </div>
+              </div>
+            )}
+            
             <video
               ref={videoRef}
               autoPlay
@@ -349,7 +492,16 @@ export default function CameraScreen({
               muted
               className={`w-full h-full object-cover transition-all duration-700 ease-out ${
                 activeMode === 'voice' ? 'blur-2xl opacity-60 scale-105' : 'opacity-100'
-              }`}
+              } ${!isCameraReady ? 'opacity-0' : 'opacity-100'}`}
+              onLoadedMetadata={() => {
+                if (videoRef.current) {
+                  videoRef.current.play().catch(() => {});
+                  setIsCameraReady(true);
+                }
+              }}
+              onCanPlay={() => {
+                setIsCameraReady(true);
+              }}
             />
 
             {/* Voice Mode Visuals */}
@@ -400,8 +552,28 @@ export default function CameraScreen({
             </div>
           </>
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-500">
-            Camera unavailable
+          <div className="w-full h-full flex flex-col items-center justify-center p-6 text-white">
+            <div className="text-center space-y-4 max-w-md">
+              <div className="w-16 h-16 mx-auto rounded-full bg-red-500/20 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-400">
+                  <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path>
+                  <circle cx="12" cy="13" r="3"></circle>
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-white mb-2">Camera Unavailable</h3>
+                <p className="text-sm text-white/70 leading-relaxed">{error}</p>
+              </div>
+              <button
+                onClick={handleRetryCamera}
+                className="mt-4 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 rounded-full text-white font-medium transition-all active:scale-95 flex items-center gap-2 mx-auto"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"></path>
+                </svg>
+                Retry
+              </button>
+            </div>
           </div>
         )}
       </div>
