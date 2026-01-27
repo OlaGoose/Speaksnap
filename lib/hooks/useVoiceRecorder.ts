@@ -61,17 +61,24 @@ export function useVoiceRecorder({
         recognitionRef.current.onend = null;
         
         // 尝试停止识别
-        if (recognitionRef.current.state === "recording" || recognitionRef.current.state === "starting") {
-          recognitionRef.current.stop();
+        try {
+          if (recognitionRef.current.state === "recording" || recognitionRef.current.state === "starting") {
+            recognitionRef.current.stop();
+          }
+        } catch (stopErr) {
+          // 停止时可能抛出错误，但我们仍然要清理引用
+          console.warn("Error stopping recognition during cleanup:", stopErr);
         }
       } catch (err) {
         // 忽略清理过程中的错误
         console.warn("Error during recognition cleanup:", err);
       } finally {
         recognitionRef.current = null;
+        isStoppingRef.current = false;
       }
+    } else {
+      isStoppingRef.current = false;
     }
-    isStoppingRef.current = false;
   }, []);
 
   const startRecording = useCallback(() => {
@@ -82,18 +89,10 @@ export function useVoiceRecorder({
       return;
     }
 
-    // 如果正在录音，先停止
+    // 清理任何现有的识别对象，确保干净的启动
     if (recognitionRef.current) {
-      const currentState = recognitionRef.current.state;
-      if (currentState === "recording" || currentState === "starting") {
-        cleanupRecognition();
-        setIsRecording(false);
-        return;
-      }
+      cleanupRecognition();
     }
-
-    // 清理旧的识别对象
-    cleanupRecognition();
 
     setError(null);
     setIsRecording(true);
@@ -166,6 +165,7 @@ export function useVoiceRecorder({
       recognition.onerror = (event: any) => {
         // 如果正在停止，忽略错误
         if (isStoppingRef.current) {
+          console.log("ℹ️ Ignoring error during stop:", event.error);
           return;
         }
 
@@ -200,20 +200,25 @@ export function useVoiceRecorder({
             : "Recognition aborted");
         }
         
-        // 错误后自动停止
+        // 错误后自动停止并清理
         setIsRecording(false);
+        cleanupRecognition();
       };
 
       recognition.onend = () => {
         console.log("🛑 Speech recognition ended");
         
-        // 只有在非主动停止的情况下才清理
-        if (!isStoppingRef.current && recognitionRef.current === recognition) {
+        // 如果不是主动停止（比如语音识别自动结束），则重置状态
+        if (!isStoppingRef.current) {
+          console.log("ℹ️ Recognition ended automatically");
           setIsRecording(false);
           lastFinalResultRef.current = "";
           accumulatedFinalTextRef.current = "";
-          recognitionRef.current = null;
+          if (recognitionRef.current === recognition) {
+            recognitionRef.current = null;
+          }
         }
+        // 如果是主动停止，不需要额外处理，因为 stopRecording 已经处理了
       };
 
       recognitionRef.current = recognition;
@@ -246,10 +251,8 @@ export function useVoiceRecorder({
       console.warn("Error stopping recognition:", err);
     }
 
-    // 延迟清理，确保 onend 事件能够正常触发
-    setTimeout(() => {
-      cleanupRecognition();
-    }, 100);
+    // 立即清理，避免快速点击时的状态不一致
+    cleanupRecognition();
   }, [cleanupRecognition]);
 
   return {
