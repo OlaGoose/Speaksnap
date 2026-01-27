@@ -109,13 +109,12 @@ export default function DialogueScreen({
   useEffect(() => {
     if (!isMobile) return;
 
-    // Prevent all context menus in chat area
     const handleContextMenu = (e: MouseEvent | TouchEvent) => {
+      // Prevent native context menu when text is selected in chat area
       const target = e.target as HTMLElement;
       if (target.closest('.message-text') || (chatContainerRef.current && chatContainerRef.current.contains(target))) {
         e.preventDefault();
         e.stopPropagation();
-        e.stopImmediatePropagation();
         return false;
       }
     };
@@ -128,54 +127,30 @@ export default function DialogueScreen({
         if (selection && !selection.isCollapsed) {
           // Prevent default behavior that shows native toolbar
           e.preventDefault();
-          e.stopPropagation();
           // Blur any active element to prevent native toolbar
           if (document.activeElement && document.activeElement !== document.body) {
             (document.activeElement as HTMLElement).blur();
           }
-          // Force remove focus from any input elements
-          const activeElement = document.activeElement as HTMLElement;
-          if (activeElement && activeElement.tagName === 'INPUT') {
-            activeElement.blur();
-          }
         }
       }
     };
 
-    // Prevent long press to show native toolbar
+    // Prevent long press context menu
     const handleTouchStart = (e: TouchEvent) => {
       const target = e.target as HTMLElement;
       if (target.closest('.message-text') || (chatContainerRef.current && chatContainerRef.current.contains(target))) {
-        // Allow selection but prevent native toolbar
+        // Allow selection but we'll prevent the toolbar in touchEnd
       }
     };
 
-    // Additional: Prevent selectionchange from triggering native toolbar
-    const handleSelectionChange = () => {
-      const selection = window.getSelection();
-      if (selection && !selection.isCollapsed) {
-        const range = selection.getRangeAt(0);
-        if (range && chatContainerRef.current && chatContainerRef.current.contains(range.commonAncestorContainer)) {
-          // Small delay to prevent native toolbar
-          setTimeout(() => {
-            if (document.activeElement && document.activeElement !== document.body) {
-              (document.activeElement as HTMLElement).blur();
-            }
-          }, 0);
-        }
-      }
-    };
-
-    document.addEventListener('contextmenu', handleContextMenu, { passive: false, capture: true });
+    document.addEventListener('contextmenu', handleContextMenu, { passive: false });
     document.addEventListener('touchstart', handleTouchStart, { passive: true });
-    document.addEventListener('touchend', handleTouchEnd, { passive: false, capture: true });
-    document.addEventListener('selectionchange', handleSelectionChange, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd, { passive: false });
 
     return () => {
-      document.removeEventListener('contextmenu', handleContextMenu, { capture: true });
+      document.removeEventListener('contextmenu', handleContextMenu);
       document.removeEventListener('touchstart', handleTouchStart);
-      document.removeEventListener('touchend', handleTouchEnd, { capture: true });
-      document.removeEventListener('selectionchange', handleSelectionChange);
+      document.removeEventListener('touchend', handleTouchEnd);
     };
   }, [isMobile]);
 
@@ -221,16 +196,13 @@ export default function DialogueScreen({
           context = text; // Fallback to selected text
         }
 
-        // ⚠️ CRITICAL: Capture rect immediately before native toolbar appears
-        // On mobile, native toolbar appears immediately and changes viewport layout,
-        // causing rect values to be incorrect when recalculated after delay
+        // Capture rect immediately to avoid native toolbar offset issues
         const capturedRect = {
           top: rect.top,
           bottom: rect.bottom,
           left: rect.left,
           right: rect.right,
           width: rect.width,
-          height: rect.height,
         };
 
         // On mobile, delay menu display to allow selection to complete
@@ -244,56 +216,18 @@ export default function DialogueScreen({
             return;
           }
 
-          // Calculate menu position - optimized for mobile
-          // Use visualViewport for accurate mobile positioning (accounts for native toolbar)
-          const visualViewport = typeof window !== 'undefined' && 'visualViewport' in window 
-            ? window.visualViewport 
-            : null;
+          // Calculate menu position - use captured rect to avoid native toolbar issues
+          const viewportWidth = window.innerWidth;
           
-          const viewportWidth = visualViewport?.width || window.innerWidth;
-          const viewportHeight = visualViewport?.height || window.innerHeight;
-          
-          // Get scroll offset - critical for accurate positioning
-          const scrollY = visualViewport?.offsetTop || window.scrollY || 0;
-          
-          // Account for native toolbar height (typically 40-50px on mobile)
-          // Native toolbar appears above selection, so it affects top but not bottom
-          const nativeToolbarHeight = isMobile ? 50 : 0;
+          // Position menu directly above selected text
+          const menuX = capturedRect.left + capturedRect.width / 2;
+          const menuY = capturedRect.top;
 
-          // Use captured rect (before native toolbar) for accurate positioning
-          let menuX = capturedRect.left + capturedRect.width / 2;
-          let menuY = capturedRect.top; // Use top as base - display above text
-
-          // Mobile-specific positioning
-          if (isMobile) {
-            // Center horizontally on mobile
-            menuX = viewportWidth / 2;
-            
-            // Calculate available space using captured rect (before native toolbar)
-            const menuHeight = 60; // Actual toolbar height
-            const spaceAbove = capturedRect.top - scrollY;
-            const spaceBelow = (viewportHeight + scrollY) - capturedRect.bottom;
-            
-            // Position above selection (user requirement)
-            // Account for native toolbar height if it appears
-            if (spaceAbove > menuHeight + 20 + nativeToolbarHeight) {
-              // Position above selection with native toolbar offset
-              menuY = capturedRect.top - menuHeight - 10 - nativeToolbarHeight;
-            } else if (spaceBelow > menuHeight + 20) {
-              // Fallback: position below if no space above
-              menuY = capturedRect.bottom + 10;
-            } else {
-              // Center vertically if no space
-              menuY = (capturedRect.top + capturedRect.bottom) / 2 - menuHeight / 2;
-            }
-          } else {
-            // Desktop positioning - above text
-            menuX = Math.min(Math.max(70, menuX), viewportWidth - 150);
-            menuY = Math.max(10, capturedRect.top - 60);
-          }
+          // Clamp horizontal position to stay in viewport
+          const clampedX = Math.min(Math.max(100, menuX), viewportWidth - 100);
 
           setSelectionMenu({
-            x: menuX,
+            x: clampedX,
             y: menuY,
             text: text,
             context: context,
@@ -821,15 +755,7 @@ export default function DialogueScreen({
           >
             {msg.speaker === 'user' ? (
               <div className="flex flex-col items-end max-w-[85%]">
-                <div 
-                  className="message-text bg-[#292929] text-white px-3.5 py-2 rounded-2xl rounded-br-sm shadow-sm relative text-[15px] font-medium leading-relaxed selection:bg-white/30 selection:text-white"
-                  style={{
-                    WebkitTouchCallout: 'none',
-                    WebkitUserSelect: 'text',
-                    userSelect: 'text',
-                    touchAction: 'manipulation',
-                  } as React.CSSProperties}
-                >
+                <div className="message-text bg-[#292929] text-white px-3.5 py-2 rounded-2xl rounded-br-sm shadow-sm relative text-[15px] font-medium leading-relaxed selection:bg-white/30 selection:text-white">
                   {msg.text}
                   <svg
                     className="absolute -right-[5px] bottom-0 text-[#292929] fill-current"
@@ -897,15 +823,7 @@ export default function DialogueScreen({
               </div>
             ) : (
               <div className="flex flex-col items-start max-w-[90%]">
-                <div 
-                  className="message-text text-[#191D20] text-[15px] font-medium leading-relaxed px-1 selection:bg-blue-200 selection:text-black"
-                  style={{
-                    WebkitTouchCallout: 'none',
-                    WebkitUserSelect: 'text',
-                    userSelect: 'text',
-                    touchAction: 'manipulation',
-                  } as React.CSSProperties}
-                >
+                <div className="message-text text-[#191D20] text-[15px] font-medium leading-relaxed px-1 selection:bg-blue-200 selection:text-black">
                   {msg.text}
                 </div>
               </div>
@@ -928,7 +846,7 @@ export default function DialogueScreen({
           style={{
             position: 'fixed',
             left: `${selectionMenu.x}px`,
-            top: `${selectionMenu.y}px`,
+            top: `${Math.max(selectionMenu.y - 10, 60)}px`,
             transform: 'translate(-50%, -100%)',
             zIndex: 50,
             pointerEvents: 'none',
