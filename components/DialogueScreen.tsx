@@ -237,7 +237,7 @@ export default function DialogueScreen({
 
           // Use captured rect (before native toolbar) for accurate positioning
           let menuX = capturedRect.left + capturedRect.width / 2;
-          let menuY = capturedRect.bottom; // Use bottom as base - more reliable on mobile
+          let menuY = capturedRect.top; // Use top as base - display above text
 
           // Mobile-specific positioning
           if (isMobile) {
@@ -249,22 +249,22 @@ export default function DialogueScreen({
             const spaceAbove = capturedRect.top - scrollY;
             const spaceBelow = (viewportHeight + scrollY) - capturedRect.bottom;
             
-            // Position below selection (more natural on mobile, avoids native toolbar)
-            // Add offset to account for native toolbar if it appears
-            if (spaceBelow > menuHeight + 20 + nativeToolbarHeight) {
-              // Position below selection
-              menuY = capturedRect.bottom + 10 + nativeToolbarHeight;
-            } else if (spaceAbove > menuHeight + 20) {
-              // Position above if no space below
-              menuY = capturedRect.top - menuHeight - 10;
+            // Position above selection (user requirement)
+            // Account for native toolbar height if it appears
+            if (spaceAbove > menuHeight + 20 + nativeToolbarHeight) {
+              // Position above selection with native toolbar offset
+              menuY = capturedRect.top - menuHeight - 10 - nativeToolbarHeight;
+            } else if (spaceBelow > menuHeight + 20) {
+              // Fallback: position below if no space above
+              menuY = capturedRect.bottom + 10;
             } else {
               // Center vertically if no space
-              menuY = (capturedRect.top + capturedRect.bottom) / 2;
+              menuY = (capturedRect.top + capturedRect.bottom) / 2 - menuHeight / 2;
             }
           } else {
-            // Desktop positioning
+            // Desktop positioning - above text
             menuX = Math.min(Math.max(70, menuX), viewportWidth - 150);
-            menuY = Math.max(10, capturedRect.top - 50);
+            menuY = Math.max(10, capturedRect.top - 60);
           }
 
           setSelectionMenu({
@@ -887,8 +887,8 @@ export default function DialogueScreen({
           style={{
             position: 'fixed',
             left: `${selectionMenu.x}px`,
-            top: `${Math.max(selectionMenu.y - 54, 60)}px`,
-            transform: 'translate(-50%, 100%)',
+            top: `${selectionMenu.y}px`,
+            transform: 'translate(-50%, -100%)',
             zIndex: 50,
             pointerEvents: 'none',
           }}
