@@ -395,14 +395,14 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
                                           e.stopPropagation();
                                           onSelectScenario(scenario, dialogue.id);
                                         }}
-                                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                                        className="flex items-center justify-center w-8 h-8 hover:bg-gray-100 rounded-lg transition-colors"
                                         title="View dialogue"
                                       >
                                         <Eye size={14} className="text-gray-400" />
                                       </button>
                                       <button
                                         onClick={(e) => handleDeleteDialogue(scenario, dialogue.id, e)}
-                                        className="p-2 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                        className="flex items-center justify-center w-8 h-8 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                                         title="Delete dialogue"
                                       >
                                         <Trash2 size={14} className="text-red-400" />
