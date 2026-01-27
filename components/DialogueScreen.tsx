@@ -109,12 +109,13 @@ export default function DialogueScreen({
   useEffect(() => {
     if (!isMobile) return;
 
+    // Prevent all context menus in chat area
     const handleContextMenu = (e: MouseEvent | TouchEvent) => {
-      // Prevent native context menu when text is selected in chat area
       const target = e.target as HTMLElement;
       if (target.closest('.message-text') || (chatContainerRef.current && chatContainerRef.current.contains(target))) {
         e.preventDefault();
         e.stopPropagation();
+        e.stopImmediatePropagation();
         return false;
       }
     };
@@ -127,30 +128,54 @@ export default function DialogueScreen({
         if (selection && !selection.isCollapsed) {
           // Prevent default behavior that shows native toolbar
           e.preventDefault();
+          e.stopPropagation();
           // Blur any active element to prevent native toolbar
           if (document.activeElement && document.activeElement !== document.body) {
             (document.activeElement as HTMLElement).blur();
+          }
+          // Force remove focus from any input elements
+          const activeElement = document.activeElement as HTMLElement;
+          if (activeElement && activeElement.tagName === 'INPUT') {
+            activeElement.blur();
           }
         }
       }
     };
 
-    // Prevent long press context menu
+    // Prevent long press to show native toolbar
     const handleTouchStart = (e: TouchEvent) => {
       const target = e.target as HTMLElement;
       if (target.closest('.message-text') || (chatContainerRef.current && chatContainerRef.current.contains(target))) {
-        // Allow selection but we'll prevent the toolbar in touchEnd
+        // Allow selection but prevent native toolbar
       }
     };
 
-    document.addEventListener('contextmenu', handleContextMenu, { passive: false });
+    // Additional: Prevent selectionchange from triggering native toolbar
+    const handleSelectionChange = () => {
+      const selection = window.getSelection();
+      if (selection && !selection.isCollapsed) {
+        const range = selection.getRangeAt(0);
+        if (range && chatContainerRef.current && chatContainerRef.current.contains(range.commonAncestorContainer)) {
+          // Small delay to prevent native toolbar
+          setTimeout(() => {
+            if (document.activeElement && document.activeElement !== document.body) {
+              (document.activeElement as HTMLElement).blur();
+            }
+          }, 0);
+        }
+      }
+    };
+
+    document.addEventListener('contextmenu', handleContextMenu, { passive: false, capture: true });
     document.addEventListener('touchstart', handleTouchStart, { passive: true });
-    document.addEventListener('touchend', handleTouchEnd, { passive: false });
+    document.addEventListener('touchend', handleTouchEnd, { passive: false, capture: true });
+    document.addEventListener('selectionchange', handleSelectionChange, { passive: true });
 
     return () => {
-      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('contextmenu', handleContextMenu, { capture: true });
       document.removeEventListener('touchstart', handleTouchStart);
-      document.removeEventListener('touchend', handleTouchEnd);
+      document.removeEventListener('touchend', handleTouchEnd, { capture: true });
+      document.removeEventListener('selectionchange', handleSelectionChange);
     };
   }, [isMobile]);
 
@@ -796,7 +821,15 @@ export default function DialogueScreen({
           >
             {msg.speaker === 'user' ? (
               <div className="flex flex-col items-end max-w-[85%]">
-                <div className="message-text bg-[#292929] text-white px-3.5 py-2 rounded-2xl rounded-br-sm shadow-sm relative text-[15px] font-medium leading-relaxed selection:bg-white/30 selection:text-white">
+                <div 
+                  className="message-text bg-[#292929] text-white px-3.5 py-2 rounded-2xl rounded-br-sm shadow-sm relative text-[15px] font-medium leading-relaxed selection:bg-white/30 selection:text-white"
+                  style={{
+                    WebkitTouchCallout: 'none',
+                    WebkitUserSelect: 'text',
+                    userSelect: 'text',
+                    touchAction: 'manipulation',
+                  } as React.CSSProperties}
+                >
                   {msg.text}
                   <svg
                     className="absolute -right-[5px] bottom-0 text-[#292929] fill-current"
@@ -864,7 +897,15 @@ export default function DialogueScreen({
               </div>
             ) : (
               <div className="flex flex-col items-start max-w-[90%]">
-                <div className="message-text text-[#191D20] text-[15px] font-medium leading-relaxed px-1 selection:bg-blue-200 selection:text-black">
+                <div 
+                  className="message-text text-[#191D20] text-[15px] font-medium leading-relaxed px-1 selection:bg-blue-200 selection:text-black"
+                  style={{
+                    WebkitTouchCallout: 'none',
+                    WebkitUserSelect: 'text',
+                    userSelect: 'text',
+                    touchAction: 'manipulation',
+                  } as React.CSSProperties}
+                >
                   {msg.text}
                 </div>
               </div>

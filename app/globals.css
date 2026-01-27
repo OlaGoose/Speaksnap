@@ -47,6 +47,21 @@ body {
   scrollbar-width: none;
 }
 
+/* Disable native text selection toolbar on mobile */
+.message-text {
+  -webkit-touch-callout: none; /* Disable iOS callout menu */
+  -webkit-user-select: text; /* Allow text selection */
+  user-select: text; /* Allow text selection */
+  touch-action: manipulation; /* Disable double-tap zoom */
+}
+
+/* Prevent native selection toolbar globally on mobile */
+@media (hover: none) and (pointer: coarse) {
+  .message-text::selection {
+    -webkit-touch-callout: none;
+  }
+}
+
 /* Safe area for mobile devices */
 .safe-area-top {
   padding-top: env(safe-area-inset-top);
