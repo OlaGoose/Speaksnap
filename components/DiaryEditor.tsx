@@ -796,17 +796,20 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
               </div>
             )}
           </div>
-            <button
-              onClick={() => {
-                setResult(null);
-                setText('');
-                onClose();
-              }}
-              className="w-full py-3 bg-white text-black font-semibold text-sm rounded-xl hover:bg-gray-100 active:scale-[0.98] transition-all shadow-sm"
-            >
-              Done
-            </button>
-          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4">
+          <button
+            onClick={() => {
+              setResult(null);
+              setText('');
+              onClose();
+            }}
+            className="w-full py-3 bg-gray-900 text-white font-medium text-sm rounded-md hover:bg-gray-800 active:scale-[0.98] transition-all"
+          >
+            Done
+          </button>
         </div>
       </div>
     );
