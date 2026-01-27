@@ -157,8 +157,8 @@ Return ONLY valid JSON with this EXACT structure:
       "thinkingTips": "spend time doing是固定搭配，必须记住！"
     }
   ],
-  "optimized": "COMPLETE corrected text - MUST include ALL sentences with 0 grammar errors, keeping original meaning and structure",
-  "upgradedVersion": "COMPLETE advanced text - MUST include ALL sentences with sophisticated vocabulary and complex structures",
+  "optimized": "Last week, my life was chaotic. I spent a lot of time doing meaningless things, such as randomly coding and exhausting myself physically. On Wednesday, I came up with an idea to build an app that combines walking with English learning... [COMPLETE corrected version of ENTIRE diary entry as one flowing text]",
+  "upgradedVersion": "Last week, my life descended into chaos. I found myself squandering considerable time on trivial pursuits, such as aimless coding sessions and physically draining activities. On Wednesday, I conceived an innovative idea to develop an application that seamlessly integrates walking exercises with English language acquisition... [COMPLETE advanced version of ENTIRE diary entry with sophisticated vocabulary]",
   "patterns": [
     {"pattern": "spend + time/money + doing", "explanation": "表示花费时间/金钱做某事", "example": "I spent two hours preparing dinner."},
     {"pattern": "come up with (an idea)", "explanation": "想出、提出（主意）", "example": "She came up with a brilliant solution."}
@@ -188,8 +188,8 @@ CRITICAL REQUIREMENTS:
    - reason: WHY it's wrong (in Chinese for clarity)
    - correction: the right way
    - explanation: detailed explanation in Chinese
-4. **optimized**: COMPLETE text with ALL original sentences corrected (保持原结构)
-5. **upgradedVersion**: COMPLETE advanced version (提升难度但保持意思)
+4. **optimized** (REQUIRED - MUST NOT BE EMPTY): Write the COMPLETE corrected version of the ENTIRE diary entry. Combine all corrected sentences from sentenceAnalysis into a coherent, flowing text. This must be a complete paragraph/article, not just individual sentences. Keep the original structure and meaning, but fix ALL grammar errors.
+5. **upgradedVersion** (REQUIRED - MUST NOT BE EMPTY): Write the COMPLETE advanced version with sophisticated vocabulary and complex sentence structures. This should be a polished, native-level version of the entire diary entry.
 6. **Patterns**: 3-5 reusable sentence patterns from the corrections
 7. **Flashcards**: 5-8 cards focusing on key mistakes and improvements
 8. Stats must be accurate

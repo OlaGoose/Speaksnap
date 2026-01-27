@@ -256,6 +256,28 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
         throw new Error('Incomplete analysis result. Please try again with a shorter entry.');
       }
       
+      // Check optimized and upgradedVersion fields
+      console.log('📊 Checking optimized field:', {
+        hasOptimized: !!data.optimized,
+        optimizedType: typeof data.optimized,
+        optimizedLength: data.optimized?.length || 0,
+        optimizedValue: data.optimized ? data.optimized.substring(0, 100) + '...' : 'empty',
+      });
+      console.log('📊 Checking upgradedVersion field:', {
+        hasUpgradedVersion: !!data.upgradedVersion,
+        upgradedVersionType: typeof data.upgradedVersion,
+        upgradedVersionLength: data.upgradedVersion?.length || 0,
+      });
+      
+      // Ensure optimized field exists, if not use sentenceAnalysis to generate it
+      if (!data.optimized || data.optimized.trim() === '') {
+        console.warn('⚠️ optimized field is missing or empty, generating from sentenceAnalysis');
+        // Generate optimized version from sentenceAnalysis
+        data.optimized = data.sentenceAnalysis
+          .map((s: any) => s.naturalExpression || s.original)
+          .join(' ');
+      }
+      
       console.log('✅ Analysis validation passed, setting result');
       setResult(data);
 
@@ -691,17 +713,31 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
           )}
 
           {/* Corrected Version */}
-          <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 shadow-sm border border-black/5 animate-in fade-in">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-9 h-9 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-sm">
-                <Sparkles size={16} className="text-white" />
+          {result.optimized && result.optimized.trim() !== '' ? (
+            <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 shadow-sm border border-black/5 animate-in fade-in">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-9 h-9 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-sm">
+                  <Sparkles size={16} className="text-white" />
+                </div>
+                <h3 className="font-semibold text-gray-900 text-base">Complete Corrected Version</h3>
               </div>
-              <h3 className="font-semibold text-gray-900 text-base">Complete Corrected Version</h3>
+              <div className="bg-gradient-to-br from-green-50/50 to-emerald-50/50 rounded-xl p-4 border border-green-100/50">
+                <p className="diary-text-content text-[15px] text-gray-800 leading-relaxed whitespace-pre-wrap">{result.optimized}</p>
+              </div>
             </div>
-            <div className="bg-gradient-to-br from-green-50/50 to-emerald-50/50 rounded-xl p-4 border border-green-100/50">
-              <p className="diary-text-content text-[15px] text-gray-800 leading-relaxed whitespace-pre-wrap">{result.optimized}</p>
+          ) : (
+            <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 shadow-sm border border-black/5 animate-in fade-in">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-9 h-9 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-xl flex items-center justify-center shadow-sm">
+                  <Sparkles size={16} className="text-white" />
+                </div>
+                <h3 className="font-semibold text-gray-900 text-base">Complete Corrected Version</h3>
+              </div>
+              <div className="bg-gradient-to-br from-yellow-50/50 to-orange-50/50 rounded-xl p-4 border border-yellow-100/50">
+                <p className="text-sm text-gray-600 italic">正在生成优化版本...</p>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Upgraded Version */}
           {result.upgradedVersion && (
