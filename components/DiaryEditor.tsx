@@ -479,9 +479,10 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
                 setText('');
                 onClose();
               }}
-              className="w-10 h-10 flex items-center justify-center bg-white rounded-md hover:bg-gray-100 transition-all border border-gray-200"
+              className="w-10 h-10 rounded-full bg-white shadow-float flex items-center justify-center text-gray-700 active:scale-95 transition-transform touch-manipulation"
+              aria-label="Go back"
             >
-              <ArrowLeft size={18} className="text-gray-700" />
+              <ArrowLeft size={18} />
             </button>
             <h2 className="text-sm font-medium text-gray-900">Analysis Results</h2>
             <div className="w-10" />
@@ -493,15 +494,24 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
           <div className="flex flex-col gap-3">
             {/* Overall Summary & Stats */}
             <div className="grid md:grid-cols-2 gap-3">
-              {/* Overall Assessment */}
-              <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
-                <div className="border-b px-5 py-3 text-sm font-medium">Overall Assessment</div>
-                <div className="p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="text-2xl font-medium text-gray-900">{result.overallScore}/10</div>
-                    <div className="text-xs text-gray-500 font-medium uppercase tracking-wide">{result.overallLevel}</div>
+              {/* Overall Assessment - Apple Style */}
+              <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-white via-gray-50/30 to-white backdrop-blur-xl border border-gray-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.04)]">
+                <div className="absolute inset-0 bg-gradient-to-br from-white/80 via-transparent to-white/40 pointer-events-none" />
+                <div className="relative p-8">
+                  <div className="flex items-start justify-between mb-6">
+                    <div className="flex-1">
+                      <div className="text-5xl font-light text-gray-900 tracking-tight mb-2" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                        {result.overallScore}
+                        <span className="text-2xl font-light text-gray-400 ml-1">/10</span>
+                      </div>
+                    </div>
+                    <div className="flex-shrink-0 ml-4">
+                      <span className="text-5xl font-light text-gray-900 tracking-tight uppercase" style={{ fontVariantNumeric: 'tabular-nums' }}>{result.overallLevel}</span>
+                    </div>
                   </div>
-                  <p className="text-sm text-gray-700 leading-relaxed">{result.summary}</p>
+                  <div className="pt-4 border-t border-gray-200/50">
+                    <p className="text-[15px] text-gray-700 leading-relaxed font-light tracking-wide">{result.summary}</p>
+                  </div>
                 </div>
               </div>
 
@@ -509,7 +519,7 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
               {result.stats && (
                 <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
                   <div className="border-b px-5 py-3 text-sm font-medium">Statistics</div>
-                  <div className="p-2 [&>*:nth-child(odd)]:bg-gray-50">
+                  <div className="p-2 ">
                     <div className="flex flex-row gap-1 items-center justify-between p-2 group rounded-sm">
                       <div className="flex flex-row items-center gap-2 min-w-0 flex-1">
                         <span className="text-sm text-gray-900">Words</span>
@@ -543,7 +553,7 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
             {result.dimensions && (
               <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
                 <div className="border-b px-5 py-3 text-sm font-medium">Dimensions</div>
-                <div className="p-2 [&>*:nth-child(odd)]:bg-gray-50">
+                <div className="p-2 ">
                   {[
                     { key: 'contentExpression', label: '内容表达', color: 'blue' },
                     { key: 'grammarAccuracy', label: '语法准确度', color: 'red' },
@@ -595,7 +605,7 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
                 {result.strengths && result.strengths.length > 0 && (
                   <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
                     <div className="border-b px-5 py-3 text-sm font-medium">Strengths</div>
-                    <div className="p-2 [&>*:nth-child(odd)]:bg-gray-50">
+                    <div className="p-2 ">
                       {result.strengths.map((strength, idx) => (
                         <div key={idx} className="flex flex-row gap-1 items-center justify-between p-2 group rounded-sm">
                           <div className="flex flex-row items-center gap-2 min-w-0 flex-1">
@@ -611,7 +621,7 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
                 {result.improvements && result.improvements.length > 0 && (
                   <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
                     <div className="border-b px-5 py-3 text-sm font-medium">Focus Areas</div>
-                    <div className="p-2 [&>*:nth-child(odd)]:bg-gray-50">
+                    <div className="p-2 ">
                       {result.improvements.map((improvement, idx) => (
                         <div key={idx} className="flex flex-row gap-1 items-center justify-between p-2 group rounded-sm">
                           <div className="flex flex-row items-center gap-2 min-w-0 flex-1">
@@ -627,7 +637,7 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
                 {result.grammarFocus && result.grammarFocus.length > 0 && (
                   <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
                     <div className="border-b px-5 py-3 text-sm font-medium">Grammar Focus</div>
-                    <div className="p-2 [&>*:nth-child(odd)]:bg-gray-50">
+                    <div className="p-2 ">
                       {result.grammarFocus.map((focus, idx) => (
                         <div key={idx} className="flex flex-row gap-1 items-center justify-between p-2 group rounded-sm">
                           <div className="flex flex-row items-center gap-2 min-w-0 flex-1">
@@ -645,7 +655,7 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
             {result.sentenceAnalysis && result.sentenceAnalysis.length > 0 && (
               <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
                 <div className="border-b px-5 py-3 text-sm font-medium">Sentence Analysis</div>
-                <div className="p-2 [&>*:nth-child(odd)]:bg-gray-50">
+                <div className="p-2 ">
                   {result.sentenceAnalysis.map((sentence, idx) => (
                     <div key={idx} className="p-4 space-y-3">
                       <div className="flex items-center gap-2 mb-2">
@@ -737,7 +747,7 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
             {result.patterns && result.patterns.length > 0 && (
               <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
                 <div className="border-b px-5 py-3 text-sm font-medium">Useful Patterns</div>
-                <div className="p-2 [&>*:nth-child(odd)]:bg-gray-50">
+                <div className="p-2 ">
                   {result.patterns.map((pattern, idx) => (
                     <div key={idx} className="p-3 space-y-2">
                       <p className="text-sm font-medium text-gray-900 font-mono">{pattern.pattern}</p>
@@ -753,7 +763,7 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
             {result.flashcards && result.flashcards.length > 0 && (
               <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
                 <div className="border-b px-5 py-3 text-sm font-medium">New Flashcards ({result.flashcards.length})</div>
-                <div className="p-2 [&>*:nth-child(odd)]:bg-gray-50">
+                <div className="p-2 ">
                   {result.flashcards.map((card, idx) => (
                     <div key={idx} className="p-4 space-y-3">
                       <div className="flex items-center gap-3 justify-between">
@@ -821,9 +831,10 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
       <div className="p-4 flex justify-between items-center border-b border-black/5 bg-white/70 backdrop-blur-md sticky top-0 z-10 shadow-sm">
         <button
           onClick={onClose}
-          className="w-10 h-10 flex items-center justify-center bg-white rounded-full shadow-sm hover:shadow transition-all border border-black/5"
+          className="w-10 h-10 rounded-full bg-white shadow-float flex items-center justify-center text-gray-700 active:scale-95 transition-transform touch-manipulation"
+          aria-label="Go back"
         >
-          <ArrowLeft size={18} className="text-gray-700" />
+          <ArrowLeft size={18} />
         </button>
         <span className="text-sm font-semibold text-gray-900">
           {new Date().toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
