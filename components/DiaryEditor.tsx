@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { ArrowLeft, Sparkles, BookOpen, TrendingUp, Target, Volume2 } from 'lucide-react';
+import { ArrowLeft, Sparkles, BookOpen, TrendingUp, Target, Volume2, Languages, Wand2, Loader2, Copy } from 'lucide-react';
 import { storage } from '@/lib/utils/storage';
 
 interface DiaryEditorProps {
@@ -63,12 +63,167 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Selection State
+  const [selectionMenu, setSelectionMenu] = useState<{
+    x: number;
+    y: number;
+    text: string;
+    context: string;
+  } | null>(null);
+  const [selectionActionLoading, setSelectionActionLoading] = useState(false);
+  const [selectionResult, setSelectionResult] = useState<{
+    type: 'translate' | 'optimize';
+    text: string;
+  } | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+  const selectionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const diaryContentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen && textareaRef.current) {
       textareaRef.current.focus();
     }
   }, [isOpen]);
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || 
+        (typeof window !== 'undefined' && window.innerWidth < 768));
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Text selection handler
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      if (selectionTimeoutRef.current) {
+        clearTimeout(selectionTimeoutRef.current);
+      }
+
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed || !selection.toString().trim()) {
+        setSelectionMenu(null);
+        return;
+      }
+
+      const text = selection.toString().trim();
+      if (text.length === 0) {
+        setSelectionMenu(null);
+        return;
+      }
+
+      const range = selection.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+
+      // Check if selection is within diary content area
+      if (
+        diaryContentRef.current &&
+        diaryContentRef.current.contains(range.commonAncestorContainer)
+      ) {
+        // Get full sentence context
+        let contextElement = range.commonAncestorContainer.parentElement;
+        let context = '';
+        
+        // Walk up the DOM to find text container
+        while (contextElement && !contextElement.classList.contains('diary-text-content')) {
+          contextElement = contextElement.parentElement;
+        }
+        
+        if (contextElement) {
+          context = contextElement.textContent || '';
+        } else {
+          context = text;
+        }
+
+        const delay = isMobile ? 300 : 0;
+        
+        selectionTimeoutRef.current = setTimeout(() => {
+          const currentSelection = window.getSelection();
+          if (!currentSelection || currentSelection.isCollapsed || 
+              currentSelection.toString().trim() !== text) {
+            return;
+          }
+
+          const viewportWidth = window.innerWidth;
+          const viewportHeight = window.innerHeight;
+          const safeAreaTop = typeof window !== 'undefined' && 'visualViewport' in window 
+            ? (window.visualViewport?.offsetTop || 0) 
+            : 0;
+          const safeAreaBottom = typeof window !== 'undefined' && 'visualViewport' in window
+            ? (window.visualViewport?.height || viewportHeight)
+            : viewportHeight;
+
+          let menuX = rect.left + rect.width / 2;
+          let menuY = rect.top;
+
+          if (isMobile) {
+            menuX = viewportWidth / 2;
+            const menuHeight = 200;
+            const spaceAbove = rect.top - safeAreaTop;
+            const spaceBelow = safeAreaBottom - rect.bottom;
+            
+            if (spaceAbove > menuHeight + 20) {
+              menuY = rect.top - menuHeight - 10;
+            } else if (spaceBelow > menuHeight + 20) {
+              menuY = rect.bottom + 10;
+            } else {
+              menuY = (rect.top + rect.bottom) / 2 - menuHeight / 2;
+            }
+          } else {
+            menuX = Math.min(Math.max(70, menuX), viewportWidth - 150);
+            menuY = Math.max(10, rect.top - 50);
+          }
+
+          setSelectionMenu({
+            x: menuX,
+            y: menuY,
+            text: text,
+            context: context,
+          });
+        }, delay);
+      }
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      setTimeout(() => {
+        handleSelectionChange();
+      }, 100);
+    };
+
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as HTMLElement;
+      if (selectionMenu && 
+          !target.closest('[class*="selection"]') && 
+          !target.closest('.diary-text-content') &&
+          !target.closest('button')) {
+        window.getSelection()?.removeAllRanges();
+        setSelectionMenu(null);
+      }
+    };
+
+    document.addEventListener('selectionchange', handleSelectionChange);
+    if (isMobile) {
+      document.addEventListener('touchend', handleTouchEnd, { passive: true });
+    }
+    document.addEventListener('click', handleClickOutside);
+    document.addEventListener('touchend', handleClickOutside, { passive: true });
+
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionChange);
+      if (isMobile) {
+        document.removeEventListener('touchend', handleTouchEnd);
+      }
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('touchend', handleClickOutside);
+      if (selectionTimeoutRef.current) {
+        clearTimeout(selectionTimeoutRef.current);
+      }
+    };
+  }, [isMobile, selectionMenu]);
 
   const handleAnalyze = async () => {
     if (!text.trim() || isAnalyzing) return;
@@ -162,6 +317,117 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
     }
   };
 
+  const handleTranslate = async () => {
+    if (!selectionMenu) return;
+    setSelectionActionLoading(true);
+
+    try {
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: selectionMenu.text }),
+      });
+
+      if (!response.ok) throw new Error('Translation failed');
+
+      const result = await response.json();
+      setSelectionResult({ type: 'translate', text: result.translation });
+    } catch (error) {
+      console.error('Translation error:', error);
+      alert('Translation failed');
+    } finally {
+      setSelectionActionLoading(false);
+    }
+  };
+
+  const handleOptimize = async () => {
+    if (!selectionMenu) return;
+    setSelectionActionLoading(true);
+
+    try {
+      const response = await fetch('/api/optimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: selectionMenu.text }),
+      });
+
+      if (!response.ok) throw new Error('Optimization failed');
+
+      const result = await response.json();
+      setSelectionResult({ type: 'optimize', text: result.optimized });
+    } catch (error) {
+      console.error('Optimization error:', error);
+      alert('Optimization failed');
+    } finally {
+      setSelectionActionLoading(false);
+    }
+  };
+
+  const handleAddToFlashcard = async () => {
+    if (!selectionMenu) return;
+
+    const selectedText = selectionMenu.text;
+    const context = selectionMenu.context;
+
+    setSelectionMenu(null);
+
+    const processingToast = document.createElement('div');
+    processingToast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-black/80 text-white px-4 py-2 rounded-full text-sm z-50 animate-in fade-in';
+    processingToast.textContent = '🔄 Generating flashcard...';
+    document.body.appendChild(processingToast);
+
+    try {
+      const response = await fetch('/api/flashcard/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: selectedText,
+          context: context,
+          scenario: 'Diary Entry',
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Flashcard generation failed');
+      }
+
+      const cardContent = await response.json();
+
+      const newCard = {
+        id: Date.now().toString(),
+        front: selectedText,
+        back: {
+          phonetic: cardContent.phonetic,
+          translation: cardContent.translation,
+          definition: cardContent.definition,
+          example: cardContent.example,
+          native_usage: cardContent.native_usage,
+          video_ids: cardContent.video_ids || [],
+        },
+        context: context,
+        timestamp: Date.now(),
+        source: 'diary',
+      };
+
+      const cards = storage.getItem<any[]>('speakSnapFlashcards') || [];
+      storage.setItem('speakSnapFlashcards', [newCard, ...cards]);
+
+      processingToast.textContent = '✅ Flashcard saved!';
+      processingToast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded-full text-sm z-50 animate-in fade-in';
+      
+      setTimeout(() => {
+        document.body.removeChild(processingToast);
+      }, 2000);
+    } catch (error) {
+      console.error('Flashcard error:', error);
+      processingToast.textContent = '❌ Failed to create flashcard';
+      processingToast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-red-600 text-white px-4 py-2 rounded-full text-sm z-50 animate-in fade-in';
+      setTimeout(() => {
+        document.body.removeChild(processingToast);
+      }, 2000);
+    }
+  };
+
   const playAudio = useCallback((text: string) => {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'en-US';
@@ -192,7 +458,7 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 pb-24 space-y-4">
+        <div ref={diaryContentRef} className="flex-1 overflow-y-auto p-4 pb-24 space-y-4">
           {/* Overall Summary */}
           <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 shadow-sm border border-black/5 animate-in fade-in">
             <div className="flex items-center justify-between mb-3">
@@ -356,7 +622,7 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
                       </span>
                       <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">句 {idx + 1}</span>
                     </div>
-                    <p className="text-sm text-gray-800 p-3 rounded-xl border border-gray-200/50 leading-relaxed bg-gray-50/70">
+                    <p className="diary-text-content text-sm text-gray-800 p-3 rounded-xl border border-gray-200/50 leading-relaxed bg-gray-50/70">
                       {sentence.original}
                     </p>
                   </div>
@@ -398,7 +664,7 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
                     <p className="text-xs font-semibold text-green-700 mb-1.5 flex items-center gap-1">
                       <span>✅</span> 自然表达：
                     </p>
-                    <p className="text-sm text-gray-900 font-medium leading-relaxed">{sentence.naturalExpression}</p>
+                    <p className="diary-text-content text-sm text-gray-900 font-medium leading-relaxed">{sentence.naturalExpression}</p>
                   </div>
 
                   {/* Thinking Tips */}
@@ -424,7 +690,7 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
               <h3 className="font-semibold text-gray-900 text-base">Complete Corrected Version</h3>
             </div>
             <div className="bg-gradient-to-br from-green-50/50 to-emerald-50/50 rounded-xl p-4 border border-green-100/50">
-              <p className="text-[15px] text-gray-800 leading-relaxed whitespace-pre-wrap">{result.optimized}</p>
+              <p className="diary-text-content text-[15px] text-gray-800 leading-relaxed whitespace-pre-wrap">{result.optimized}</p>
             </div>
           </div>
 
@@ -441,7 +707,7 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
                 </div>
               </div>
               <div className="bg-gradient-to-br from-purple-50/50 to-indigo-50/50 rounded-xl p-4 border border-purple-100/50">
-                <p className="text-[15px] text-gray-800 leading-relaxed whitespace-pre-wrap">{result.upgradedVersion}</p>
+                <p className="diary-text-content text-[15px] text-gray-800 leading-relaxed whitespace-pre-wrap">{result.upgradedVersion}</p>
               </div>
             </div>
           )}
@@ -611,6 +877,170 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
           )}
         </button>
       </div>
+
+      {/* Selection Menu */}
+      {selectionMenu && !selectionResult && (
+        <div
+          style={{
+            position: 'fixed',
+            left: `${selectionMenu.x}px`,
+            top: `${Math.max(selectionMenu.y - 54, 60)}px`,
+            transform: 'translate(-50%, 0)',
+            zIndex: 50,
+            pointerEvents: 'none',
+          }}
+          onClick={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+        >
+          <div className="inline-flex items-center gap-1 bg-white/98 backdrop-blur-xl rounded-full shadow-[0_4px_24px_rgba(0,0,0,0.12),0_1px_3px_rgba(0,0,0,0.08)] pointer-events-auto border border-gray-200/80 p-1">
+            {selectionActionLoading ? (
+              <div className="px-3 py-2 flex items-center justify-center gap-2">
+                <Loader2 size={16} className="animate-spin text-gray-500" />
+              </div>
+            ) : (
+              <>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const utterance = new SpeechSynthesisUtterance(selectionMenu.text);
+                    utterance.lang = 'en-US';
+                    utterance.rate = 0.85;
+                    window.speechSynthesis.speak(utterance);
+                  }}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  className="group p-2 hover:bg-gray-100 active:bg-gray-200 transition-all rounded-full touch-manipulation"
+                  title="Play audio"
+                  aria-label="Play audio"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-700 group-hover:text-gray-900 transition-colors">
+                    <path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"></path>
+                    <path d="M16 9a5 5 0 0 1 0 6"></path>
+                  </svg>
+                </button>
+                
+                <div className="h-4 w-px bg-gray-200"></div>
+                
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleTranslate();
+                  }}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  className="group p-2 hover:bg-blue-50 active:bg-blue-100 transition-all rounded-full touch-manipulation"
+                  title="Translate"
+                  aria-label="Translate"
+                >
+                  <Languages size={18} className="text-blue-600 group-hover:text-blue-700 transition-colors" />
+                </button>
+                
+                <div className="h-4 w-px bg-gray-200"></div>
+                
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOptimize();
+                  }}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  className="group p-2 hover:bg-purple-50 active:bg-purple-100 transition-all rounded-full touch-manipulation"
+                  title="AI Optimize"
+                  aria-label="AI Optimize"
+                >
+                  <Wand2 size={18} className="text-purple-600 group-hover:text-purple-700 transition-colors" />
+                </button>
+                
+                <div className="h-4 w-px bg-gray-200"></div>
+                
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddToFlashcard();
+                  }}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  className="group p-2 hover:bg-green-50 active:bg-green-100 transition-all rounded-full touch-manipulation"
+                  title="Save to Flashcard"
+                  aria-label="Save to Flashcard"
+                >
+                  <Bookmark size={18} className="text-green-600 group-hover:text-green-700 transition-colors" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Selection Result Popup */}
+      {selectionResult && (
+        <div 
+          className={`fixed ${isMobile ? 'bottom-20 left-4 right-4' : 'bottom-24 left-4 right-4'} z-50 bg-white/95 backdrop-blur-xl border border-gray-200 shadow-2xl rounded-2xl p-4 animate-in slide-in-from-bottom max-h-[60vh] overflow-y-auto`}
+          onClick={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+        >
+          <div className="flex justify-between items-start mb-3">
+            <div className="flex items-center gap-2">
+              {selectionResult.type === 'translate' ? (
+                <div className="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0">
+                  <Languages size={16} />
+                </div>
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
+                  <Wand2 size={16} />
+                </div>
+              )}
+              <h3 className="font-semibold text-gray-900 text-sm">
+                {selectionResult.type === 'translate' ? 'Translation' : 'Optimized'}
+              </h3>
+            </div>
+            <button
+              onClick={() => {
+                setSelectionResult(null);
+                setSelectionMenu(null);
+                window.getSelection()?.removeAllRanges();
+              }}
+              className="w-7 h-7 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <div className="space-y-2">
+            <p className="text-xs text-gray-500 font-medium">Original:</p>
+            <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded-lg">{selectionMenu?.text}</p>
+            <p className="text-xs text-gray-500 font-medium mt-3">
+              {selectionResult.type === 'translate' ? 'Translation:' : 'Optimized:'}
+            </p>
+            <p className="text-sm text-gray-900 bg-blue-50 p-3 rounded-lg leading-relaxed">{selectionResult.text}</p>
+          </div>
+          <div className="flex gap-2 mt-4">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(selectionResult.text);
+                const btn = document.activeElement as HTMLElement;
+                const originalText = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => {
+                  btn.textContent = originalText;
+                }, 1000);
+              }}
+              className="flex-1 px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 transition-colors flex items-center justify-center gap-2"
+            >
+              <Copy size={14} />
+              Copy
+            </button>
+            <button
+              onClick={() => {
+                setSelectionResult(null);
+                setSelectionMenu(null);
+                window.getSelection()?.removeAllRanges();
+              }}
+              className="flex-1 px-3 py-2 bg-gray-900 hover:bg-black text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

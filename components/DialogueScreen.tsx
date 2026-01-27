@@ -818,7 +818,7 @@ export default function DialogueScreen({
             position: 'fixed',
             left: `${selectionMenu.x}px`,
             top: `${Math.max(selectionMenu.y - 54, 60)}px`,
-            transform: 'translate(-50%, 0)',
+            transform: 'translate(-50%, 100%)',
             zIndex: 50,
             pointerEvents: 'none',
           }}
