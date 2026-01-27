@@ -39,7 +39,10 @@ export default function DialogueScreen({
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [autoPlayAudio, setAutoPlayAudio] = useState(false);
+  const [realTimeVoice, setRealTimeVoice] = useState(false);
   const [showAudioToast, setShowAudioToast] = useState(false);
+  const [showVoiceToast, setShowVoiceToast] = useState(false);
+  const autoSendTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Selection State
   const [selectionMenu, setSelectionMenu] = useState<{
@@ -88,6 +91,62 @@ export default function DialogueScreen({
     // Save initial state
     saveDialogueProgress(initialMessages, false);
   }, [scenario, dialogueId]);
+
+  // 语音识别 Hook
+  const {
+    isRecording,
+    isSupported: isVoiceSupported,
+    startRecording,
+    stopRecording,
+    error: voiceError,
+  } = useVoiceRecorder({
+    onResult: (text, isFinal) => {
+      if (isFinal) {
+        // 最终结果：追加到输入框
+        setInputValue((prev) => {
+          const separator = prev && !prev.endsWith(' ') ? ' ' : '';
+          const newText = prev + separator + text;
+          
+          // If real-time voice is enabled, automatically send message when a significant pause is detected
+          if (realTimeVoice && text.trim().length > 0) {
+            // Use a small timeout to allow for potential additional results or user to see the text
+            setTimeout(() => {
+              // We need to use the latest inputValue here, but since this is inside setInputValue,
+              // it's tricky. A better way is to use a separate effect or handle it differently.
+              // For now, let's just update the input and we'll handle the auto-send in a separate useEffect.
+            }, 500);
+          }
+          
+          return newText;
+        });
+        // 清空临时文本
+        setInterimText('');
+      }
+    },
+    onInterimResult: (text) => {
+      // 实时临时结果：显示在输入框中但不保存
+      setInterimText(text);
+    },
+    onError: (error) => {
+      console.error('Voice recognition error:', error);
+      setInterimText('');
+    },
+    language: 'en-US',
+    preventDuplicates: true,
+  });
+
+  // Auto-send logic for real-time voice
+  useEffect(() => {
+    if (realTimeVoice && inputValue.trim() && !isRecording && !isProcessing) {
+      if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current);
+      autoSendTimerRef.current = setTimeout(() => {
+        handleSend();
+      }, 800);
+    }
+    return () => {
+      if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current);
+    };
+  }, [inputValue, realTimeVoice, isRecording, isProcessing]);
 
   // Detect mobile device
   useEffect(() => {
@@ -277,37 +336,6 @@ export default function DialogueScreen({
     };
   }, [isMobile, selectionMenu]);
 
-  // 语音识别 Hook
-  const {
-    isRecording,
-    isSupported: isVoiceSupported,
-    startRecording,
-    stopRecording,
-    error: voiceError,
-  } = useVoiceRecorder({
-    onResult: (text, isFinal) => {
-      if (isFinal) {
-        // 最终结果：追加到输入框
-        setInputValue((prev) => {
-          const separator = prev && !prev.endsWith(' ') ? ' ' : '';
-          return prev + separator + text;
-        });
-        // 清空临时文本
-        setInterimText('');
-      }
-    },
-    onInterimResult: (text) => {
-      // 实时临时结果：显示在输入框中但不保存
-      setInterimText(text);
-    },
-    onError: (error) => {
-      console.error('Voice recognition error:', error);
-      setInterimText('');
-    },
-    language: 'en-US',
-    preventDuplicates: true,
-  });
-
   const handleToggleAutoPlay = () => {
     const newState = !autoPlayAudio;
     setAutoPlayAudio(newState);
@@ -317,6 +345,25 @@ export default function DialogueScreen({
     setTimeout(() => setShowAudioToast(false), 2000);
   };
 
+  const handleToggleRealTimeVoice = () => {
+    const newState = !realTimeVoice;
+    setRealTimeVoice(newState);
+    
+    // Show toast feedback
+    setShowVoiceToast(true);
+    setTimeout(() => setShowVoiceToast(false), 2000);
+
+    if (newState) {
+      if (!isRecording) {
+        startRecording();
+      }
+    } else {
+      if (isRecording) {
+        stopRecording();
+      }
+    }
+  };
+
   const handleVoiceInput = () => {
     if (!isVoiceSupported) {
       alert('Voice input is not supported in this browser.');
@@ -324,6 +371,11 @@ export default function DialogueScreen({
     }
 
     if (isRecording) {
+      if (realTimeVoice) {
+        setRealTimeVoice(false);
+        setShowVoiceToast(true);
+        setTimeout(() => setShowVoiceToast(false), 2000);
+      }
       stopRecording();
     } else {
       startRecording();
@@ -396,8 +448,17 @@ export default function DialogueScreen({
             const utterance = new SpeechSynthesisUtterance(result.next_response);
             utterance.lang = 'en-US';
             utterance.rate = 0.9;
+            utterance.onend = () => {
+              // If real-time voice is enabled, restart recording after AI finishes speaking
+              if (realTimeVoice) {
+                startRecording();
+              }
+            };
             window.speechSynthesis.speak(utterance);
           }, 500); // Slight delay for better UX
+        } else if (realTimeVoice) {
+          // If auto-play is off but real-time voice is on, restart recording immediately
+          startRecording();
         }
       }
 
@@ -626,53 +687,84 @@ export default function DialogueScreen({
     <div className="flex flex-col h-full w-full bg-primary-50 relative overflow-hidden">
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-30 flex justify-between items-start p-4 pt-6 bg-gradient-to-b from-primary-50 via-primary-50/90 to-transparent pointer-events-none">
-        {/* Auto-play Audio Toggle - Enhanced UI */}
-        <button
-          onClick={handleToggleAutoPlay}
-          className={`relative group h-9 rounded-full flex items-center gap-2 transition-all duration-300 pointer-events-auto active:scale-95 touch-manipulation overflow-hidden ${
-            autoPlayAudio 
-              ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30 pr-3 pl-2.5' 
-              : 'bg-white/95 text-gray-500 hover:text-gray-700 hover:bg-white shadow-md hover:shadow-lg pr-3 pl-2.5 border border-gray-200/50'
-          }`}
-          aria-label={autoPlayAudio ? 'Disable auto audio' : 'Enable auto audio'}
-        >
-          {/* Background pulse effect when ON */}
-          {autoPlayAudio && (
-            <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
-          )}
-          
-          {/* Icon with animation */}
-          <div className="relative z-10 flex items-center justify-center w-5 h-5">
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              width="18" 
-              height="18" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2.5" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
-              className="transition-transform duration-300"
-            >
-              <path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"></path>
-              {autoPlayAudio && (
-                <>
-                  <path d="M16 9a5 5 0 0 1 0 6" className="animate-pulse"></path>
-                  <path d="M19 7a9 9 0 0 1 0 10" className="animate-pulse" style={{ animationDelay: '0.15s' }}></path>
-                </>
-              )}
-              {!autoPlayAudio && <path d="M23 9l-6 6m0-6l6 6" strokeWidth="2"></path>}
-            </svg>
-          </div>
-          
-          {/* Text label */}
-          <span className={`relative z-10 text-xs font-bold tracking-wide transition-all duration-300 ${
-            autoPlayAudio ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'
-          }`}>
-            {autoPlayAudio ? 'Auto ON' : 'Auto OFF'}
-          </span>
-        </button>
+        <div className="flex flex-col gap-2 pointer-events-auto">
+          {/* Auto-play Audio Toggle - Enhanced UI */}
+          <button
+            onClick={handleToggleAutoPlay}
+            className={`relative group h-9 rounded-full flex items-center gap-2 transition-all duration-300 active:scale-95 touch-manipulation overflow-hidden ${
+              autoPlayAudio 
+                ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30 pr-3 pl-2.5' 
+                : 'bg-white/95 text-gray-500 hover:text-gray-700 hover:bg-white shadow-md hover:shadow-lg pr-3 pl-2.5 border border-gray-200/50'
+            }`}
+            aria-label={autoPlayAudio ? 'Disable auto audio' : 'Enable auto audio'}
+          >
+            {/* Background pulse effect when ON */}
+            {autoPlayAudio && (
+              <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+            )}
+            
+            {/* Icon with animation */}
+            <div className="relative z-10 flex items-center justify-center w-5 h-5">
+              <svg 
+                xmlns="http://www.w3.org/2000/svg" 
+                width="18" 
+                height="18" 
+                viewBox="0 0 24 24" 
+                fill="none" 
+                stroke="currentColor" 
+                strokeWidth="2.5" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+                className="transition-transform duration-300"
+              >
+                <path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"></path>
+                {autoPlayAudio && (
+                  <>
+                    <path d="M16 9a5 5 0 0 1 0 6" className="animate-pulse"></path>
+                    <path d="M19 7a9 9 0 0 1 0 10" className="animate-pulse" style={{ animationDelay: '0.15s' }}></path>
+                  </>
+                )}
+                {!autoPlayAudio && <path d="M23 9l-6 6m0-6l6 6" strokeWidth="2"></path>}
+              </svg>
+            </div>
+            
+            {/* Text label */}
+            <span className={`relative z-10 text-xs font-bold tracking-wide transition-all duration-300 ${
+              autoPlayAudio ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'
+            }`}>
+              {autoPlayAudio ? 'Auto ON' : 'Auto OFF'}
+            </span>
+          </button>
+
+          {/* Real-time Voice Toggle */}
+          <button
+            onClick={handleToggleRealTimeVoice}
+            className={`relative group h-9 rounded-full flex items-center gap-2 transition-all duration-300 active:scale-95 touch-manipulation overflow-hidden ${
+              realTimeVoice 
+                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30 pr-3 pl-2.5' 
+                : 'bg-white/95 text-gray-500 hover:text-gray-700 hover:bg-white shadow-md hover:shadow-lg pr-3 pl-2.5 border border-gray-200/50'
+            }`}
+            aria-label={realTimeVoice ? 'Disable real-time voice' : 'Enable real-time voice'}
+          >
+            {realTimeVoice && (
+              <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+            )}
+            
+            <div className="relative z-10 flex items-center justify-center w-5 h-5">
+              <Mic 
+                size={18} 
+                strokeWidth={2.5}
+                className={`transition-transform duration-300 ${realTimeVoice ? 'animate-bounce' : ''}`}
+              />
+            </div>
+            
+            <span className={`relative z-10 text-xs font-bold tracking-wide transition-all duration-300 ${
+              realTimeVoice ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'
+            }`}>
+              {realTimeVoice ? 'Voice ON' : 'Voice OFF'}
+            </span>
+          </button>
+        </div>
 
         <button
           onClick={onBack}
@@ -704,6 +796,24 @@ export default function DialogueScreen({
             </div>
             <span className="text-sm font-semibold whitespace-nowrap">
               {autoPlayAudio ? 'Auto-play enabled' : 'Auto-play disabled'}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Toast notification for real-time voice toggle */}
+      {showVoiceToast && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top fade-in duration-300">
+          <div className={`px-4 py-2.5 rounded-full shadow-2xl backdrop-blur-xl flex items-center gap-2 ${
+            realTimeVoice 
+              ? 'bg-blue-600 text-white' 
+              : 'bg-gray-800 text-white'
+          }`}>
+            <div className="w-5 h-5 flex items-center justify-center">
+              <Mic size={16} strokeWidth={2.5} />
+            </div>
+            <span className="text-sm font-semibold whitespace-nowrap">
+              {realTimeVoice ? 'Real-time voice enabled' : 'Real-time voice disabled'}
             </span>
           </div>
         </div>
