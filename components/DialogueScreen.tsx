@@ -196,6 +196,18 @@ export default function DialogueScreen({
           context = text; // Fallback to selected text
         }
 
+        // ⚠️ CRITICAL: Capture rect immediately before native toolbar appears
+        // On mobile, native toolbar appears immediately and changes viewport layout,
+        // causing rect values to be incorrect when recalculated after delay
+        const capturedRect = {
+          top: rect.top,
+          bottom: rect.bottom,
+          left: rect.left,
+          right: rect.right,
+          width: rect.width,
+          height: rect.height,
+        };
+
         // On mobile, delay menu display to allow selection to complete
         const delay = isMobile ? 300 : 0;
         
@@ -208,42 +220,51 @@ export default function DialogueScreen({
           }
 
           // Calculate menu position - optimized for mobile
-          const viewportWidth = window.innerWidth;
-          const viewportHeight = window.innerHeight;
-          const safeAreaTop = typeof window !== 'undefined' && 'visualViewport' in window 
-            ? (window.visualViewport?.offsetTop || 0) 
-            : 0;
-          const safeAreaBottom = typeof window !== 'undefined' && 'visualViewport' in window
-            ? (window.visualViewport?.height || viewportHeight)
-            : viewportHeight;
+          // Use visualViewport for accurate mobile positioning (accounts for native toolbar)
+          const visualViewport = typeof window !== 'undefined' && 'visualViewport' in window 
+            ? window.visualViewport 
+            : null;
+          
+          const viewportWidth = visualViewport?.width || window.innerWidth;
+          const viewportHeight = visualViewport?.height || window.innerHeight;
+          
+          // Get scroll offset - critical for accurate positioning
+          const scrollY = visualViewport?.offsetTop || window.scrollY || 0;
+          
+          // Account for native toolbar height (typically 40-50px on mobile)
+          // Native toolbar appears above selection, so it affects top but not bottom
+          const nativeToolbarHeight = isMobile ? 50 : 0;
 
-          let menuX = rect.left + rect.width / 2;
-          let menuY = rect.top;
+          // Use captured rect (before native toolbar) for accurate positioning
+          let menuX = capturedRect.left + capturedRect.width / 2;
+          let menuY = capturedRect.bottom; // Use bottom as base - more reliable on mobile
 
           // Mobile-specific positioning
           if (isMobile) {
             // Center horizontally on mobile
             menuX = viewportWidth / 2;
             
-            // Position above selection if there's space, otherwise below
-            const menuHeight = 200; // Approximate menu height for vertical layout
-            const spaceAbove = rect.top - safeAreaTop;
-            const spaceBelow = safeAreaBottom - rect.bottom;
+            // Calculate available space using captured rect (before native toolbar)
+            const menuHeight = 60; // Actual toolbar height
+            const spaceAbove = capturedRect.top - scrollY;
+            const spaceBelow = (viewportHeight + scrollY) - capturedRect.bottom;
             
-            if (spaceAbove > menuHeight + 20) {
-              // Position above
-              menuY = rect.top - menuHeight - 10;
-            } else if (spaceBelow > menuHeight + 20) {
-              // Position below
-              menuY = rect.bottom + 10;
+            // Position below selection (more natural on mobile, avoids native toolbar)
+            // Add offset to account for native toolbar if it appears
+            if (spaceBelow > menuHeight + 20 + nativeToolbarHeight) {
+              // Position below selection
+              menuY = capturedRect.bottom + 10 + nativeToolbarHeight;
+            } else if (spaceAbove > menuHeight + 20) {
+              // Position above if no space below
+              menuY = capturedRect.top - menuHeight - 10;
             } else {
               // Center vertically if no space
-              menuY = (rect.top + rect.bottom) / 2 - menuHeight / 2;
+              menuY = (capturedRect.top + capturedRect.bottom) / 2;
             }
           } else {
             // Desktop positioning
             menuX = Math.min(Math.max(70, menuX), viewportWidth - 150);
-            menuY = Math.max(10, rect.top - 50);
+            menuY = Math.max(10, capturedRect.top - 50);
           }
 
           setSelectionMenu({
