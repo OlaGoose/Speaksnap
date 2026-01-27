@@ -27,6 +27,7 @@ export function useGeminiLive({
   const audioContextRef = useRef<AudioContext | null>(null);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const audioWorkletNodeRef = useRef<AudioWorkletNode | null>(null);
 
   const cleanup = useCallback(() => {
     if (wsRef.current) {
@@ -36,6 +37,10 @@ export function useGeminiLive({
     if (processorRef.current) {
       processorRef.current.disconnect();
       processorRef.current = null;
+    }
+    if (audioWorkletNodeRef.current) {
+      audioWorkletNodeRef.current.disconnect();
+      audioWorkletNodeRef.current = null;
     }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
@@ -79,7 +84,7 @@ export function useGeminiLive({
               speech_config: {
                 voice_config: {
                   prebuilt_voice_config: {
-                    voice_name: "Aoide", // 推荐的语音
+                    voice_name: "Aoide", 
                   }
                 }
               }
@@ -92,20 +97,52 @@ export function useGeminiLive({
       ws.onmessage = async (event) => {
         try {
           const response = JSON.parse(event.data);
+          console.log("Gemini Live message:", response);
           
-          if (response.serverContent?.modelTurn?.parts) {
-            const parts = response.serverContent.modelTurn.parts;
-            for (const part of parts) {
-              if (part.inlineData?.data) {
-                onAudioData?.(part.inlineData.data);
-              }
-              if (part.text) {
-                onTextData?.(part.text);
+          // 处理服务端内容
+          if (response.serverContent) {
+            const serverContent = response.serverContent;
+            
+            // 处理模型回合
+            if (serverContent.modelTurn?.parts) {
+              const parts = serverContent.modelTurn.parts;
+              console.log("Gemini Live: Processing parts", parts.length);
+              for (const part of parts) {
+                if (part.inlineData?.data) {
+                  console.log("Gemini Live: Audio data received, length:", part.inlineData.data.length);
+                  onAudioData?.(part.inlineData.data);
+                }
+                if (part.text) {
+                  console.log("Gemini Live: Text data received:", part.text);
+                  onTextData?.(part.text);
+                }
               }
             }
+
+            // 处理直接包含的音频数据（某些响应格式）
+            if (serverContent.inlineData?.data) {
+              console.log("Gemini Live: Direct audio data received");
+              onAudioData?.(serverContent.inlineData.data);
+            }
+
+            // 处理打断 (Interruption)
+            if (serverContent.interrupted) {
+              console.log("Gemini Live: Interrupted by user");
+            }
+
+            // 处理回合结束
+            if (serverContent.turnComplete) {
+              console.log("Gemini Live: Turn complete");
+            }
+          }
+          
+          // 处理错误响应
+          if (response.error) {
+            console.error("Gemini Live error:", response.error);
+            onError?.(response.error.message || "Gemini Live API error");
           }
         } catch (err) {
-          console.error("Error parsing Gemini message:", err);
+          console.error("Error parsing Gemini message:", err, event.data);
         }
       };
 
@@ -120,7 +157,14 @@ export function useGeminiLive({
       };
 
       // 2. 初始化音频采集
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          sampleRate: 16000
+        } 
+      });
       streamRef.current = stream;
       
       const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
@@ -129,6 +173,9 @@ export function useGeminiLive({
       audioContextRef.current = audioContext;
 
       const source = audioContext.createMediaStreamSource(stream);
+      
+      // 使用 ScriptProcessorNode (虽然已废弃但兼容性好，且在简单场景下足够)
+      // 注意：Gemini 期望 16kHz L16 PCM
       const processor = audioContext.createScriptProcessor(4096, 1, 1);
       processorRef.current = processor;
 
@@ -138,14 +185,24 @@ export function useGeminiLive({
       processor.onaudioprocess = (e) => {
         if (ws.readyState === WebSocket.OPEN) {
           const inputData = e.inputBuffer.getChannelData(0);
-          // 转换为 16-bit PCM
-          const pcmData = new Int16Array(inputData.length);
+          
+          // 转换为 16-bit PCM (Little Endian)
+          const pcmBuffer = new ArrayBuffer(inputData.length * 2);
+          const pcmView = new DataView(pcmBuffer);
+          
           for (let i = 0; i < inputData.length; i++) {
-            pcmData[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7FFF;
+            const s = Math.max(-1, Math.min(1, inputData[i]));
+            pcmView.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
           }
           
-          // 转为 Base64 并发送
-          const base64 = btoa(String.fromCharCode(...new Uint8Array(pcmData.buffer)));
+          // 转为 Base64 并通过 realtime_input 发送
+          const uint8Array = new Uint8Array(pcmBuffer);
+          let binary = '';
+          for (let i = 0; i < uint8Array.byteLength; i++) {
+            binary += String.fromCharCode(uint8Array[i]);
+          }
+          const base64 = btoa(binary);
+          
           ws.send(JSON.stringify({
             realtime_input: {
               media_chunks: [{

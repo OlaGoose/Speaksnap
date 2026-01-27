@@ -46,6 +46,63 @@ export default function DialogueScreen({
   const [isLiveActive, setIsLiveActive] = useState(false);
 
   // Gemini Live Integration
+  const audioQueueRef = useRef<string[]>([]);
+  const isPlayingRef = useRef(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+
+  const playNextInQueue = useCallback(() => {
+    if (audioQueueRef.current.length === 0) {
+      isPlayingRef.current = false;
+      return;
+    }
+
+    isPlayingRef.current = true;
+    const base64 = audioQueueRef.current.shift()!;
+    
+    try {
+      // 初始化 AudioContext（如果还没有）
+      if (!audioContextRef.current) {
+        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({
+          sampleRate: 24000, // Gemini Live 返回 24kHz
+        });
+      }
+      
+      const audioContext = audioContextRef.current;
+      
+      // 解码 base64 音频数据
+      const binaryString = window.atob(base64);
+      const len = binaryString.length;
+      const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      
+      // 将 16-bit PCM 转换为 Float32Array
+      const pcmData = new Int16Array(bytes.buffer);
+      const float32Data = new Float32Array(pcmData.length);
+      for (let i = 0; i < pcmData.length; i++) {
+        float32Data[i] = pcmData[i] / 32768.0;
+      }
+      
+      // 创建 AudioBuffer 并播放
+      const audioBuffer = audioContext.createBuffer(1, float32Data.length, 24000);
+      audioBuffer.getChannelData(0).set(float32Data);
+      
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContext.destination);
+      
+      source.onended = () => {
+        playNextInQueue();
+      };
+      
+      source.start(0);
+    } catch (err) {
+      console.error("Error processing audio chunk:", err);
+      playNextInQueue();
+    }
+  }, []);
+
   const { 
     isActive: geminiLiveActive, 
     connectionState: geminiLiveState,
@@ -54,13 +111,12 @@ export default function DialogueScreen({
   } = useGeminiLive({
     apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY || '',
     onAudioData: (base64) => {
-      // Play audio stream
-      const audio = new Audio(`data:audio/pcm;base64,${base64}`);
-      // Note: This is a simple playback, for better experience use a buffer-based player
-      audio.play().catch(e => console.error("Audio play error:", e));
+      audioQueueRef.current.push(base64);
+      if (!isPlayingRef.current) {
+        playNextInQueue();
+      }
     },
     onTextData: (text) => {
-      // Handle real-time text if needed
       console.log("Gemini Live Text:", text);
     },
     onError: (err) => {
@@ -712,33 +768,6 @@ export default function DialogueScreen({
           </span>
         </button>
 
-        {/* Gemini Live Call Button */}
-        <button
-          onClick={handleToggleLive}
-          className={`relative group h-9 rounded-full flex items-center gap-2 transition-all duration-300 pointer-events-auto active:scale-95 touch-manipulation overflow-hidden ${
-            isLiveActive 
-              ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/30 pr-3 pl-2.5' 
-              : 'bg-white/95 text-gray-500 hover:text-gray-700 hover:bg-white shadow-md hover:shadow-lg pr-3 pl-2.5 border border-gray-200/50'
-          }`}
-          aria-label={isLiveActive ? 'End Live Call' : 'Start Live Call'}
-        >
-          {isLiveActive && (
-            <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
-          )}
-          <div className="relative z-10 flex items-center justify-center w-5 h-5">
-            {isLiveActive ? (
-              <PhoneOff size={18} strokeWidth={2.5} className="animate-bounce" />
-            ) : (
-              <Phone size={18} strokeWidth={2.5} />
-            )}
-          </div>
-          <span className={`relative z-10 text-xs font-bold tracking-wide transition-all duration-300 ${
-            isLiveActive ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'
-          }`}>
-            {isLiveActive ? (geminiLiveState === 'connecting' ? 'Connecting...' : 'Live ON') : 'Live Call'}
-          </span>
-        </button>
-
         <button
           onClick={onBack}
           className="w-10 h-10 rounded-full bg-white/80 backdrop-blur-md shadow-float border border-white/50 flex items-center justify-center text-gray-400 hover:text-gray-900 transition-all pointer-events-auto active:scale-95 hover:bg-white touch-manipulation"
@@ -1086,6 +1115,38 @@ export default function DialogueScreen({
           </div>
         </div>
       )}
+
+      {/* Gemini Live Call Button - Floating Bottom Right */}
+      <div className="absolute bottom-32 right-6 z-40">
+        <button
+          onClick={handleToggleLive}
+          className={`relative group w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 pointer-events-auto active:scale-90 touch-manipulation shadow-2xl ${
+            isLiveActive 
+              ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white ring-4 ring-blue-100' 
+              : 'bg-white text-gray-500 hover:text-blue-600 hover:bg-blue-50 border border-gray-200/50'
+          }`}
+          aria-label={isLiveActive ? 'End Live Call' : 'Start Live Call'}
+        >
+          {isLiveActive && (
+            <div className="absolute inset-0 rounded-full bg-blue-400 animate-ping opacity-20"></div>
+          )}
+          <div className="relative z-10 flex items-center justify-center">
+            {isLiveActive ? (
+              <PhoneOff size={24} strokeWidth={2.5} />
+            ) : (
+              <Phone size={24} strokeWidth={2.5} />
+            )}
+          </div>
+          
+          {/* Status Indicator */}
+          {isLiveActive && geminiLiveState === 'connecting' && (
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full border-2 border-white animate-pulse"></div>
+          )}
+          {isLiveActive && geminiLiveState === 'connected' && (
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
+          )}
+        </button>
+      </div>
 
       {/* Bottom Input Area */}
       <div className="absolute bottom-0 left-0 right-0 bg-white p-3 pb-6 border-t border-black/5 z-40 rounded-t-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
