@@ -1011,21 +1011,34 @@ export default function DialogueScreen({
             ? 'border-blue-300 shadow-[0_0_0_3px_rgba(59,130,246,0.1)]' 
             : 'border-gray-200 focus-within:border-gray-300 focus-within:shadow-sm'
         }`}>
-          <div className="flex-1 relative">
+          <div className="flex-1 relative min-w-0 flex items-center h-full py-1">
+            {/* 输入框 */}
             <input
               ref={textareaRef}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+              value={inputValue + interimText}
+              onChange={(e) => {
+                // 只更新确认的文本部分，不更新临时识别文本
+                const newValue = e.target.value;
+                if (interimText && newValue.endsWith(interimText)) {
+                  setInputValue(newValue.slice(0, -interimText.length));
+                } else {
+                  setInputValue(newValue);
+                }
+              }}
               onKeyDown={handleKeyDown}
-              placeholder={isRecording ? 'Listening...' : 'Ask the tutor...'}
-              className="w-full bg-transparent text-primary-900 placeholder:text-gray-400 text-[16px] outline-none min-w-0"
+              placeholder={(inputValue || interimText) ? '' : (isRecording ? 'Listening...' : 'Ask the tutor...')}
+              className={`w-full bg-transparent text-[16px] outline-none min-w-0 leading-normal ${
+                interimText ? 'text-transparent caret-primary-900' : 'text-primary-900 placeholder:text-gray-400'
+              }`}
             />
-            {/* 实时识别文本叠加显示 */}
+            {/* 可见的文本叠加层 - 带样式区分，防止溢出 */}
             {interimText && (
-              <div className="absolute left-0 top-0 pointer-events-none text-[16px] text-gray-400 italic whitespace-nowrap overflow-hidden animate-in fade-in duration-200">
-                {inputValue && <span className="opacity-0">{inputValue}</span>}
-                {inputValue && ' '}
-                {interimText}
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 pointer-events-none text-[16px] leading-normal w-full pr-2 overflow-hidden">
+                <div className="whitespace-nowrap overflow-hidden text-ellipsis">
+                  <span className="text-primary-900">{inputValue}</span>
+                  {inputValue && <span className="text-primary-900"> </span>}
+                  <span className="text-gray-400 italic transition-opacity duration-200">{interimText}</span>
+                </div>
               </div>
             )}
           </div>
