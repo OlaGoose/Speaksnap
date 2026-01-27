@@ -14,6 +14,11 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await analyzeCompleteDiary(text);
+    
+    console.log('📊 Diary analysis result keys:', Object.keys(result));
+    console.log('📊 Has dimensions:', !!result.dimensions);
+    console.log('📊 Has sentenceAnalysis:', !!result.sentenceAnalysis);
+    console.log('📊 overallScore:', result.overallScore);
 
     return NextResponse.json(result);
   } catch (error: any) {

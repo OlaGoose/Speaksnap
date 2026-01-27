@@ -221,6 +221,9 @@ CRITICAL REQUIREMENTS:
       console.log('📝 Doubao response length:', responseText.length);
       const parsed = DoubaoProvider.parseJSONResponse(responseText);
       console.log('✅ Doubao JSON parsed successfully');
+      console.log('📊 Parsed data keys:', Object.keys(parsed));
+      console.log('📊 Has dimensions:', !!parsed.dimensions);
+      console.log('📊 Has sentenceAnalysis:', !!parsed.sentenceAnalysis);
       return parsed;
     } catch (error: any) {
       lastError = error;
@@ -271,7 +274,10 @@ CRITICAL REQUIREMENTS:
       });
       const result = await model.generateContent(prompt);
       const responseText = result.response.text();
-      return JSON.parse(responseText);
+      const parsed = JSON.parse(responseText);
+      console.log('✅ Gemini JSON parsed successfully');
+      console.log('📊 Parsed data keys:', Object.keys(parsed));
+      return parsed;
     } catch (error: any) {
       lastError = error;
       // Don't log quota errors as warnings

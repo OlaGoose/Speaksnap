@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { ArrowLeft, Sparkles, BookOpen, TrendingUp, Target, Volume2, Languages, Wand2, Loader2, Copy } from 'lucide-react';
+import { ArrowLeft, Sparkles, BookOpen, TrendingUp, Target, Volume2, Languages, Wand2, Loader2, Copy, Bookmark } from 'lucide-react';
 import { storage } from '@/lib/utils/storage';
 
 interface DiaryEditorProps {
@@ -243,11 +243,20 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
 
       const data = await response.json();
       
+      console.log('📊 Diary analysis response:', data);
+      
       // Validate required fields
       if (!data.overallScore || !data.sentenceAnalysis) {
+        console.error('❌ Incomplete analysis data:', {
+          hasOverallScore: !!data.overallScore,
+          hasSentenceAnalysis: !!data.sentenceAnalysis,
+          hasDimensions: !!data.dimensions,
+          keys: Object.keys(data),
+        });
         throw new Error('Incomplete analysis result. Please try again with a shorter entry.');
       }
       
+      console.log('✅ Analysis validation passed, setting result');
       setResult(data);
 
       // Save flashcards with YouTube videos
