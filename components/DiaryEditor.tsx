@@ -469,9 +469,9 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
 
   if (result) {
     return (
-      <div className="fixed inset-0 z-50 bg-gradient-to-br from-orange-50/30 via-white to-blue-50/30 flex flex-col animate-in slide-in-from-bottom duration-300">
+      <div className="fixed inset-0 z-50 bg-gray-50 flex flex-col">
         {/* Header */}
-        <div className="sticky top-0 bg-white/70 backdrop-blur-md border-b border-black/5 z-10 shadow-sm">
+        <div className="sticky top-0 bg-white border-b border-gray-200 z-10">
           <div className="p-4 flex items-center justify-between">
             <button
               onClick={() => {
@@ -479,373 +479,323 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
                 setText('');
                 onClose();
               }}
-              className="w-10 h-10 flex items-center justify-center bg-white rounded-full shadow-sm hover:shadow transition-all border border-black/5"
+              className="w-10 h-10 flex items-center justify-center bg-white rounded-md hover:bg-gray-100 transition-all border border-gray-200"
             >
               <ArrowLeft size={18} className="text-gray-700" />
             </button>
-            <h2 className="text-base font-semibold text-gray-900">Analysis Results</h2>
+            <h2 className="text-sm font-medium text-gray-900">Analysis Results</h2>
             <div className="w-10" />
           </div>
         </div>
 
         {/* Content */}
-        <div ref={diaryContentRef} className="flex-1 overflow-y-auto p-4 pb-24 space-y-4">
-          {/* Overall Summary */}
-          <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 shadow-sm border border-black/5 animate-in fade-in">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
-                  <Target size={18} className="text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 text-base">Overall Assessment</h3>
-                  <p className="text-xs text-gray-500 font-medium">Level: {result.overallLevel}</p>
+        <div ref={diaryContentRef} className="flex-1 overflow-y-auto p-4 pb-24">
+          <div className="flex flex-col gap-3">
+            {/* Overall Summary & Stats */}
+            <div className="grid md:grid-cols-2 gap-3">
+              {/* Overall Assessment */}
+              <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
+                <div className="border-b px-5 py-3 text-sm font-medium">Overall Assessment</div>
+                <div className="p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-2xl font-medium text-gray-900">{result.overallScore}/10</div>
+                    <div className="text-xs text-gray-500 font-medium uppercase tracking-wide">{result.overallLevel}</div>
+                  </div>
+                  <p className="text-sm text-gray-700 leading-relaxed">{result.summary}</p>
                 </div>
               </div>
-              <div className="text-right">
-                <div className="text-3xl font-black bg-gradient-to-br from-blue-600 to-indigo-600 bg-clip-text text-transparent">{result.overallScore}/10</div>
-                <div className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">Score</div>
-              </div>
+
+              {/* Stats */}
+              {result.stats && (
+                <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
+                  <div className="border-b px-5 py-3 text-sm font-medium">Statistics</div>
+                  <div className="p-2 [&>*:nth-child(odd)]:bg-gray-50">
+                    <div className="flex flex-row gap-1 items-center justify-between p-2 group rounded-sm">
+                      <div className="flex flex-row items-center gap-2 min-w-0 flex-1">
+                        <span className="text-sm text-gray-900">Words</span>
+                      </div>
+                      <div className="text-sm font-medium text-gray-900 flex-shrink-0">{result.stats.wordCount}</div>
+                    </div>
+                    <div className="flex flex-row gap-1 items-center justify-between p-2 group rounded-sm">
+                      <div className="flex flex-row items-center gap-2 min-w-0 flex-1">
+                        <span className="text-sm text-gray-900">Sentences</span>
+                      </div>
+                      <div className="text-sm font-medium text-gray-900 flex-shrink-0">{result.stats.sentenceCount}</div>
+                    </div>
+                    <div className="flex flex-row gap-1 items-center justify-between p-2 group rounded-sm">
+                      <div className="flex flex-row items-center gap-2 min-w-0 flex-1">
+                        <span className="text-sm text-gray-900">Avg Length</span>
+                      </div>
+                      <div className="text-sm font-medium text-gray-900 flex-shrink-0">{result.stats.avgSentenceLength}</div>
+                    </div>
+                    <div className="flex flex-row gap-1 items-center justify-between p-2 group rounded-sm">
+                      <div className="flex flex-row items-center gap-2 min-w-0 flex-1">
+                        <span className="text-sm text-gray-900">Unique Words</span>
+                      </div>
+                      <div className="text-sm font-medium text-gray-900 flex-shrink-0">{result.stats.uniqueWords}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            <p className="text-sm text-gray-700 leading-relaxed">{result.summary}</p>
-            
-            {/* Stats */}
-            {result.stats && (
-              <div className="grid grid-cols-4 gap-2 mt-4 pt-4 border-t border-gray-100">
-                <div className="text-center">
-                  <div className="text-lg font-bold text-gray-900">{result.stats.wordCount}</div>
-                  <div className="text-[10px] text-gray-500 font-medium">Words</div>
+
+            {/* Dimensions Scoring */}
+            {result.dimensions && (
+              <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
+                <div className="border-b px-5 py-3 text-sm font-medium">Dimensions</div>
+                <div className="p-2 [&>*:nth-child(odd)]:bg-gray-50">
+                  {[
+                    { key: 'contentExpression', label: '内容表达', color: 'blue' },
+                    { key: 'grammarAccuracy', label: '语法准确度', color: 'red' },
+                    { key: 'vocabularyNaturalness', label: '用词自然度', color: 'yellow' },
+                    { key: 'englishThinking', label: '英语思维', color: 'purple' },
+                  ].map(({ key, label, color }) => {
+                    const dimension = result.dimensions[key as keyof typeof result.dimensions];
+                    return (
+                      <div key={key} className="flex flex-row gap-1 items-center justify-between p-2 group rounded-sm">
+                        <div className="flex flex-row items-center gap-2 min-w-0 flex-1">
+                          <span className="text-sm text-gray-900">{label}</span>
+                        </div>
+                        <div className="group relative flex items-center gap-x-2 w-[120px] font-medium text-gray-900 flex-shrink-0">
+                          <div className="absolute inset-0 pr-2" style={{ width: '100%' }}>
+                            <div className="h-full rounded-sm bg-gray-100 group-hover:bg-gray-200" style={{ width: `${dimension.score * 10}%` }}></div>
+                          </div>
+                          <div className="z-0 px-1 text-nowrap flex flex-row items-center gap-1">
+                            <div className="w-[30px] text-right text-xs">{dimension.score}/10</div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-gray-900">{result.stats.sentenceCount}</div>
-                  <div className="text-[10px] text-gray-500 font-medium">Sentences</div>
+                <div className="border-t px-5 py-3 bg-gray-50">
+                  <div className="space-y-2">
+                    {[
+                      { key: 'contentExpression', label: '内容表达' },
+                      { key: 'grammarAccuracy', label: '语法准确度' },
+                      { key: 'vocabularyNaturalness', label: '用词自然度' },
+                      { key: 'englishThinking', label: '英语思维' },
+                    ].map(({ key, label }) => {
+                      const dimension = result.dimensions[key as keyof typeof result.dimensions];
+                      return (
+                        <div key={key} className="text-xs text-gray-700">
+                          <span className="font-medium">{label}:</span> {dimension.comment}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-gray-900">{result.stats.avgSentenceLength}</div>
-                  <div className="text-[10px] text-gray-500 font-medium">Avg Length</div>
+              </div>
+            )}
+
+            {/* Strengths & Improvements */}
+            {((result.strengths && result.strengths.length > 0) || (result.improvements && result.improvements.length > 0) || (result.grammarFocus && result.grammarFocus.length > 0)) && (
+              <div className="grid md:grid-cols-3 gap-3">
+                {/* Strengths */}
+                {result.strengths && result.strengths.length > 0 && (
+                  <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
+                    <div className="border-b px-5 py-3 text-sm font-medium">Strengths</div>
+                    <div className="p-2 [&>*:nth-child(odd)]:bg-gray-50">
+                      {result.strengths.map((strength, idx) => (
+                        <div key={idx} className="flex flex-row gap-1 items-center justify-between p-2 group rounded-sm">
+                          <div className="flex flex-row items-center gap-2 min-w-0 flex-1">
+                            <span className="text-sm text-gray-900">{strength}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Areas to Improve */}
+                {result.improvements && result.improvements.length > 0 && (
+                  <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
+                    <div className="border-b px-5 py-3 text-sm font-medium">Focus Areas</div>
+                    <div className="p-2 [&>*:nth-child(odd)]:bg-gray-50">
+                      {result.improvements.map((improvement, idx) => (
+                        <div key={idx} className="flex flex-row gap-1 items-center justify-between p-2 group rounded-sm">
+                          <div className="flex flex-row items-center gap-2 min-w-0 flex-1">
+                            <span className="text-sm text-gray-900">{improvement}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Grammar Focus */}
+                {result.grammarFocus && result.grammarFocus.length > 0 && (
+                  <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
+                    <div className="border-b px-5 py-3 text-sm font-medium">Grammar Focus</div>
+                    <div className="p-2 [&>*:nth-child(odd)]:bg-gray-50">
+                      {result.grammarFocus.map((focus, idx) => (
+                        <div key={idx} className="flex flex-row gap-1 items-center justify-between p-2 group rounded-sm">
+                          <div className="flex flex-row items-center gap-2 min-w-0 flex-1">
+                            <span className="text-sm text-gray-900 font-mono">{focus}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Sentence Analysis */}
+            {result.sentenceAnalysis && result.sentenceAnalysis.length > 0 && (
+              <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
+                <div className="border-b px-5 py-3 text-sm font-medium">Sentence Analysis</div>
+                <div className="p-2 [&>*:nth-child(odd)]:bg-gray-50">
+                  {result.sentenceAnalysis.map((sentence, idx) => (
+                    <div key={idx} className="p-4 space-y-3">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-sm font-medium text-gray-900">{sentence.isCorrect ? '✅' : '❌'} Sentence {idx + 1}</span>
+                      </div>
+                      <div className="text-sm text-gray-700 leading-relaxed bg-gray-50 p-3 rounded border border-gray-200">
+                        <p className="diary-text-content">{sentence.original}</p>
+                      </div>
+
+                      {/* Issues Detail */}
+                      {sentence.issues && sentence.issues.length > 0 && (
+                        <div className="space-y-2">
+                          {sentence.issues.map((issue, issueIdx) => (
+                            <div key={issueIdx} className="bg-red-50 p-3 rounded border border-red-200 space-y-1.5">
+                              <div className="flex items-center gap-2">
+                                <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium uppercase">
+                                  {issue.errorType}
+                                </span>
+                                <span className="text-sm text-red-700 font-medium">{issue.errorText}</span>
+                              </div>
+                              <div className="text-xs text-gray-700 leading-relaxed">
+                                <span className="font-medium">Reason:</span> {issue.reason}
+                              </div>
+                              <div className="flex items-center gap-2 text-xs">
+                                <span className="text-red-600 font-mono">{issue.errorText}</span>
+                                <span className="text-gray-400">→</span>
+                                <span className="text-green-600 font-mono font-medium">{issue.correction}</span>
+                              </div>
+                              {issue.explanation && (
+                                <div className="text-xs text-gray-600 leading-relaxed pt-1.5 border-t border-red-200">
+                                  {issue.explanation}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Natural Expression */}
+                      <div className="bg-green-50 p-3 rounded border border-green-200">
+                        <p className="text-xs font-medium text-green-700 mb-1.5">Natural Expression:</p>
+                        <p className="diary-text-content text-sm text-gray-900 leading-relaxed">{sentence.naturalExpression}</p>
+                      </div>
+
+                      {/* Thinking Tips */}
+                      {sentence.thinkingTips && (
+                        <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                          <p className="text-xs font-medium text-blue-700 mb-1.5">Thinking Tips:</p>
+                          <p className="text-xs text-gray-700 leading-relaxed">{sentence.thinkingTips}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-gray-900">{result.stats.uniqueWords}</div>
-                  <div className="text-[10px] text-gray-500 font-medium">Unique</div>
+              </div>
+            )}
+
+            {/* Corrected & Upgraded Versions */}
+            <div className="grid md:grid-cols-2 gap-3">
+              {/* Corrected Version */}
+              {result.optimized && result.optimized.trim() !== '' ? (
+                <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
+                  <div className="border-b px-5 py-3 text-sm font-medium">Corrected Version</div>
+                  <div className="p-5">
+                    <p className="diary-text-content text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{result.optimized}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
+                  <div className="border-b px-5 py-3 text-sm font-medium">Corrected Version</div>
+                  <div className="p-5">
+                    <p className="text-sm text-gray-600 italic">Generating optimized version...</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Upgraded Version */}
+              {result.upgradedVersion && (
+                <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
+                  <div className="border-b px-5 py-3 text-sm font-medium">Advanced Version</div>
+                  <div className="p-5">
+                    <p className="diary-text-content text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">{result.upgradedVersion}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Sentence Patterns */}
+            {result.patterns && result.patterns.length > 0 && (
+              <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
+                <div className="border-b px-5 py-3 text-sm font-medium">Useful Patterns</div>
+                <div className="p-2 [&>*:nth-child(odd)]:bg-gray-50">
+                  {result.patterns.map((pattern, idx) => (
+                    <div key={idx} className="p-3 space-y-2">
+                      <p className="text-sm font-medium text-gray-900 font-mono">{pattern.pattern}</p>
+                      <p className="text-xs text-gray-600 leading-relaxed">{pattern.explanation}</p>
+                      <p className="text-xs text-gray-500 italic leading-relaxed bg-gray-50 px-2 py-1 rounded border border-gray-200">"{pattern.example}"</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Flashcards */}
+            {result.flashcards && result.flashcards.length > 0 && (
+              <div className="rounded-md border border-gray-200 bg-white overflow-hidden">
+                <div className="border-b px-5 py-3 text-sm font-medium">New Flashcards ({result.flashcards.length})</div>
+                <div className="p-2 [&>*:nth-child(odd)]:bg-gray-50">
+                  {result.flashcards.map((card, idx) => (
+                    <div key={idx} className="p-4 space-y-3">
+                      <div className="flex items-center gap-3 justify-between">
+                        <div className="flex items-baseline gap-2 flex-1">
+                          <h4 className="text-base font-medium text-gray-900">{card.term}</h4>
+                          {card.phonetic && (
+                            <span className="text-xs text-gray-500 font-mono">/{card.phonetic}/</span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => playAudio(card.term)}
+                          className="p-2 hover:bg-gray-100 rounded transition-all flex-shrink-0"
+                        >
+                          <Volume2 size={16} className="text-gray-600" />
+                        </button>
+                      </div>
+                      {card.translation && (
+                        <div className="text-sm text-gray-700 font-medium">{card.translation}</div>
+                      )}
+                      {card.definition && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Definition</p>
+                          <p className="text-xs text-gray-700 leading-relaxed">{card.definition}</p>
+                        </div>
+                      )}
+                      {card.example && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Example</p>
+                          <p className="text-xs text-gray-600 italic leading-relaxed bg-gray-50 px-3 py-2 rounded border border-gray-200">"{card.example}"</p>
+                        </div>
+                      )}
+                      {card.nativeUsage && (
+                        <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                          <p className="text-xs text-blue-700 leading-relaxed">{card.nativeUsage}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
           </div>
-
-          {/* Dimensions Scoring */}
-          {result.dimensions && (
-            <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 shadow-sm border border-black/5 animate-in fade-in">
-              <h3 className="text-sm font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                <span>🧮</span> 总体评分（按真实英语能力维度）
-              </h3>
-              <div className="space-y-4">
-                {[
-                  { key: 'contentExpression', label: '内容表达', color: 'blue' },
-                  { key: 'grammarAccuracy', label: '语法准确度', color: 'red' },
-                  { key: 'vocabularyNaturalness', label: '用词自然度', color: 'yellow' },
-                  { key: 'englishThinking', label: '英语思维', color: 'purple' },
-                ].map(({ key, label, color }) => {
-                  const dimension = result.dimensions[key as keyof typeof result.dimensions];
-                  return (
-                    <div key={key} className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-32">
-                        <div className="text-xs font-semibold text-gray-700 mb-1">{label}</div>
-                        <div className="flex items-center gap-2">
-                          <div className={`text-lg font-black ${
-                            color === 'blue' ? 'text-blue-600' :
-                            color === 'red' ? 'text-red-600' :
-                            color === 'yellow' ? 'text-yellow-600' :
-                            'text-purple-600'
-                          }`}>
-                            {dimension.score}/10
-                          </div>
-                          <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full transition-all ${
-                                color === 'blue' ? 'bg-blue-500' :
-                                color === 'red' ? 'bg-red-500' :
-                                color === 'yellow' ? 'bg-yellow-500' :
-                                'bg-purple-500'
-                              }`}
-                              style={{ width: `${dimension.score * 10}%` }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex-1 text-xs text-gray-600 leading-relaxed bg-gray-50/70 p-2.5 rounded-lg">
-                        {dimension.comment}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Strengths & Improvements */}
-          {((result.strengths && result.strengths.length > 0) || (result.improvements && result.improvements.length > 0)) && (
-            <div className="grid grid-cols-1 gap-3">
-              {/* Strengths */}
-              {result.strengths && result.strengths.length > 0 && (
-                <div className="bg-white/70 backdrop-blur-md rounded-2xl p-4 shadow-sm border border-black/5 animate-in fade-in">
-                  <h3 className="text-sm font-semibold text-green-600 mb-3 flex items-center gap-2">
-                    <span className="text-base">✨</span> What You Did Well
-                  </h3>
-                  <ul className="space-y-2">
-                    {result.strengths.map((strength, idx) => (
-                      <li key={idx} className="text-xs text-gray-700 flex items-start gap-2.5 leading-relaxed">
-                        <span className="text-green-500 flex-shrink-0 font-bold">✓</span>
-                        <span>{strength}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Areas to Improve */}
-              {result.improvements && result.improvements.length > 0 && (
-                <div className="bg-white/70 backdrop-blur-md rounded-2xl p-4 shadow-sm border border-black/5 animate-in fade-in">
-                  <h3 className="text-sm font-semibold text-orange-600 mb-3 flex items-center gap-2">
-                    <span className="text-base">🎯</span> Focus Areas
-                  </h3>
-                  <ul className="space-y-2">
-                    {result.improvements.map((improvement, idx) => (
-                      <li key={idx} className="text-xs text-gray-700 flex items-start gap-2.5 leading-relaxed">
-                        <span className="text-orange-500 flex-shrink-0 font-bold">→</span>
-                        <span>{improvement}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {/* Grammar Focus */}
-              {result.grammarFocus && result.grammarFocus.length > 0 && (
-                <div className="bg-white/70 backdrop-blur-md rounded-2xl p-4 shadow-sm border border-black/5 animate-in fade-in">
-                  <h3 className="text-sm font-semibold text-purple-600 mb-3 flex items-center gap-2">
-                    <span className="text-base">📚</span> Grammar to Practice
-                  </h3>
-                  <div className="flex flex-wrap gap-2">
-                    {result.grammarFocus.map((focus, idx) => (
-                      <span key={idx} className="px-3 py-1.5 bg-purple-50 text-purple-700 rounded-full text-xs font-medium shadow-sm border border-purple-100">
-                        {focus}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Sentence Analysis */}
-          {result.sentenceAnalysis && result.sentenceAnalysis.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-gray-800 px-1 flex items-center gap-2">
-                <span>✍️</span> 逐句分析
-              </h3>
-              {result.sentenceAnalysis.map((sentence, idx) => (
-                <div key={idx} className="bg-white/70 backdrop-blur-md rounded-2xl p-4 shadow-sm border border-black/5 animate-in fade-in">
-                  {/* Original Sentence */}
-                  <div className="mb-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`text-lg font-bold ${sentence.isCorrect ? '✅' : '❌'}`}>
-                        {sentence.isCorrect ? '✅' : '❌'}
-                      </span>
-                      <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">句 {idx + 1}</span>
-                    </div>
-                    <p className="diary-text-content text-sm text-gray-800 p-3 rounded-xl border border-gray-200/50 leading-relaxed bg-gray-50/70">
-                      {sentence.original}
-                    </p>
-                  </div>
-
-                  {/* Issues Detail */}
-                  {sentence.issues && sentence.issues.length > 0 && (
-                    <div className="mb-3 space-y-3">
-                      <p className="text-xs font-semibold text-red-600 mb-2">问题：</p>
-                      {sentence.issues.map((issue, issueIdx) => (
-                        <div key={issueIdx} className="bg-red-50/70 p-3 rounded-xl border border-red-200/50 space-y-2">
-                          <div className="flex items-start gap-2">
-                            <span className="flex-shrink-0 px-2 py-0.5 bg-red-100 text-red-700 rounded text-[10px] font-bold uppercase">
-                              {issue.errorType}
-                            </span>
-                            <span className="text-sm text-red-700 font-medium">{issue.errorText}</span>
-                          </div>
-                          <div className="text-xs text-gray-700 leading-relaxed">
-                            <span className="font-semibold text-gray-800">原因：</span>
-                            {issue.reason}
-                          </div>
-                          <div className="flex items-center gap-2 text-xs">
-                            <span className="text-gray-600">❌</span>
-                            <span className="text-red-600 font-mono">{issue.errorText}</span>
-                            <span className="text-gray-400">→</span>
-                            <span className="text-green-600 font-mono font-semibold">✓ {issue.correction}</span>
-                          </div>
-                          {issue.explanation && (
-                            <div className="text-xs text-gray-600 leading-relaxed pt-2 border-t border-red-200/30">
-                              💡 {issue.explanation}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Natural Expression */}
-                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-3 rounded-xl border border-green-200/50 shadow-sm">
-                    <p className="text-xs font-semibold text-green-700 mb-1.5 flex items-center gap-1">
-                      <span>✅</span> 自然表达：
-                    </p>
-                    <p className="diary-text-content text-sm text-gray-900 font-medium leading-relaxed">{sentence.naturalExpression}</p>
-                  </div>
-
-                  {/* Thinking Tips */}
-                  {sentence.thinkingTips && (
-                    <div className="mt-3 bg-blue-50/70 p-3 rounded-xl border border-blue-200/50">
-                      <p className="text-xs font-semibold text-blue-700 mb-1.5 flex items-center gap-1">
-                        <span>💡</span> 思维提示：
-                      </p>
-                      <p className="text-xs text-gray-700 leading-relaxed">{sentence.thinkingTips}</p>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Corrected Version */}
-          {result.optimized && result.optimized.trim() !== '' ? (
-            <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 shadow-sm border border-black/5 animate-in fade-in">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-sm">
-                  <Sparkles size={16} className="text-white" />
-                </div>
-                <h3 className="font-semibold text-gray-900 text-base">Complete Corrected Version</h3>
-              </div>
-              <div className="bg-gradient-to-br from-green-50/50 to-emerald-50/50 rounded-xl p-4 border border-green-100/50">
-                <p className="diary-text-content text-[15px] text-gray-800 leading-relaxed whitespace-pre-wrap">{result.optimized}</p>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 shadow-sm border border-black/5 animate-in fade-in">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 bg-gradient-to-br from-yellow-500 to-orange-600 rounded-xl flex items-center justify-center shadow-sm">
-                  <Sparkles size={16} className="text-white" />
-                </div>
-                <h3 className="font-semibold text-gray-900 text-base">Complete Corrected Version</h3>
-              </div>
-              <div className="bg-gradient-to-br from-yellow-50/50 to-orange-50/50 rounded-xl p-4 border border-yellow-100/50">
-                <p className="text-sm text-gray-600 italic">正在生成优化版本...</p>
-              </div>
-            </div>
-          )}
-
-          {/* Upgraded Version */}
-          {result.upgradedVersion && (
-            <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 shadow-sm border border-black/5 animate-in fade-in">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-sm">
-                  <TrendingUp size={16} className="text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900 text-base">Advanced Version</h3>
-                  <p className="text-[10px] text-purple-600 font-medium">+30% Difficulty</p>
-                </div>
-              </div>
-              <div className="bg-gradient-to-br from-purple-50/50 to-indigo-50/50 rounded-xl p-4 border border-purple-100/50">
-                <p className="diary-text-content text-[15px] text-gray-800 leading-relaxed whitespace-pre-wrap">{result.upgradedVersion}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Sentence Patterns */}
-          {result.patterns && result.patterns.length > 0 && (
-            <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 shadow-sm border border-black/5 animate-in fade-in">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-9 h-9 bg-gradient-to-br from-amber-500 to-orange-600 rounded-xl flex items-center justify-center shadow-sm">
-                  <BookOpen size={16} className="text-white" />
-                </div>
-                <h3 className="font-semibold text-gray-900 text-base">Useful Patterns</h3>
-              </div>
-              <div className="space-y-3">
-                {result.patterns.map((pattern, idx) => (
-                  <div key={idx} className="bg-gradient-to-br from-amber-50/50 to-orange-50/50 rounded-xl p-4 border border-amber-100/50 space-y-2">
-                    <p className="text-sm font-semibold text-amber-900">{pattern.pattern}</p>
-                    <p className="text-xs text-gray-600 leading-relaxed">{pattern.explanation}</p>
-                    <p className="text-xs text-gray-500 italic leading-relaxed bg-white/50 px-2 py-1 rounded">"{pattern.example}"</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Flashcards */}
-          {result.flashcards && result.flashcards.length > 0 && (
-            <div className="bg-white/70 backdrop-blur-md rounded-2xl p-5 shadow-sm border border-black/5 animate-in fade-in">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl flex items-center justify-center shadow-sm">
-                    <Sparkles size={16} className="text-white" />
-                  </div>
-                  <h3 className="font-semibold text-gray-900 text-base">New Flashcards</h3>
-                </div>
-                <span className="text-xs font-semibold text-gray-400 bg-gray-100 px-2.5 py-1 rounded-full">{result.flashcards.length} cards</span>
-              </div>
-              <div className="space-y-3">
-                {result.flashcards.map((card, idx) => (
-                  <div key={idx} className="bg-gradient-to-br from-gray-50/70 to-white/70 rounded-xl p-4 border border-gray-100/50 shadow-sm space-y-3">
-                    <div className="flex items-center gap-3 justify-between">
-                      <div className="flex items-baseline gap-2 flex-1">
-                        <h4 className="text-lg font-bold text-gray-900">{card.term}</h4>
-                        {card.phonetic && (
-                          <span className="text-xs text-gray-500 font-mono bg-gray-100 px-2 py-0.5 rounded">/{card.phonetic}/</span>
-                        )}
-                      </div>
-                      <button
-                        onClick={() => playAudio(card.term)}
-                        className="p-2 hover:bg-white rounded-lg transition-all shadow-sm border border-gray-200/50 hover:shadow flex-shrink-0"
-                      >
-                        <Volume2 size={16} className="text-gray-600" />
-                      </button>
-                    </div>
-                    {card.translation && (
-                      <div className="bg-white/70 rounded-lg px-3 py-2 border border-gray-200/50">
-                        <p className="text-sm text-gray-700 font-medium">{card.translation}</p>
-                      </div>
-                    )}
-                    {card.definition && (
-                      <div className="space-y-1">
-                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Definition</p>
-                        <p className="text-xs text-gray-600 leading-relaxed">{card.definition}</p>
-                      </div>
-                    )}
-                    {card.example && (
-                      <div className="space-y-1">
-                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Example</p>
-                        <p className="text-xs text-gray-600 italic leading-relaxed bg-white/50 px-3 py-2 rounded-lg border border-gray-200/30">"{card.example}"</p>
-                      </div>
-                    )}
-                    {card.nativeUsage && (
-                      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg px-3 py-2.5 border border-blue-100/50">
-                        <p className="text-xs text-blue-700 leading-relaxed flex items-start gap-2">
-                          <span className="flex-shrink-0 text-sm">💡</span>
-                          <span className="font-medium">{card.nativeUsage}</span>
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Success Message */}
-          <div className="bg-gradient-to-br from-gray-900 to-black rounded-2xl p-5 text-white shadow-lg border border-white/10">
-            <h4 className="text-lg font-bold mb-2 flex items-center gap-2">
-              <span>✨</span> Great Work!
-            </h4>
-            <p className="text-white/80 text-sm mb-4 leading-relaxed">
-              Your diary has been analyzed and flashcards saved automatically.
-            </p>
             <button
               onClick={() => {
                 setResult(null);
