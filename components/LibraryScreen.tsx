@@ -244,7 +244,7 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
                     {/* Scenario Header */}
                     <div
                       onClick={() => toggleExpand(scenario.id)}
-                      className="p-4 cursor-pointer active:bg-gray-50 transition-colors touch-manipulation"
+                      className="p-4 cursor-pointer transition-colors touch-manipulation"
                       role="button"
                       aria-expanded={isExpanded}
                       aria-label={`${isExpanded ? 'Collapse' : 'Expand'} scenario: ${scenario.location}`}
@@ -320,7 +320,12 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
 
                     {/* Expanded Content */}
                     {isExpanded && (
-                      <div className="border-t border-gray-100 bg-gray-50/50 animate-in slide-in-from-top duration-200">
+                      <div 
+                        className="border-t border-gray-100 bg-gray-50/50 overflow-hidden"
+                        style={{
+                          animation: 'expandDown 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards'
+                        }}
+                      >
                         {/* Action Buttons */}
                         <div className="p-4 space-y-2">
                           {inProgressDialogue ? (
@@ -468,7 +473,7 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
                   >
                     <div
                       onClick={() => setExpandedDiaryId(isExpanded ? null : entry.id)}
-                      className="p-4 cursor-pointer active:bg-gray-50 transition-colors touch-manipulation"
+                      className="p-4 cursor-pointer transition-colors touch-manipulation"
                       role="button"
                       aria-expanded={isExpanded}
                       aria-label={`${isExpanded ? 'Collapse' : 'Expand'} diary entry`}
@@ -500,7 +505,12 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
                     </div>
 
                     {isExpanded && (
-                      <div className="border-t border-gray-100 bg-gray-50/50 animate-in slide-in-from-top duration-200">
+                      <div 
+                        className="border-t border-gray-100 bg-gray-50/50 overflow-hidden"
+                        style={{
+                          animation: 'expandDown 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards'
+                        }}
+                      >
                         <div className="p-4 space-y-4">
                           {/* Original Version */}
                           {entry.original && (

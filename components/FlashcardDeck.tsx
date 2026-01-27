@@ -595,7 +595,7 @@ export default function FlashcardDeck() {
 
                   {/* Footer - Tap to flip - Apple Frosted Glass */}
                   <div 
-                    className="front-footer flex-shrink-0 py-5 px-4 text-center cursor-pointer transition-all pointer-events-auto relative overflow-hidden"
+                    className="front-footer flex-shrink-0 py-5 pt-10 px-4 text-center cursor-pointer transition-all pointer-events-auto relative overflow-hidden"
                     style={{
                       background: 'linear-gradient(to top, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.1) 25%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.05) 100%)',
                       backdropFilter: 'blur(20px) saturate(180%)',

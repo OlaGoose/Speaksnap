@@ -105,6 +105,55 @@ export default function DialogueScreen({
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isProcessing]);
 
+  // Disable browser native text selection toolbar on mobile
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const handleContextMenu = (e: MouseEvent | TouchEvent) => {
+      // Prevent native context menu when text is selected in chat area
+      const target = e.target as HTMLElement;
+      if (target.closest('.message-text') || (chatContainerRef.current && chatContainerRef.current.contains(target))) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+      }
+    };
+
+    // Prevent native text selection toolbar by handling touch events
+    const handleTouchEnd = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('.message-text') || (chatContainerRef.current && chatContainerRef.current.contains(target))) {
+        const selection = window.getSelection();
+        if (selection && !selection.isCollapsed) {
+          // Prevent default behavior that shows native toolbar
+          e.preventDefault();
+          // Blur any active element to prevent native toolbar
+          if (document.activeElement && document.activeElement !== document.body) {
+            (document.activeElement as HTMLElement).blur();
+          }
+        }
+      }
+    };
+
+    // Prevent long press context menu
+    const handleTouchStart = (e: TouchEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('.message-text') || (chatContainerRef.current && chatContainerRef.current.contains(target))) {
+        // Allow selection but we'll prevent the toolbar in touchEnd
+      }
+    };
+
+    document.addEventListener('contextmenu', handleContextMenu, { passive: false });
+    document.addEventListener('touchstart', handleTouchStart, { passive: true });
+    document.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+    return () => {
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('touchstart', handleTouchStart);
+      document.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [isMobile]);
+
   // Handle text selection with context - Mobile optimized
   useEffect(() => {
     const handleSelectionChange = () => {
@@ -849,6 +898,28 @@ export default function DialogueScreen({
                     <path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"></path>
                     <path d="M16 9a5 5 0 0 1 0 6"></path>
                   </svg>
+                </button>
+                
+                <div className="h-4 w-px bg-gray-200"></div>
+                
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(selectionMenu.text);
+                    // Visual feedback
+                    const btn = e.currentTarget;
+                    const originalHTML = btn.innerHTML;
+                    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" class="text-green-600"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+                    setTimeout(() => {
+                      btn.innerHTML = originalHTML;
+                    }, 1000);
+                  }}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  className="group p-2 hover:bg-gray-100 active:bg-gray-200 transition-all rounded-full touch-manipulation"
+                  title="Copy text"
+                  aria-label="Copy text"
+                >
+                  <Copy size={18} className="text-gray-700 group-hover:text-gray-900 transition-colors" />
                 </button>
                 
                 <div className="h-4 w-px bg-gray-200"></div>

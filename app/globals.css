@@ -110,6 +110,19 @@ body {
   }
 }
 
+@keyframes expandDown {
+  from {
+    max-height: 0;
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    max-height: 1000px;
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .animate-in {
   animation-duration: 0.3s;
   animation-fill-mode: both;
