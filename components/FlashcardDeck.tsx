@@ -5,6 +5,35 @@ import { Bookmark, Volume2, Trash2, BookOpen, MessageCircle, ChevronUp, ChevronD
 import { Flashcard } from '@/lib/types';
 import { storage } from '@/lib/utils/storage';
 
+// YouGlish API types
+declare global {
+  interface Window {
+    onYouglishAPIReady?: () => void;
+    YG?: {
+      Widget: new (
+        containerId: string,
+        config: {
+          width: string | number;
+          components: number;
+          autoStart?: number; // 0 to disable, 1 to enable
+          events?: {
+            onFetchDone?: (event: any) => void;
+            onVideoChange?: (event: any) => void;
+          };
+        }
+      ) => {
+        fetch: (query: string, lang: string, accent?: string) => void;
+        play: () => void;
+        pause: () => void;
+        next: () => void;
+        previous: () => void;
+        setSpeed: (rate: number) => void;
+        destroy?: () => void;
+      };
+    };
+  }
+}
+
 export default function FlashcardDeck() {
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -18,6 +47,30 @@ export default function FlashcardDeck() {
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const iframeRefs = useRef<{ [key: string]: HTMLIFrameElement | null }>({});
   const scrollRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const youglishWidgetsRef = useRef<{ [key: string]: any }>({});
+  const youglishReadyRef = useRef(false);
+
+  // Load YouGlish API script
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !youglishReadyRef.current) {
+      // Declare global callback
+      (window as any).onYouglishAPIReady = () => {
+        youglishReadyRef.current = true;
+        console.log('✅ YouGlish API ready');
+      };
+
+      // Load script if not already loaded
+      const existingScript = document.querySelector('script[src*="youglish.com"]');
+      if (!existingScript) {
+        const script = document.createElement('script');
+        script.src = 'https://youglish.com/public/emb/widget.js';
+        script.async = true;
+        document.body.appendChild(script);
+      } else if ((window as any).YG) {
+        youglishReadyRef.current = true;
+      }
+    }
+  }, []);
 
   useEffect(() => {
     const savedCards = storage.getItem<Flashcard[]>('speakSnapFlashcards');
@@ -32,6 +85,17 @@ export default function FlashcardDeck() {
     // Cleanup: stop all videos when component unmounts
     return () => {
       setPlayingVideoId(null);
+      // Cleanup YouGlish widgets
+      Object.values(youglishWidgetsRef.current).forEach((widget) => {
+        if (widget && typeof widget.destroy === 'function') {
+          try {
+            widget.destroy();
+          } catch (e) {
+            console.warn('Error destroying YouGlish widget:', e);
+          }
+        }
+      });
+      youglishWidgetsRef.current = {};
     };
   }, []);
 
@@ -43,7 +107,176 @@ export default function FlashcardDeck() {
     Object.values(scrollRefs.current).forEach((el) => {
       if (el) el.scrollTop = 0;
     });
-  }, [activeIndex]);
+    // Cleanup YouGlish widgets for inactive cards
+    Object.keys(youglishWidgetsRef.current).forEach((cardId) => {
+      const currentCard = flashcards[activeIndex];
+      if (currentCard && cardId !== currentCard.id) {
+        const widget = youglishWidgetsRef.current[cardId];
+        if (widget && typeof widget.destroy === 'function') {
+          try {
+            widget.destroy();
+          } catch (e) {
+            console.warn('Error destroying YouGlish widget:', e);
+          }
+        }
+        delete youglishWidgetsRef.current[cardId];
+      }
+    });
+  }, [activeIndex, flashcards]);
+
+  // Initialize YouGlish widget when card is flipped and active
+  useEffect(() => {
+    if (!isFlipped || !youglishReadyRef.current) return;
+    
+    const currentCard = flashcards[activeIndex];
+    if (!currentCard) return;
+
+    const widgetId = `youglish-widget-${currentCard.id}`;
+    
+    // Use setTimeout to ensure DOM is ready
+    const timer = setTimeout(() => {
+      const widgetContainer = document.getElementById(widgetId);
+      if (!widgetContainer) {
+        console.warn('YouGlish widget container not found:', widgetId);
+        return;
+      }
+
+      // Ensure container is visible and has dimensions
+      const containerRect = widgetContainer.getBoundingClientRect();
+      if (containerRect.width === 0 || containerRect.height === 0) {
+        console.warn('YouGlish widget container has no dimensions, retrying...');
+        // Retry after a short delay
+        setTimeout(() => {
+          const retryContainer = document.getElementById(widgetId);
+          if (retryContainer) {
+            const retryRect = retryContainer.getBoundingClientRect();
+            if (retryRect.width > 0 && retryRect.height > 0) {
+              // Re-run initialization logic
+              const retryWidth = retryRect.width || 640;
+              const retryWidgetWidth = Math.max(320, Math.min(retryWidth, 1200));
+              if (window.YG && !youglishWidgetsRef.current[currentCard.id]) {
+                try {
+                  const retryWidget = new window.YG.Widget(widgetId, {
+                    width: retryWidgetWidth,
+                    components: 72, // Search (1) + Title (4) + Control Buttons (64) = 69 (Caption removed)
+                    autoStart: 1, // Enable auto-start for automatic video playback
+                    events: {
+                      'onFetchDone': (event: any) => {
+                        console.log('YouGlish fetch done:', event);
+                      },
+                      'onVideoChange': (event: any) => {
+                        console.log('YouGlish video changed:', event);
+                      },
+                    },
+                  });
+                  youglishWidgetsRef.current[currentCard.id] = retryWidget;
+                  const searchTerm = currentCard.front.trim();
+                  if (searchTerm) {
+                    retryWidget.fetch(searchTerm, 'english');
+                  }
+                } catch (retryError) {
+                  console.error('Error initializing YouGlish widget on dimension retry:', retryError);
+                }
+              }
+            }
+          }
+        }, 200);
+        return;
+      }
+
+      // Get the actual width of the container to avoid encoding issues with percentages
+      const containerWidth = containerRect.width || widgetContainer.offsetWidth || widgetContainer.clientWidth || 640;
+      const widgetWidth = Math.max(320, Math.min(containerWidth, 1200)); // Clamp between 320 and 1200px
+
+      // Check if widget already exists
+      if (youglishWidgetsRef.current[currentCard.id]) {
+        // Widget exists, just refresh the search
+        const widget = youglishWidgetsRef.current[currentCard.id];
+        const searchTerm = currentCard.front.trim();
+        if (searchTerm && typeof widget.fetch === 'function') {
+          widget.fetch(searchTerm, 'english');
+        }
+        return;
+      }
+
+      try {
+        const YG = window.YG;
+        if (!YG) {
+          console.warn('YouGlish API not available, retrying...');
+          // Retry after a short delay
+          setTimeout(() => {
+            const retryContainer = document.getElementById(widgetId);
+            if (window.YG && retryContainer) {
+              try {
+                const retryWidth = retryContainer.offsetWidth || retryContainer.clientWidth || 640;
+                const retryWidgetWidth = Math.max(320, Math.min(retryWidth, 1200));
+                const retryWidget = new window.YG.Widget(widgetId, {
+                  width: retryWidgetWidth, // Use computed width
+                  components: 72, // Search (1) + Title (4) + Control Buttons (64) = 69 (Caption removed)
+                  autoStart: 1, // Enable auto-start for automatic video playback
+                  events: {
+                    'onFetchDone': (event: any) => {
+                      console.log('YouGlish fetch done:', event);
+                    },
+                    'onVideoChange': (event: any) => {
+                      console.log('YouGlish video changed:', event);
+                    },
+                  },
+                });
+                youglishWidgetsRef.current[currentCard.id] = retryWidget;
+                const searchTerm = currentCard.front.trim();
+                if (searchTerm) {
+                  retryWidget.fetch(searchTerm, 'english');
+                }
+              } catch (retryError) {
+                console.error('Error initializing YouGlish widget on retry:', retryError);
+              }
+            }
+          }, 500);
+          return;
+        }
+
+        const widget = new YG.Widget(widgetId, {
+          width: widgetWidth, // Use computed width to avoid percentage encoding issues
+          components: 72, // Search (1) + Title (4) + Control Buttons (64) = 69 (Caption removed)
+          autoStart: 1, // Enable auto-start for automatic video playback
+          events: {
+            'onFetchDone': (event: any) => {
+              console.log('YouGlish fetch done:', event);
+            },
+            'onVideoChange': (event: any) => {
+              console.log('YouGlish video changed:', event);
+            },
+          },
+        });
+
+        youglishWidgetsRef.current[currentCard.id] = widget;
+        
+        // Fetch videos for the word
+        const searchTerm = currentCard.front.trim();
+        if (searchTerm) {
+          try {
+            widget.fetch(searchTerm, 'english');
+          } catch (fetchError) {
+            console.error('Error fetching YouGlish videos:', fetchError);
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing YouGlish widget:', error);
+        // Log additional details for debugging
+        if (error instanceof Error) {
+          console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            widgetId,
+            widgetWidth,
+          });
+        }
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [isFlipped, activeIndex, flashcards]);
 
   useEffect(() => {
     // Reset scroll position when flipping to back
@@ -260,7 +493,7 @@ export default function FlashcardDeck() {
           const isPrev = index < activeIndex;
 
           const front = card.front;
-          const back = card.back;
+          const back = card.back || {};
           const videoIds = back.video_ids || [];
           const currentVidIndex = currentVideoIndices[card.id] || 0;
           const currentVideoId = videoIds.length > 0 ? videoIds[currentVidIndex] : null;
@@ -446,7 +679,7 @@ export default function FlashcardDeck() {
                   )}
 
                   {/* Compact Header with Delete */}
-                  <div className="flex-shrink-0 px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-white">
+                  <div className="flex-shrink-0 px-4 py-2 border-b border-gray-100 flex items-center justify-between bg-white">
                     <h4 className="text-3xl font-bold text-gray-900 tracking-tight">{front}</h4>
                     <button
                       onClick={(e) => {
@@ -462,7 +695,7 @@ export default function FlashcardDeck() {
                   {/* Scrollable Content Panel */}
                   <div 
                     ref={(el) => { scrollRefs.current[card.id] = el; }}
-                    className="flex-1 overflow-y-auto overscroll-contain px-5 py-4 space-y-4 bg-white flashcard-scroll"
+                    className="flex-1 overflow-y-auto overscroll-contain px-5 py-2 space-y-4 bg-white flashcard-scroll"
                     style={{
                       WebkitOverflowScrolling: 'touch',
                       touchAction: 'pan-y',
@@ -486,9 +719,11 @@ export default function FlashcardDeck() {
                     )}
 
                     {/* Translation */}
-                    <div>
-                      <p className="text-lg font-semibold text-gray-900">{back.translation}</p>
-                    </div>
+                    {back.translation && (
+                      <div>
+                        <p className="text-lg font-semibold text-gray-900">{back.translation}</p>
+                      </div>
+                    )}
 
                     {/* Definition - Full */}
                     {back.definition && (
@@ -585,6 +820,29 @@ export default function FlashcardDeck() {
                           <p className="text-sm text-gray-700 leading-relaxed">{back.native_usage}</p>
                         </div>
                       )
+                    )}
+
+                    {/* YouGlish Pronunciation */}
+                    {isActive && isFlipped && (
+                      <div className="space-y-2 pt-2 border-t border-gray-100">
+                        <div className="flex items-center gap-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-600">
+                            <path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"></path>
+                            <path d="M16 9a5 5 0 0 1 0 6"></path>
+                            <path d="M19.364 18.364a9 9 0 0 0 0-12.728"></path>
+                          </svg>
+                          <span className="text-xs font-semibold text-gray-500 uppercase">Pronunciation</span>
+                        </div>
+                        <div 
+                          id={`youglish-widget-${card.id}`}
+                          className="w-full min-h-[280px] rounded-lg overflow-hidden bg-white border border-gray-200 shadow-sm"
+                          style={{ minHeight: '280px', width: '100%', maxWidth: '100%' }}
+                          onClick={(e) => e.stopPropagation()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                          onTouchMove={(e) => e.stopPropagation()}
+                          onTouchEnd={(e) => e.stopPropagation()}
+                        />
+                      </div>
                     )}
 
                   </div>
