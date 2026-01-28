@@ -6,6 +6,50 @@
  * 3. YouTube API (optional, requires quota)
  */
 
+/**
+ * Fetch with timeout and retry mechanism
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeout: number = 10000,
+  maxRetries: number = 2
+): Promise<Response> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+      
+      try {
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+        return response;
+      } catch (error: any) {
+        clearTimeout(timeoutId);
+        if (error.name === 'AbortError') {
+          throw new Error(`Request timeout after ${timeout}ms`);
+        }
+        throw error;
+      }
+    } catch (error: any) {
+      lastError = error;
+      if (attempt < maxRetries) {
+        // Wait before retry (exponential backoff)
+        const delay = Math.min(1000 * Math.pow(2, attempt), 3000);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+    }
+  }
+  
+  throw lastError || new Error('Fetch failed after retries');
+}
+
 export interface YouTubeVideo {
   videoId: string;
   title: string;
@@ -29,12 +73,17 @@ export interface YouTubeSearchResult {
 async function searchViaRSS(query: string): Promise<YouTubeVideo[]> {
   const tryOnce = async (q: string): Promise<YouTubeVideo[] | null> => {
     const rssUrl = `https://www.youtube.com/feeds/videos.xml?search_query=${encodeURIComponent(q)}`;
-    const response = await fetch(rssUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'application/atom+xml,application/xml;q=0.9,*/*;q=0.8',
+    const response = await fetchWithTimeout(
+      rssUrl,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'application/atom+xml,application/xml;q=0.9,*/*;q=0.8',
+        },
       },
-    });
+      10000, // 10 second timeout
+      1 // 1 retry
+    );
     
     if (!response.ok) return null;
     
@@ -153,13 +202,18 @@ async function searchViaHTML(query: string): Promise<YouTubeVideo[]> {
   try {
     const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
     
-    const response = await fetch(searchUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.9',
+    const response = await fetchWithTimeout(
+      searchUrl,
+      {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
       },
-    });
+      10000, // 10 second timeout
+      1 // 1 retry
+    );
 
     if (!response.ok) {
       throw new Error(`HTML search returned ${response.status}`);
@@ -264,7 +318,12 @@ async function searchViaAPI(query: string): Promise<YouTubeVideo[]> {
   searchUrl.searchParams.set('safeSearch', 'strict');
   searchUrl.searchParams.set('videoEmbeddable', 'true');
 
-  const response = await fetch(searchUrl.toString());
+  const response = await fetchWithTimeout(
+    searchUrl.toString(),
+    {},
+    10000, // 10 second timeout
+    1 // 1 retry
+  );
   
   if (!response.ok) {
     const errorText = await response.text();
@@ -288,6 +347,8 @@ async function searchViaAPI(query: string): Promise<YouTubeVideo[]> {
  * Priority: RSS Feed -> HTML Scraping -> API
  */
 export async function searchYouTube(query: string): Promise<YouTubeSearchResult> {
+  const errors: string[] = [];
+  
   // Try RSS Feed first (free, official, recommended)
   try {
     const rssVideos = await searchViaRSS(query);
@@ -298,6 +359,8 @@ export async function searchYouTube(query: string): Promise<YouTubeSearchResult>
       };
     }
   } catch (rssError) {
+    const errorMsg = rssError instanceof Error ? rssError.message : 'RSS search failed';
+    errors.push(`RSS: ${errorMsg}`);
     if (process.env.NODE_ENV === 'development') {
       console.log('[YouTube Search] RSS unavailable, trying HTML fallback');
     }
@@ -313,22 +376,38 @@ export async function searchYouTube(query: string): Promise<YouTubeSearchResult>
       };
     }
   } catch (htmlError) {
-    console.warn('[YouTube Search] HTML scraping failed, trying API:', htmlError);
+    const errorMsg = htmlError instanceof Error ? htmlError.message : 'HTML search failed';
+    errors.push(`HTML: ${errorMsg}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[YouTube Search] HTML scraping failed, trying API:', htmlError);
+    }
   }
 
   // Last resort: Use YouTube API (if available)
   try {
     const apiVideos = await searchViaAPI(query);
-    return {
-      videos: apiVideos,
-      source: 'api',
-    };
+    if (apiVideos.length > 0) {
+      return {
+        videos: apiVideos,
+        source: 'api',
+      };
+    }
   } catch (apiError) {
-    console.error('[YouTube Search] All methods failed:', apiError);
-    return {
-      videos: [],
-      source: 'api',
-      error: apiError instanceof Error ? apiError.message : 'All search methods failed',
-    };
+    const errorMsg = apiError instanceof Error ? apiError.message : 'API search failed';
+    errors.push(`API: ${errorMsg}`);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[YouTube Search] API failed:', apiError);
+    }
   }
+
+  // All methods failed - return empty result with error info
+  const errorMessage = errors.length > 0 
+    ? `All search methods failed: ${errors.join('; ')}`
+    : 'No videos found';
+  
+  return {
+    videos: [],
+    source: 'api',
+    error: errorMessage,
+  };
 }

@@ -197,95 +197,106 @@ CRITICAL REQUIREMENTS:
 `;
 
   let lastError: any = null;
+  const providers: Array<{ name: string; fn: () => Promise<any> }> = [];
 
-  // Try Doubao
-  if ((AI_PROVIDER === 'doubao' || AI_PROVIDER === 'auto') && doubao) {
-    try {
-      console.log('🔥 Analyzing complete diary with Doubao...');
-      let responseText: string | undefined;
-      
-      const response = await doubao.chat(
-        [
-          { role: 'system', content: 'You are an English writing coach. Return ONLY valid JSON. Keep all responses concise. Maximum 3000 tokens total.' },
-          { role: 'user', content: prompt },
-        ],
-        {
-          maxTokens: 3000, // Limit to prevent truncation
-          temperature: 0.2, // Lower temperature for more consistent JSON
-        }
-      );
-      
-      responseText = response.choices[0]?.message?.content;
-      if (!responseText) throw new Error('Empty response');
-      
-      console.log('📝 Doubao response length:', responseText.length);
-      const parsed = DoubaoProvider.parseJSONResponse(responseText);
-      console.log('✅ Doubao JSON parsed successfully');
-      console.log('📊 Parsed data keys:', Object.keys(parsed));
-      console.log('📊 Has dimensions:', !!parsed.dimensions);
-      console.log('📊 Has sentenceAnalysis:', !!parsed.sentenceAnalysis);
-      return parsed;
-    } catch (error: any) {
-      lastError = error;
-      console.warn('❌ Doubao analysis failed:', error.message);
-      // Don't log responseText here as it may not be in scope
-    }
-  }
+  // Build provider list based on AI_PROVIDER preference
+  const tryDoubao = async () => {
+    if (!doubao) throw new Error('Doubao not configured');
+    console.log('🔥 Analyzing complete diary with Doubao...');
+    const response = await doubao.chat(
+      [
+        { role: 'system', content: 'You are an English writing coach. Return ONLY valid JSON. Keep all responses concise. Maximum 3000 tokens total.' },
+        { role: 'user', content: prompt },
+      ],
+      {
+        maxTokens: 3000,
+        temperature: 0.2,
+      }
+    );
+    const responseText = response.choices[0]?.message?.content;
+    if (!responseText) throw new Error('Empty response');
+    console.log('📝 Doubao response length:', responseText.length);
+    const parsed = DoubaoProvider.parseJSONResponse(responseText);
+    console.log('✅ Doubao JSON parsed successfully');
+    return parsed;
+  };
 
-  // Try OpenAI
-  if (AI_PROVIDER === 'auto' && openai) {
-    try {
-      console.log('🔄 Trying OpenAI...');
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: 'You are an English learning assistant. Return ONLY valid JSON, no markdown.' },
-          { role: 'user', content: prompt },
-        ],
-        response_format: { type: 'json_object' },
-        max_tokens: 4000,
+  const tryOpenAI = async () => {
+    if (!openai) throw new Error('OpenAI not configured');
+    console.log('🔄 Trying OpenAI...');
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: 'You are an English learning assistant. Return ONLY valid JSON, no markdown.' },
+        { role: 'user', content: prompt },
+      ],
+      response_format: { type: 'json_object' },
+      max_tokens: 4000,
+      temperature: 0.3,
+    });
+    const responseText = response.choices[0]?.message?.content;
+    if (!responseText) throw new Error('Empty response');
+    return JSON.parse(responseText);
+  };
+
+  const tryGemini = async () => {
+    if (!gemini) throw new Error('Gemini not configured');
+    console.log('🔄 Trying Gemini...');
+    const model = gemini.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      generationConfig: { 
+        responseMimeType: 'application/json',
+        maxOutputTokens: 4000,
         temperature: 0.3,
-      });
-      const responseText = response.choices[0]?.message?.content;
-      if (!responseText) throw new Error('Empty response');
-      return JSON.parse(responseText);
-    } catch (error: any) {
-      lastError = error;
-      // Don't log API key errors as warnings
-      if (error.message?.includes('API key') || error.message?.includes('401') || error.message?.includes('403')) {
-        console.log('ℹ️ OpenAI skipped (API key issue)');
-      } else {
-        console.warn('❌ OpenAI analysis failed:', error.message);
-      }
-    }
+      },
+    });
+    const result = await model.generateContent(prompt);
+    const responseText = result.response.text();
+    return JSON.parse(responseText);
+  };
+
+  // Add providers in priority order
+  if (AI_PROVIDER === 'doubao') {
+    if (doubao) providers.push({ name: 'Doubao', fn: tryDoubao });
+    if (openai) providers.push({ name: 'OpenAI', fn: tryOpenAI });
+    if (gemini) providers.push({ name: 'Gemini', fn: tryGemini });
+  } else if (AI_PROVIDER === 'openai') {
+    if (openai) providers.push({ name: 'OpenAI', fn: tryOpenAI });
+    if (doubao) providers.push({ name: 'Doubao', fn: tryDoubao });
+    if (gemini) providers.push({ name: 'Gemini', fn: tryGemini });
+  } else if (AI_PROVIDER === 'gemini') {
+    if (gemini) providers.push({ name: 'Gemini', fn: tryGemini });
+    if (doubao) providers.push({ name: 'Doubao', fn: tryDoubao });
+    if (openai) providers.push({ name: 'OpenAI', fn: tryOpenAI });
+  } else { // auto
+    if (doubao) providers.push({ name: 'Doubao', fn: tryDoubao });
+    if (openai) providers.push({ name: 'OpenAI', fn: tryOpenAI });
+    if (gemini) providers.push({ name: 'Gemini', fn: tryGemini });
   }
 
-  // Try Gemini
-  if (gemini) {
+  // Try each provider in order
+  for (const provider of providers) {
     try {
-      console.log('🔄 Trying Gemini...');
-      const model = gemini.getGenerativeModel({
-        model: 'gemini-2.0-flash-exp',
-        generationConfig: { 
-          responseMimeType: 'application/json',
-          maxOutputTokens: 4000,
-          temperature: 0.3,
-        },
-      });
-      const result = await model.generateContent(prompt);
-      const responseText = result.response.text();
-      const parsed = JSON.parse(responseText);
-      console.log('✅ Gemini JSON parsed successfully');
-      console.log('📊 Parsed data keys:', Object.keys(parsed));
-      return parsed;
+      const result = await provider.fn();
+      console.log(`✅ ${provider.name} analysis successful`);
+      return result;
     } catch (error: any) {
       lastError = error;
-      // Don't log quota errors as warnings
-      if (error.message?.includes('quota') || error.message?.includes('429')) {
-        console.log('ℹ️ Gemini skipped (quota exceeded)');
+      const isConfigError = error.message?.includes('API key') || 
+                           error.message?.includes('401') || 
+                           error.message?.includes('403') ||
+                           error.message?.includes('not configured');
+      
+      if (isConfigError) {
+        console.log(`ℹ️ ${provider.name} skipped (configuration issue)`);
+      } else if (error.message?.includes('quota') || error.message?.includes('429')) {
+        console.log(`ℹ️ ${provider.name} skipped (quota exceeded)`);
+      } else if (error.message?.includes('fetch failed') || error.message?.includes('network')) {
+        console.warn(`❌ ${provider.name} failed (network issue):`, error.message);
       } else {
-        console.warn('❌ Gemini analysis failed:', error.message);
+        console.warn(`❌ ${provider.name} failed:`, error.message);
       }
+      // Continue to next provider
     }
   }
 
@@ -332,7 +343,10 @@ Return JSON:
       const response = await doubao.chat([
         { role: 'system', content: 'You are an English learning assistant. Always return valid JSON.' },
         { role: 'user', content: prompt },
-      ]);
+      ], {
+        maxTokens: 2000, // Outline generation needs moderate token limit
+        temperature: 0.7,
+      });
       const text = response.choices[0]?.message?.content;
       if (!text) throw new Error('Empty response');
       return DoubaoProvider.parseJSONResponse(text);
@@ -424,7 +438,10 @@ Return JSON:
       const response = await doubao.chat([
         { role: 'system', content: 'You are an English writing coach. Always return valid JSON.' },
         { role: 'user', content: prompt },
-      ]);
+      ], {
+        maxTokens: 3000, // Analysis needs detailed feedback
+        temperature: 0.7,
+      });
       const responseText = response.choices[0]?.message?.content;
       if (!responseText) throw new Error('Empty response');
       return DoubaoProvider.parseJSONResponse(responseText);
@@ -520,7 +537,10 @@ Return JSON:
       const response = await doubao.chat([
         { role: 'system', content: 'You are an English writing upgrade assistant. Always return valid JSON.' },
         { role: 'user', content: prompt },
-      ]);
+      ], {
+        maxTokens: 2500, // Upgrade suggestions need moderate token limit
+        temperature: 0.7,
+      });
       const responseText = response.choices[0]?.message?.content;
       if (!responseText) throw new Error('Empty response');
       return DoubaoProvider.parseJSONResponse(responseText);
@@ -620,7 +640,10 @@ Return JSON:
       const response = await doubao.chat([
         { role: 'system', content: 'You are a flashcard generator. Always return valid JSON.' },
         { role: 'user', content: prompt },
-      ]);
+      ], {
+        maxTokens: 2000, // Flashcards need moderate token limit
+        temperature: 0.7,
+      });
       const responseText = response.choices[0]?.message?.content;
       if (!responseText) throw new Error('Empty response');
       return DoubaoProvider.parseJSONResponse(responseText);

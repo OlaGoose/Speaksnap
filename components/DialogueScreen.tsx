@@ -62,10 +62,40 @@ export default function DialogueScreen({
     setDisplayedText('');
     
     let currentIndex = 0;
+    let lastScrollIndex = 0;
+    const CHARS_PER_SCROLL = 8; // 每打8个字符滚动一次
+    
+    const smoothScrollDown = () => {
+      if (!chatContainerRef.current) return;
+      
+      // 平滑向下滚动，保持打字内容可见
+      const currentScroll = chatContainerRef.current.scrollTop;
+      const scrollHeight = chatContainerRef.current.scrollHeight;
+      const clientHeight = chatContainerRef.current.clientHeight;
+      const maxScroll = scrollHeight - clientHeight;
+      
+      // 每次向下滚动 20px（约一行文字的高度）
+      const newScroll = Math.min(currentScroll + 20, maxScroll);
+      
+      chatContainerRef.current.scrollTo({
+        top: newScroll,
+        behavior: 'smooth',
+      });
+    };
+    
     const typeNextChar = () => {
       if (currentIndex < fullText.length) {
         setDisplayedText(fullText.slice(0, currentIndex + 1));
         currentIndex++;
+        
+        // 每打完指定数量的字符，自动向下滚动
+        if (currentIndex - lastScrollIndex >= CHARS_PER_SCROLL) {
+          lastScrollIndex = currentIndex;
+          requestAnimationFrame(() => {
+            smoothScrollDown();
+          });
+        }
+        
         // 根据字符类型调整速度：标点符号稍慢，其他字符快速
         const char = fullText[currentIndex - 1];
         const delay = /[.,!?;:]/.test(char) ? 100 : 20;
@@ -73,8 +103,31 @@ export default function DialogueScreen({
       } else {
         setTypingMessageId(null);
         setDisplayedText('');
+        // 打字完成后滚动到最底部
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (chatContainerRef.current) {
+              const scrollHeight = chatContainerRef.current.scrollHeight;
+              chatContainerRef.current.scrollTo({
+                top: scrollHeight,
+                behavior: 'smooth',
+              });
+            }
+          }, 100);
+        });
       }
     };
+    
+    // 开始打字前先滚动到底部，确保有足够空间
+    requestAnimationFrame(() => {
+      if (chatContainerRef.current) {
+        const scrollHeight = chatContainerRef.current.scrollHeight;
+        chatContainerRef.current.scrollTo({
+          top: scrollHeight,
+          behavior: 'smooth',
+        });
+      }
+    });
     
     typeNextChar();
   }, []);
@@ -315,6 +368,7 @@ IMPORTANT:
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLInputElement>(null);
+  const typingMessageRef = useRef<HTMLDivElement | null>(null);
 
   // Initialize chat with AI's first line or load existing dialogue
   useEffect(() => {
@@ -1061,7 +1115,7 @@ IMPORTANT:
       {/* Chat Area */}
       <div
         ref={chatContainerRef}
-        className="flex-1 overflow-y-auto px-4 pt-0 pb-48 space-y-6 bg-transparent relative"
+        className="flex-1 overflow-y-auto px-4 pt-0 pb-60 space-y-6 bg-transparent relative"
       >
         <div className="h-14 w-full" />
 
@@ -1138,7 +1192,7 @@ IMPORTANT:
         )}
 
         {/* Messages */}
-        {messages.map((msg) => (
+        {messages.map((msg: DialogueLine) => (
           <div
             key={msg.id}
             className={`flex w-full ${msg.speaker === 'user' ? 'justify-end' : 'justify-start'}`}
@@ -1213,7 +1267,10 @@ IMPORTANT:
               </div>
             ) : (
               <div className="flex flex-col items-start max-w-[90%]">
-                <div className="message-text text-[#191D20] text-[15px] font-medium leading-relaxed px-1 selection:bg-blue-200 selection:text-black">
+                <div 
+                  ref={typingMessageId === msg.id ? typingMessageRef : null}
+                  className="message-text text-[#191D20] text-[15px] font-medium leading-relaxed px-1 selection:bg-blue-200 selection:text-black"
+                >
                   {/* 显示打字动画或完整文本 */}
                   {typingMessageId === msg.id ? displayedText : msg.text}
                   {/* 打字光标 */}
@@ -1227,15 +1284,15 @@ IMPORTANT:
         ))}
 
         {isProcessing && (
-          <div className="flex items-start gap-2 px-1">
-            <div className="flex items-center gap-2 bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl px-4 py-2.5 shadow-sm border border-blue-100/50">
-              <div className="flex gap-1">
-                <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-              </div>
-              <span className="text-sm font-medium bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                AI is thinking...
+          <div className="flex items-center gap-2 px-1 animate-in fade-in duration-200">
+            <div className="flex items-center gap-1.5 text-sm">
+              <span className="bg-gradient-to-r from-apple-blue to-apple-blue-light bg-clip-text text-transparent font-medium">
+                Thinking
+              </span>
+              <span className="inline-flex items-center gap-0 leading-none text-apple-blue">
+                <span className="animate-typing-dot-1">.</span>
+                <span className="animate-typing-dot-2">.</span>
+                <span className="animate-typing-dot-3">.</span>
               </span>
             </div>
           </div>
@@ -1625,24 +1682,17 @@ IMPORTANT:
             onClick={handleSend}
             disabled={!inputValue.trim() || isProcessing}
             className={`
-              flex items-center justify-center gap-2 h-9 px-4 rounded-lg text-sm font-bold transition-all
+              flex items-center justify-center gap-2 h-9 px-4 rounded-lg text-sm font-medium transition-all
               ${
                 isProcessing
-                  ? 'bg-gray-300 text-gray-500 cursor-wait'
+                  ? 'bg-gray-200 text-gray-500 cursor-wait'
                   : inputValue.trim()
-                  ? 'bg-black text-white shadow-md hover:bg-gray-800 active:scale-95'
+                  ? 'bg-black text-white hover:bg-gray-800 active:scale-95'
                   : 'bg-gray-100 text-gray-400 cursor-not-allowed'
               }
             `}
           >
-            {isProcessing ? (
-              <>
-                <Loader2 size={14} className="animate-spin" />
-                <span>Sending...</span>
-              </>
-            ) : (
-              <span>Go</span>
-            )}
+            Go
           </button>
         </div>
       </div>

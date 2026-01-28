@@ -278,7 +278,10 @@ Return JSON:
       const response = await doubao.chat([
         { role: 'system', content: 'You are a scenario generator. Always return valid JSON.' },
         { role: 'user', content: prompt },
-      ]);
+      ], {
+        maxTokens: 4000, // Scenarios need more tokens for detailed responses
+        temperature: 0.8,
+      });
       const text = response.choices[0]?.message?.content;
       if (!text) throw new Error('Empty response from Doubao');
       const parsed = DoubaoProvider.parseJSONResponse(text);
@@ -417,7 +420,10 @@ Return JSON:
   if ((AI_PROVIDER === 'doubao' || AI_PROVIDER === 'auto') && doubao) {
     try {
       console.log('🔥 Trying Doubao dialogue...');
-      const response = await doubao.chat(messages);
+      const response = await doubao.chat(messages, {
+        maxTokens: 3000, // Prevent response truncation
+        temperature: 0.7,
+      });
       const text = response.choices[0]?.message?.content;
       if (!text) {
         throw new Error('Empty response from Doubao');
@@ -595,7 +601,10 @@ Return JSON:
       const response = await doubao.chat([
         { role: 'system', content: 'You are an English learning assistant. Return valid JSON.' },
         { role: 'user', content: prompt },
-      ]);
+      ], {
+        maxTokens: 2000, // Flashcards need moderate token limit
+        temperature: 0.7,
+      });
       const text = response.choices[0]?.message?.content;
       if (!text) throw new Error('Empty response');
       return DoubaoProvider.parseJSONResponse(text);
@@ -652,7 +661,10 @@ export async function translateText(text: string): Promise<string> {
 
   try {
     if (doubao) {
-      const response = await doubao.chat([{ role: 'user', content: prompt }]);
+      const response = await doubao.chat([{ role: 'user', content: prompt }], {
+        maxTokens: 1000, // Translation should be concise
+        temperature: 0.3,
+      });
       return response.choices[0]?.message?.content || 'Translation failed';
     }
     if (openai) {
@@ -679,7 +691,10 @@ export async function optimizeText(text: string): Promise<string> {
 
   try {
     if (doubao) {
-      const response = await doubao.chat([{ role: 'user', content: prompt }]);
+      const response = await doubao.chat([{ role: 'user', content: prompt }], {
+        maxTokens: 1000, // Optimization should be concise
+        temperature: 0.7,
+      });
       return response.choices[0]?.message?.content || text;
     }
     if (openai) {
