@@ -167,7 +167,6 @@ Return JSON:
             },
           ],
           response_format: { type: 'json_object' },
-          timeout: 30000, // 30 seconds
         }),
         timeoutPromise,
       ]);
