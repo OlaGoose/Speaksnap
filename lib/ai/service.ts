@@ -74,6 +74,8 @@ Return JSON:
   "difficulty": "A1/A2/B1/B2/C1/C2 based on ${level}",
   "role_name": "Character role (e.g., Barista, Local, Clerk)",
   "context": "Character personality, scene instructions, and GOAL: what needs to be accomplished (e.g., GOAL: Help customer complete their order and payment)",
+  "goals": ["Specific goal step 1", "Specific goal step 2", "Specific goal step 3"],
+  "completion_phrase": "Natural completion phrase when all goals are achieved",
   "first_line": "AI's natural opening line that sets up the goal",
   "user_hints": ["3 realistic response options that move towards the goal"]
 }
@@ -260,6 +262,8 @@ Return JSON:
   "difficulty": "A1/A2/B1/B2/C1/C2 based on ${level}",
   "role_name": "Character role (e.g., Barista, Local, Clerk)",
   "context": "Character personality, scene instructions, and GOAL: what needs to be accomplished (e.g., GOAL: Help customer complete their order and payment)",
+  "goals": ["Specific goal step 1", "Specific goal step 2", "Specific goal step 3"],
+  "completion_phrase": "Natural completion phrase when all goals are achieved",
   "first_line": "AI's natural opening line that sets up the goal",
   "user_hints": ["3 realistic response options that move towards the goal"]
 }
@@ -613,6 +617,8 @@ function validateAnalysisResponse(data: any): AnalyzeImageResponse {
     difficulty: data?.difficulty || 'A1',
     role_name: data?.role_name || 'Partner',
     context: data?.context || 'Be friendly and helpful',
+    goals: Array.isArray(data?.goals) ? data.goals : undefined,
+    completion_phrase: data?.completion_phrase || undefined,
     first_line: data?.first_line || 'Hello! How can I help you?',
     user_hints: Array.isArray(data?.user_hints)
       ? data.user_hints

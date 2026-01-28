@@ -115,65 +115,77 @@ export default function DialogueScreen({
       'Post Office': 'a helpful post office clerk',
     }[scenario.location] || 'a helpful assistant';
 
-    // 定义场景目标
-    const scenarioGoals = {
-      'Coffee Shop': {
-        goals: ['Take order', 'Confirm preferences', 'Process payment'],
-        completion: 'Your order is ready! Have a great day!',
-        steps: 'Guide the user through: 1) Greeting and asking what they want, 2) Confirming size/customization, 3) Mentioning the price and payment method'
-      },
-      'Restaurant': {
-        goals: ['Seat customer', 'Take order', 'Handle special requests'],
-        completion: 'Your order will be right out! Enjoy your meal!',
-        steps: 'Guide the user through: 1) Welcome and seating, 2) Menu recommendations and taking order, 3) Confirming special dietary needs or preferences'
-      },
-      'Airport': {
-        goals: ['Check-in', 'Luggage handling', 'Gate information'],
-        completion: 'You\'re all set! Have a safe flight!',
-        steps: 'Guide the user through: 1) Checking booking details, 2) Luggage weight and tags, 3) Providing boarding pass and gate info'
-      },
-      'Hotel': {
-        goals: ['Check-in', 'Room preferences', 'Hotel amenities'],
-        completion: 'Your room is ready! Enjoy your stay!',
-        steps: 'Guide the user through: 1) Verifying reservation, 2) Confirming room type and preferences, 3) Explaining hotel facilities and WiFi'
-      },
-      'Supermarket': {
-        goals: ['Find items', 'Provide directions', 'Checkout assistance'],
-        completion: 'Found everything you need! Have a nice day!',
-        steps: 'Guide the user through: 1) Asking what they\'re looking for, 2) Directing them to aisles, 3) Offering help with checkout or bags'
-      },
-      'Library': {
-        goals: ['Book search', 'Library card', 'Return information'],
-        completion: 'All set! Happy reading!',
-        steps: 'Guide the user through: 1) Finding the book they need, 2) Checking out with library card, 3) Explaining due dates and return process'
-      },
-      'Gym': {
-        goals: ['Membership check', 'Equipment guidance', 'Workout plan'],
-        completion: 'Great workout plan! Stay motivated!',
-        steps: 'Guide the user through: 1) Checking membership status, 2) Showing equipment locations, 3) Suggesting workout routines based on their goals'
-      },
-      'Hospital': {
-        goals: ['Check-in', 'Insurance verification', 'Department directions'],
-        completion: 'You\'re all checked in! The doctor will see you soon!',
-        steps: 'Guide the user through: 1) Patient information and reason for visit, 2) Verifying insurance, 3) Directing to the correct department'
-      },
-      'Bank': {
-        goals: ['Account inquiry', 'Transaction processing', 'Documentation'],
-        completion: 'Transaction complete! Is there anything else I can help you with?',
-        steps: 'Guide the user through: 1) Verifying identity and account, 2) Processing transaction (deposit/withdrawal/transfer), 3) Providing receipts or confirmations'
-      },
-      'Post Office': {
-        goals: ['Package details', 'Shipping options', 'Payment'],
-        completion: 'Your package is on its way! Have a great day!',
-        steps: 'Guide the user through: 1) Getting package information (destination, weight), 2) Offering shipping options (speed, tracking), 3) Processing payment'
-      }
-    };
+    // 优先使用AI返回的goals，如果没有则使用预设模板作为后备
+    let currentScenario;
+    
+    if (scenario.goals && scenario.goals.length > 0) {
+      // 使用AI生成的goals（优先）
+      currentScenario = {
+        goals: scenario.goals,
+        completion: scenario.completion_phrase || 'All done! Have a great day!',
+        steps: `Guide the conversation naturally toward completing these goals: ${scenario.goals.join(', ')}`
+      };
+    } else {
+      // 回退到预设模板（向后兼容）
+      const scenarioGoals = {
+        'Coffee Shop': {
+          goals: ['Take order', 'Confirm preferences', 'Process payment'],
+          completion: 'Your order is ready! Have a great day!',
+          steps: 'Guide the user through: 1) Greeting and asking what they want, 2) Confirming size/customization, 3) Mentioning the price and payment method'
+        },
+        'Restaurant': {
+          goals: ['Seat customer', 'Take order', 'Handle special requests'],
+          completion: 'Your order will be right out! Enjoy your meal!',
+          steps: 'Guide the user through: 1) Welcome and seating, 2) Menu recommendations and taking order, 3) Confirming special dietary needs or preferences'
+        },
+        'Airport': {
+          goals: ['Check-in', 'Luggage handling', 'Gate information'],
+          completion: 'You\'re all set! Have a safe flight!',
+          steps: 'Guide the user through: 1) Checking booking details, 2) Luggage weight and tags, 3) Providing boarding pass and gate info'
+        },
+        'Hotel': {
+          goals: ['Check-in', 'Room preferences', 'Hotel amenities'],
+          completion: 'Your room is ready! Enjoy your stay!',
+          steps: 'Guide the user through: 1) Verifying reservation, 2) Confirming room type and preferences, 3) Explaining hotel facilities and WiFi'
+        },
+        'Supermarket': {
+          goals: ['Find items', 'Provide directions', 'Checkout assistance'],
+          completion: 'Found everything you need! Have a nice day!',
+          steps: 'Guide the user through: 1) Asking what they\'re looking for, 2) Directing them to aisles, 3) Offering help with checkout or bags'
+        },
+        'Library': {
+          goals: ['Book search', 'Library card', 'Return information'],
+          completion: 'All set! Happy reading!',
+          steps: 'Guide the user through: 1) Finding the book they need, 2) Checking out with library card, 3) Explaining due dates and return process'
+        },
+        'Gym': {
+          goals: ['Membership check', 'Equipment guidance', 'Workout plan'],
+          completion: 'Great workout plan! Stay motivated!',
+          steps: 'Guide the user through: 1) Checking membership status, 2) Showing equipment locations, 3) Suggesting workout routines based on their goals'
+        },
+        'Hospital': {
+          goals: ['Check-in', 'Insurance verification', 'Department directions'],
+          completion: 'You\'re all checked in! The doctor will see you soon!',
+          steps: 'Guide the user through: 1) Patient information and reason for visit, 2) Verifying insurance, 3) Directing to the correct department'
+        },
+        'Bank': {
+          goals: ['Account inquiry', 'Transaction processing', 'Documentation'],
+          completion: 'Transaction complete! Is there anything else I can help you with?',
+          steps: 'Guide the user through: 1) Verifying identity and account, 2) Processing transaction (deposit/withdrawal/transfer), 3) Providing receipts or confirmations'
+        },
+        'Post Office': {
+          goals: ['Package details', 'Shipping options', 'Payment'],
+          completion: 'Your package is on its way! Have a great day!',
+          steps: 'Guide the user through: 1) Getting package information (destination, weight), 2) Offering shipping options (speed, tracking), 3) Processing payment'
+        }
+      };
 
-    const currentScenario = scenarioGoals[scenario.location as keyof typeof scenarioGoals] || {
-      goals: ['Assist customer', 'Answer questions', 'Complete transaction'],
-      completion: 'All done! Have a great day!',
-      steps: 'Guide the conversation naturally toward completing the customer\'s needs'
-    };
+      currentScenario = scenarioGoals[scenario.location as keyof typeof scenarioGoals] || {
+        goals: ['Assist customer', 'Answer questions', 'Complete transaction'],
+        completion: 'All done! Have a great day!',
+        steps: 'Guide the conversation naturally toward completing the customer\'s needs'
+      };
+    }
 
     // 保存目标用于UI显示
     if (conversationGoals.length === 0) {

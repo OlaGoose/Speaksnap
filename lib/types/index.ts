@@ -43,6 +43,8 @@ export interface Scenario {
   difficulty: string;
   role_name: string;
   context: string;
+  goals?: string[]; // AI-generated conversation goals
+  completion_phrase?: string; // Phrase to indicate conversation completion
   timestamp: number;
   created_at?: string;
   
@@ -109,6 +111,8 @@ export interface AnalyzeImageResponse {
   difficulty: string;
   role_name: string;
   context: string;
+  goals?: string[]; // AI-generated conversation goals
+  completion_phrase?: string; // Phrase to indicate conversation completion
   first_line: string;
   user_hints: string[];
 }
