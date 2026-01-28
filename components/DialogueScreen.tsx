@@ -45,83 +45,64 @@ export default function DialogueScreen({
   const [showAudioToast, setShowAudioToast] = useState(false);
   const [isLiveActive, setIsLiveActive] = useState(false);
 
-  // Gemini Live Integration
-  const audioQueueRef = useRef<string[]>([]);
-  const isPlayingRef = useRef(false);
-  const audioContextRef = useRef<AudioContext | null>(null);
+  // Gemini Live Integration - 构建场景和NPC角色的系统指令
+  const buildSystemInstruction = () => {
+    // 根据场景构建NPC角色和对话背景
+    const npcRole = {
+      'Coffee Shop': 'a friendly barista at a coffee shop',
+      'Restaurant': 'a warm and helpful waiter at a restaurant',
+      'Airport': 'a professional airline staff member at the airport',
+      'Hotel': 'a courteous hotel receptionist',
+      'Supermarket': 'a helpful supermarket employee',
+      'Library': 'a knowledgeable librarian',
+      'Gym': 'a friendly gym trainer',
+      'Hospital': 'a caring nurse at the hospital reception',
+      'Bank': 'a professional bank teller',
+      'Post Office': 'a helpful post office clerk',
+    }[scenario.location] || 'a helpful assistant';
 
-  const playNextInQueue = useCallback(() => {
-    if (audioQueueRef.current.length === 0) {
-      isPlayingRef.current = false;
-      return;
-    }
+    const instruction = `You are ${npcRole}. 
 
-    isPlayingRef.current = true;
-    const base64 = audioQueueRef.current.shift()!;
-    
-    try {
-      // 初始化 AudioContext（如果还没有）
-      if (!audioContextRef.current) {
-        audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({
-          sampleRate: 24000, // Gemini Live 返回 24kHz
-        });
-      }
-      
-      const audioContext = audioContextRef.current;
-      
-      // 解码 base64 音频数据
-      const binaryString = window.atob(base64);
-      const len = binaryString.length;
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-      
-      // 将 16-bit PCM 转换为 Float32Array
-      const pcmData = new Int16Array(bytes.buffer);
-      const float32Data = new Float32Array(pcmData.length);
-      for (let i = 0; i < pcmData.length; i++) {
-        float32Data[i] = pcmData[i] / 32768.0;
-      }
-      
-      // 创建 AudioBuffer 并播放
-      const audioBuffer = audioContext.createBuffer(1, float32Data.length, 24000);
-      audioBuffer.getChannelData(0).set(float32Data);
-      
-      const source = audioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioContext.destination);
-      
-      source.onended = () => {
-        playNextInQueue();
-      };
-      
-      source.start(0);
-    } catch (err) {
-      console.error("Error processing audio chunk:", err);
-      playNextInQueue();
-    }
-  }, []);
+SCENE: ${scenario.location} - ${scenario.situation}
+CONTEXT: ${scenario.context}
+
+YOUR ROLE:
+- Stay in character as ${npcRole} throughout the conversation
+- Respond naturally and concisely (2-3 sentences max)
+- Use appropriate vocabulary for this setting
+- Be helpful and friendly
+- Speak at a normal conversational pace
+
+USER LEVEL: ${userLevel}
+- Beginner: Use simple words and short sentences
+- Intermediate: Use everyday vocabulary with some idiomatic expressions
+- Advanced: Use natural native expressions and varied vocabulary
+
+IMPORTANT:
+- Keep responses brief and natural (like real conversation)
+- Don't over-explain unless asked
+- React naturally to what the user says
+- Guide the conversation based on the scenario context`;
+
+    return instruction;
+  };
 
   const { 
     isActive: geminiLiveActive, 
     connectionState: geminiLiveState,
+    volume: liveVolume,
     startLiveSession, 
     stopLiveSession 
   } = useGeminiLive({
     apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY || '',
-    onAudioData: (base64) => {
-      audioQueueRef.current.push(base64);
-      if (!isPlayingRef.current) {
-        playNextInQueue();
-      }
-    },
-    onTextData: (text) => {
-      console.log("Gemini Live Text:", text);
-    },
+    systemInstruction: buildSystemInstruction(),
+    voiceName: 'Kore', // 可以根据场景选择不同声音：Puck, Charon, Kore, Fenrir, Aoide
     onError: (err) => {
       console.error("Gemini Live Error:", err);
       setIsLiveActive(false);
+    },
+    onInterrupted: () => {
+      console.log("AI was interrupted by user");
     }
   });
 
@@ -1120,18 +1101,42 @@ export default function DialogueScreen({
       <div className="absolute bottom-32 right-6 z-40">
         <button
           onClick={handleToggleLive}
+          disabled={geminiLiveState === 'connecting'}
           className={`relative group w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 pointer-events-auto active:scale-90 touch-manipulation shadow-2xl ${
             isLiveActive 
-              ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white ring-4 ring-blue-100' 
+              ? 'bg-gradient-to-br from-red-500 to-red-600 text-white ring-4 ring-red-100' 
+              : geminiLiveState === 'connecting'
+              ? 'bg-gray-300 text-gray-500 cursor-wait'
               : 'bg-white text-gray-500 hover:text-blue-600 hover:bg-blue-50 border border-gray-200/50'
           }`}
           aria-label={isLiveActive ? 'End Live Call' : 'Start Live Call'}
         >
+          {/* Pulsing effect when active */}
           {isLiveActive && (
-            <div className="absolute inset-0 rounded-full bg-blue-400 animate-ping opacity-20"></div>
+            <div 
+              className="absolute inset-0 rounded-full bg-red-400 animate-pulse opacity-30"
+              style={{ 
+                transform: `scale(${1 + liveVolume * 0.3})`,
+                transition: 'transform 0.1s ease-out'
+              }}
+            ></div>
           )}
+          
+          {/* Volume-responsive outer ring */}
+          {isLiveActive && liveVolume > 0.1 && (
+            <div 
+              className="absolute inset-0 rounded-full border-4 border-white/50"
+              style={{ 
+                transform: `scale(${1 + liveVolume * 0.5})`,
+                transition: 'transform 0.05s ease-out'
+              }}
+            ></div>
+          )}
+          
           <div className="relative z-10 flex items-center justify-center">
-            {isLiveActive ? (
+            {geminiLiveState === 'connecting' ? (
+              <Loader2 size={24} className="animate-spin" />
+            ) : isLiveActive ? (
               <PhoneOff size={24} strokeWidth={2.5} />
             ) : (
               <Phone size={24} strokeWidth={2.5} />
@@ -1139,13 +1144,20 @@ export default function DialogueScreen({
           </div>
           
           {/* Status Indicator */}
-          {isLiveActive && geminiLiveState === 'connecting' && (
+          {geminiLiveState === 'connecting' && (
             <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full border-2 border-white animate-pulse"></div>
           )}
           {isLiveActive && geminiLiveState === 'connected' && (
             <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
           )}
         </button>
+        
+        {/* Live Call Status Label */}
+        {isLiveActive && (
+          <div className="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap bg-black/80 text-white text-xs px-3 py-1.5 rounded-full font-medium animate-in fade-in slide-in-from-bottom">
+            🎙️ Live Call
+          </div>
+        )}
       </div>
 
       {/* Bottom Input Area */}

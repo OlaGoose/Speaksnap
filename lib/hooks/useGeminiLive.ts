@@ -1,237 +1,263 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
+import { createPcmBlob, decode, decodeAudioData } from '../utils/audioUtils';
 
 interface UseGeminiLiveOptions {
   apiKey: string;
-  onAudioData?: (base64Audio: string) => void;
-  onTextData?: (text: string) => void;
+  systemInstruction?: string;
+  voiceName?: string;
   onError?: (error: string) => void;
-  onStateChange?: (state: "connected" | "disconnected" | "connecting") => void;
+  onInterrupted?: () => void;
+}
+
+interface UseGeminiLiveReturn {
+  isActive: boolean;
+  connectionState: 'connected' | 'disconnected' | 'connecting';
+  volume: number;
+  startLiveSession: () => Promise<void>;
+  stopLiveSession: () => void;
 }
 
 /**
  * Gemini Multimodal Live API Hook
- * 实现低延迟实时语音交互
+ * 使用官方 @google/genai SDK 实现低延迟实时语音交互
  */
 export function useGeminiLive({
   apiKey,
-  onAudioData,
-  onTextData,
+  systemInstruction = "You are a helpful, concise AI assistant. You answer briefly and clearly.",
+  voiceName = 'Kore',
   onError,
-  onStateChange,
-}: UseGeminiLiveOptions) {
+  onInterrupted,
+}: UseGeminiLiveOptions): UseGeminiLiveReturn {
   const [isActive, setIsActive] = useState(false);
-  const [connectionState, setConnectionState] = useState<"connected" | "disconnected" | "connecting">("disconnected");
-  const wsRef = useRef<WebSocket | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const audioWorkletNodeRef = useRef<AudioWorkletNode | null>(null);
+  const [connectionState, setConnectionState] = useState<'connected' | 'disconnected' | 'connecting'>('disconnected');
+  const [volume, setVolume] = useState(0);
 
-  const cleanup = useCallback(() => {
-    if (wsRef.current) {
-      wsRef.current.close();
-      wsRef.current = null;
+  // Audio Contexts and Nodes
+  const inputAudioContextRef = useRef<AudioContext | null>(null);
+  const outputAudioContextRef = useRef<AudioContext | null>(null);
+  const inputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const outputNodeRef = useRef<GainNode | null>(null);
+  
+  // State for audio playback queue
+  const nextStartTimeRef = useRef<number>(0);
+  const audioSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
+  
+  // API Session
+  const sessionPromiseRef = useRef<Promise<any> | null>(null);
+  const closeSessionRef = useRef<(() => void) | null>(null);
+
+  // Helper to stop all audio
+  const stopAudio = useCallback(() => {
+    // Stop all currently playing sources
+    audioSourcesRef.current.forEach((source) => {
+      try {
+        source.stop();
+      } catch (e) {
+        // Ignore errors if already stopped
+      }
+    });
+    audioSourcesRef.current.clear();
+    nextStartTimeRef.current = 0;
+  }, []);
+
+  const stopLiveSession = useCallback(() => {
+    console.log("Disconnecting...");
+    
+    // Close the Live API session
+    if (closeSessionRef.current) {
+      closeSessionRef.current();
+      closeSessionRef.current = null;
     }
+    sessionPromiseRef.current = null;
+
+    // Stop processing input
     if (processorRef.current) {
       processorRef.current.disconnect();
       processorRef.current = null;
     }
-    if (audioWorkletNodeRef.current) {
-      audioWorkletNodeRef.current.disconnect();
-      audioWorkletNodeRef.current = null;
+    if (inputSourceRef.current) {
+      inputSourceRef.current.disconnect();
+      inputSourceRef.current = null;
     }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
+    
+    // Close Audio Contexts
+    if (inputAudioContextRef.current) {
+      inputAudioContextRef.current.close();
+      inputAudioContextRef.current = null;
     }
-    if (audioContextRef.current) {
-      audioContextRef.current.close();
-      audioContextRef.current = null;
+    if (outputAudioContextRef.current) {
+      outputAudioContextRef.current.close();
+      outputAudioContextRef.current = null;
     }
-    setConnectionState("disconnected");
-    onStateChange?.("disconnected");
+
+    stopAudio();
     setIsActive(false);
-  }, [onStateChange]);
+    setConnectionState('disconnected');
+    setVolume(0);
+  }, [stopAudio]);
 
   const startLiveSession = useCallback(async () => {
+    if (isActive || connectionState === 'connecting') return;
+    
     if (!apiKey) {
       onError?.("Gemini API Key is missing");
       return;
     }
 
+    setConnectionState('connecting');
+
     try {
-      setConnectionState("connecting");
-      onStateChange?.("connecting");
-      setIsActive(true);
-
-      // 1. 初始化 WebSocket
-      const url = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
-      const ws = new WebSocket(url);
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        setConnectionState("connected");
-        onStateChange?.("connected");
-        
-        // 发送初始配置
-        const setup = {
-          setup: {
-            model: "models/gemini-2.0-flash-exp",
-            generation_config: {
-              response_modalities: ["AUDIO"],
-              speech_config: {
-                voice_config: {
-                  prebuilt_voice_config: {
-                    voice_name: "Aoide", 
-                  }
-                }
-              }
-            }
-          }
-        };
-        ws.send(JSON.stringify(setup));
-      };
-
-      ws.onmessage = async (event) => {
-        try {
-          const response = JSON.parse(event.data);
-          console.log("Gemini Live message:", response);
-          
-          // 处理服务端内容
-          if (response.serverContent) {
-            const serverContent = response.serverContent;
-            
-            // 处理模型回合
-            if (serverContent.modelTurn?.parts) {
-              const parts = serverContent.modelTurn.parts;
-              console.log("Gemini Live: Processing parts", parts.length);
-              for (const part of parts) {
-                if (part.inlineData?.data) {
-                  console.log("Gemini Live: Audio data received, length:", part.inlineData.data.length);
-                  onAudioData?.(part.inlineData.data);
-                }
-                if (part.text) {
-                  console.log("Gemini Live: Text data received:", part.text);
-                  onTextData?.(part.text);
-                }
-              }
-            }
-
-            // 处理直接包含的音频数据（某些响应格式）
-            if (serverContent.inlineData?.data) {
-              console.log("Gemini Live: Direct audio data received");
-              onAudioData?.(serverContent.inlineData.data);
-            }
-
-            // 处理打断 (Interruption)
-            if (serverContent.interrupted) {
-              console.log("Gemini Live: Interrupted by user");
-            }
-
-            // 处理回合结束
-            if (serverContent.turnComplete) {
-              console.log("Gemini Live: Turn complete");
-            }
-          }
-          
-          // 处理错误响应
-          if (response.error) {
-            console.error("Gemini Live error:", response.error);
-            onError?.(response.error.message || "Gemini Live API error");
-          }
-        } catch (err) {
-          console.error("Error parsing Gemini message:", err, event.data);
-        }
-      };
-
-      ws.onerror = (ev) => {
-        console.error("WebSocket error:", ev);
-        onError?.("WebSocket connection failed");
-        cleanup();
-      };
-
-      ws.onclose = () => {
-        cleanup();
-      };
-
-      // 2. 初始化音频采集
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          sampleRate: 16000
-        } 
-      });
-      streamRef.current = stream;
+      // 1. Initialize Audio Contexts
+      const InputContextClass = (window.AudioContext || (window as any).webkitAudioContext);
+      const inputCtx = new InputContextClass({ sampleRate: 16000 });
+      const outputCtx = new InputContextClass({ sampleRate: 24000 });
       
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({
-        sampleRate: 16000,
-      });
-      audioContextRef.current = audioContext;
+      inputAudioContextRef.current = inputCtx;
+      outputAudioContextRef.current = outputCtx;
 
-      const source = audioContext.createMediaStreamSource(stream);
-      
-      // 使用 ScriptProcessorNode (虽然已废弃但兼容性好，且在简单场景下足够)
-      // 注意：Gemini 期望 16kHz L16 PCM
-      const processor = audioContext.createScriptProcessor(4096, 1, 1);
+      // 2. Setup Output Node
+      const outputNode = outputCtx.createGain();
+      outputNode.connect(outputCtx.destination);
+      outputNodeRef.current = outputNode;
+
+      // 3. Setup Input (Microphone)
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const source = inputCtx.createMediaStreamSource(stream);
+      inputSourceRef.current = source;
+
+      // 4. Setup Visualizer (Analyser)
+      const analyser = inputCtx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      analyserRef.current = analyser;
+
+      // 5. Setup Processor for Streaming
+      const processor = inputCtx.createScriptProcessor(4096, 1, 1);
       processorRef.current = processor;
-
+      
       source.connect(processor);
-      processor.connect(audioContext.destination);
+      processor.connect(inputCtx.destination); // Required for script processor to run
 
-      processor.onaudioprocess = (e) => {
-        if (ws.readyState === WebSocket.OPEN) {
-          const inputData = e.inputBuffer.getChannelData(0);
-          
-          // 转换为 16-bit PCM (Little Endian)
-          const pcmBuffer = new ArrayBuffer(inputData.length * 2);
-          const pcmView = new DataView(pcmBuffer);
-          
-          for (let i = 0; i < inputData.length; i++) {
-            const s = Math.max(-1, Math.min(1, inputData[i]));
-            pcmView.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-          }
-          
-          // 转为 Base64 并通过 realtime_input 发送
-          const uint8Array = new Uint8Array(pcmBuffer);
-          let binary = '';
-          for (let i = 0; i < uint8Array.byteLength; i++) {
-            binary += String.fromCharCode(uint8Array[i]);
-          }
-          const base64 = btoa(binary);
-          
-          ws.send(JSON.stringify({
-            realtime_input: {
-              media_chunks: [{
-                data: base64,
-                mime_type: "audio/pcm;rate=16000"
-              }]
+      // 6. Initialize Gemini Client
+      const ai = new GoogleGenAI({ apiKey });
+      
+      // 7. Connect to Live API
+      const sessionPromise = ai.live.connect({
+        model: 'gemini-2.5-flash-native-audio-preview-12-2025',
+        callbacks: {
+          onopen: () => {
+            console.log('Gemini Live Session Opened');
+            setIsActive(true);
+            setConnectionState('connected');
+            
+            // Start processing audio only when connected
+            processor.onaudioprocess = (e) => {
+              const inputData = e.inputBuffer.getChannelData(0);
+              const pcmBlob = createPcmBlob(inputData);
+              
+              // Calculate volume for visualizer
+              let sum = 0;
+              for (let i = 0; i < inputData.length; i++) {
+                sum += inputData[i] * inputData[i];
+              }
+              const rms = Math.sqrt(sum / inputData.length);
+              // Normalize roughly for visual effect
+              setVolume(Math.min(rms * 5, 1)); 
+
+              sessionPromise.then((session) => {
+                session.sendRealtimeInput({ media: pcmBlob });
+              });
+            };
+          },
+          onmessage: async (message: LiveServerMessage) => {
+            // Handle Audio Output
+            const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
+            if (base64Audio && outputAudioContextRef.current && outputNodeRef.current) {
+              const ctx = outputAudioContextRef.current;
+              
+              // Ensure playback time is continuous
+              nextStartTimeRef.current = Math.max(
+                nextStartTimeRef.current,
+                ctx.currentTime
+              );
+
+              const audioBuffer = await decodeAudioData(
+                decode(base64Audio),
+                ctx,
+                24000,
+                1
+              );
+
+              const bufferSource = ctx.createBufferSource();
+              bufferSource.buffer = audioBuffer;
+              bufferSource.connect(outputNodeRef.current);
+              
+              bufferSource.onended = () => {
+                audioSourcesRef.current.delete(bufferSource);
+              };
+
+              bufferSource.start(nextStartTimeRef.current);
+              nextStartTimeRef.current += audioBuffer.duration;
+              audioSourcesRef.current.add(bufferSource);
             }
-          }));
-        }
+
+            // Handle Interruptions
+            if (message.serverContent?.interrupted) {
+              console.log("Model interrupted");
+              stopAudio();
+              onInterrupted?.();
+            }
+          },
+          onclose: () => {
+            console.log("Session closed");
+            stopLiveSession();
+          },
+          onerror: (err) => {
+            console.error("Session error:", err);
+            onError?.("Connection lost or error occurred.");
+            stopLiveSession();
+          }
+        },
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: { prebuiltVoiceConfig: { voiceName } }
+          },
+          systemInstruction,
+        },
+      });
+
+      sessionPromiseRef.current = sessionPromise;
+
+      // Expose close method
+      closeSessionRef.current = () => {
+        sessionPromise.then(session => session.close());
       };
 
     } catch (err: any) {
-      console.error("Failed to start Gemini Live:", err);
-      onError?.(err.message || "Failed to access microphone");
-      cleanup();
+      console.error("Failed to connect:", err);
+      onError?.(err.message || "Failed to access microphone or connect.");
+      setConnectionState('disconnected');
+      stopLiveSession();
     }
-  }, [apiKey, onAudioData, onTextData, onError, onStateChange, cleanup]);
+  }, [isActive, connectionState, apiKey, systemInstruction, voiceName, onError, onInterrupted, stopAudio, stopLiveSession]);
 
-  const stopLiveSession = useCallback(() => {
-    cleanup();
-  }, [cleanup]);
-
+  // Cleanup on unmount
   useEffect(() => {
-    return () => cleanup();
-  }, [cleanup]);
+    return () => {
+      stopLiveSession();
+    };
+  }, [stopLiveSession]);
 
   return {
     isActive,
     connectionState,
+    volume,
     startLiveSession,
     stopLiveSession,
   };
