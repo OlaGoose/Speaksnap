@@ -67,21 +67,26 @@ Context:
 Requirements:
 1. Be EXTREMELY realistic - if it's nighttime, suggest nighttime activities
 2. Identify specific elements in the image (signs, objects, lighting)
-3. Create a clear conversation GOAL (e.g., order coffee, buy tickets, ask for directions)
-4. Make the scenario have a natural beginning, middle, and end
+3. Create a clear conversation GOAL based on the scene type:
+   - Service scenes (café, restaurant, shop): Student practices ASKING/ORDERING
+   - Social/Home scenes (objects, toys, desk): Student practices ASKING ABOUT items
+   - Information scenes (signs, places): Student practices SEEKING information
+4. Determine WHO initiates based on scene:
+   - In service scenes: AI (shopkeeper/staff) greets FIRST
+   - In social scenes: Student can ask FIRST, AI responds
 5. Match difficulty to ${level} level
 
 Return JSON:
 {
   "location": "Specific place name from image",
-  "situation": "Clear scenario goal - what needs to be accomplished in this conversation",
+  "situation": "Clear scenario goal - what needs to be accomplished",
   "difficulty": "A1/A2/B1/B2/C1/C2 based on ${level}",
-  "role_name": "Character role (e.g., Barista, Local, Clerk)",
-  "context": "Character personality, scene instructions, and GOAL: what needs to be accomplished (e.g., GOAL: Help customer complete their order and payment)",
-  "goals": ["Specific goal step 1", "Specific goal step 2", "Specific goal step 3"],
+  "role_name": "AI's character role (e.g., for service: Barista, Staff; for social: Friend, Roommate)",
+  "context": "AI's role and behavior. CRITICAL: If goals involve student ASKING (e.g., 'Ask about...'), AI should WAIT for student's question and RESPOND helpfully. If goals involve student ORDERING, AI can GREET first.",
+  "goals": ["Clear goal steps starting with action word: Ask/Order/Request/Find out...", "Goal 2", "Goal 3"],
   "completion_phrase": "Natural completion phrase when all goals are achieved",
-  "first_line": "AI's natural opening line that sets up the goal",
-  "user_hints": ["3 realistic response options that move towards the goal"]
+  "first_line": "AI's opening line: SHORT greeting in service scenes, or wait for student in social scenes (use empty string '' if student should speak first)",
+  "user_hints": ["3 realistic options that help achieve the first goal"]
 }
   `;
 
@@ -420,11 +425,17 @@ You are an English conversation tutor conducting a roleplay dialogue exercise.
 📍 SCENARIO CONTEXT & GOAL:
 ${scenarioContext}
 
-🎯 YOUR ROLE:
-- You are the conversation partner in this scenario (e.g., shopkeeper, friend, colleague)
-- Guide the conversation towards achieving the scenario goal naturally
-- Each response should advance the conversation towards completion
-- Engage in natural, realistic conversation appropriate for the scenario
+🎯 YOUR ROLE & BEHAVIOR:
+CRITICAL: Check the context above to understand your role correctly:
+- If context says "wait for student's question" or "respond to inquiries": Student leads, YOU respond helpfully
+- If context says "greet" or "help customer": YOU can initiate and guide
+- Match the interaction style to the scenario (service-oriented vs. conversational)
+- Your responses should naturally advance towards goal completion
+
+Key principles:
+- If goals start with "Ask about/Find out": Student asks, YOU answer
+- If goals start with "Order/Request/Buy": YOU guide the transaction
+- Always stay in character and keep responses natural and appropriate
 
 👤 STUDENT LEVEL: ${level}
 - Adapt language complexity to match their level
@@ -435,7 +446,13 @@ ${scenarioContext}
 Evaluate each student response on:
 1. **Grammar** - Identify errors and explain corrections
 2. **Natural Expression** - Show how a native speaker would say it
-3. **Scenario Progress** - How well they're moving towards the goal
+3. **Scenario Progress** - How well they're moving towards the goal (0-100 score)
+
+Scoring guide:
+- 0-30: Off-topic or grammatically poor, not progressing
+- 31-60: On-topic but needs improvement, slight progress
+- 61-85: Good response, clear progress towards goal
+- 86-100: Excellent, significant progress or goal achieved
 
 ⚠️ IMPORTANT:
 - Keep the main storyline clear and guide towards the goal

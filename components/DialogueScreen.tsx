@@ -13,6 +13,7 @@ import {
   Copy,
   Phone,
   PhoneOff,
+  ChevronRight,
 } from 'lucide-react';
 import { Scenario, DialogueLine, UserLevel } from '@/lib/types';
 import { storage } from '@/lib/utils/storage';
@@ -54,6 +55,8 @@ export default function DialogueScreen({
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const autoPlayAudioRef = useRef(false);
   const lastPlayedMessageIdRef = useRef<string | null>(null);
+  // 反馈面板展开/收起状态
+  const [expandedFeedbacks, setExpandedFeedbacks] = useState<Set<string>>(new Set());
 
   // 检测对话目标完成的通用函数
   // 打字动画效果 - 逐字显示AI响应
@@ -141,9 +144,10 @@ export default function DialogueScreen({
     };
   }, []);
 
-  const checkGoalCompletion = useCallback((text: string) => {
+  const checkGoalCompletion = useCallback((text: string, userScore?: number) => {
     conversationTextRef.current += ' ' + text;
     
+    // Check for completion phrases
     const completionPhrases = [
       'Have a great day!',
       'Enjoy your meal!',
@@ -153,40 +157,50 @@ export default function DialogueScreen({
       'Stay motivated!',
       'The doctor will see you soon!',
       'All done!',
-      'Your package is on its way!'
+      'Your package is on its way!',
+      scenario.completion_phrase || ''
     ];
 
     const isGoalComplete = completionPhrases.some(phrase => 
-      text.toLowerCase().includes(phrase.toLowerCase())
+      phrase && text.toLowerCase().includes(phrase.toLowerCase())
     );
 
     if (isGoalComplete && !showGoalComplete) {
       setShowGoalComplete(true);
       setGoalProgress(100);
-    } else if (!showGoalComplete) {
-      // 根据对话自然进展估算进度
-      const progressKeywords = [
-        { words: ['hello', 'hi', 'hey'], weight: 10 },
-        { words: ['yes', 'okay', 'sure', 'alright'], weight: 20 },
-        { words: ['please', 'could', 'would like'], weight: 15 },
-        { words: ['thank', 'thanks'], weight: 25 },
-        { words: ['perfect', 'great', 'good'], weight: 20 }
-      ];
+    } else if (!showGoalComplete && userScore !== undefined) {
+      // 基于AI评分智能更新进度
+      // 进度 = 对话轮次基础分 + 用户得分加成
+      const dialogueTurns = messages.filter(m => m.speaker === 'user').length + 1;
+      const turnsBonus = Math.min(dialogueTurns * 5, 30); // 每轮+5分，最多30分
       
-      const lowerText = conversationTextRef.current.toLowerCase();
-      let calculatedProgress = 0;
+      // 根据得分计算进度增量
+      let progressIncrement = 0;
+      if (userScore >= 86) {
+        progressIncrement = 15; // 优秀：大幅进步
+      } else if (userScore >= 61) {
+        progressIncrement = 10; // 良好：稳步前进
+      } else if (userScore >= 31) {
+        progressIncrement = 3;  // 尚可：轻微进步
+      } else {
+        progressIncrement = -5; // 偏离：进度倒退
+      }
       
-      progressKeywords.forEach(({ words, weight }) => {
-        if (words.some(word => lowerText.includes(word))) {
-          calculatedProgress = Math.min(calculatedProgress + weight, 90);
-        }
-      });
+      // 计算新进度（基础 + 增量，上限90%，避免过早到100%）
+      const baseProgress = turnsBonus;
+      let newProgress = Math.max(0, Math.min(goalProgress + progressIncrement, 90));
       
-      if (calculatedProgress > goalProgress) {
-        setGoalProgress(calculatedProgress);
+      // 如果是首轮，使用基础进度
+      if (dialogueTurns === 1) {
+        newProgress = Math.max(baseProgress, 15);
+      }
+      
+      // 平滑更新进度
+      if (newProgress !== goalProgress) {
+        setGoalProgress(newProgress);
       }
     }
-  }, [goalProgress, showGoalComplete]);
+  }, [goalProgress, showGoalComplete, messages, scenario.completion_phrase]);
 
   // Gemini Live Integration - 构建场景和NPC角色的系统指令
   const buildSystemInstruction = () => {
@@ -768,8 +782,8 @@ IMPORTANT:
         // Then trigger typing animation for better UX
         typeMessage(aiMessageId, result.next_response);
         
-        // Check goal completion in text chat mode
-        checkGoalCompletion(result.next_response);
+        // Check goal completion in text chat mode with user score
+        checkGoalCompletion(result.next_response, result.feedback?.score);
       } else {
         // No AI response, just update messages
         setMessages(updatedMessages);
@@ -783,10 +797,10 @@ IMPORTANT:
       // Save after each message exchange
       saveDialogueProgress(updatedMessages, result.is_finished);
 
-      if (result.is_finished) {
-        setTimeout(() => {
-          onFinish();
-        }, 2000);
+      // Show celebration instead of auto-exit when finished
+      if (result.is_finished && !showGoalComplete) {
+        setShowGoalComplete(true);
+        setGoalProgress(100);
       }
     } catch (error) {
       console.error('Dialogue error:', error);
@@ -1219,48 +1233,79 @@ IMPORTANT:
                   
                   if (!shouldShowFeedback) return null;
                   
+                  const isExpanded = expandedFeedbacks.has(msg.id);
+                  const hasDetails = hasGrammarIssues || hasNativeExpression;
+                  
                   return (
-                    <div className="mt-2 mr-1 max-w-full bg-white/60 border border-black/5 rounded-xl p-3 text-xs backdrop-blur-sm animate-in fade-in slide-in-from-top space-y-2">
-                      {/* Score and Title */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className={`w-1.5 h-1.5 rounded-full ${
-                              msg.feedback.score > 80 ? 'bg-green-500' : 'bg-orange-400'
-                            }`}
-                          />
-                          <span className="font-semibold text-gray-800">AI Feedback</span>
+                    <div className="mt-2 mr-1 max-w-full bg-white/60 border border-black/5 rounded-xl overflow-hidden text-xs backdrop-blur-sm animate-in fade-in slide-in-from-top">
+                      {/* Header - Always visible, clickable if has details */}
+                      <div 
+                        className={`flex items-center justify-between p-3 ${hasDetails ? 'cursor-pointer hover:bg-white/40 transition-colors' : ''}`}
+                        onClick={() => {
+                          if (hasDetails) {
+                            setExpandedFeedbacks(prev => {
+                              const newSet = new Set(prev);
+                              if (newSet.has(msg.id)) {
+                                newSet.delete(msg.id);
+                              } else {
+                                newSet.add(msg.id);
+                              }
+                              return newSet;
+                            });
+                          }
+                        }}
+                      >
+                        <div className="flex items-center gap-2 flex-1">
+                          <Lightbulb size={14} className="text-amber-500 flex-shrink-0" />
+                          <span className="font-semibold text-gray-800">
+                            {msg.feedback.score >= 86 ? 'Excellent!' : msg.feedback.score >= 61 ? 'Good Progress' : 'Keep Trying'}
+                          </span>
+                          <span className="text-[10px] font-medium text-gray-500 ml-auto">{msg.feedback.score}/100</span>
                         </div>
-                        <span className="text-[10px] font-medium text-gray-500">{msg.feedback.score}/100</span>
+                        {hasDetails && (
+                          <ChevronRight 
+                            size={16} 
+                            className={`text-gray-400 ml-2 flex-shrink-0 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                          />
+                        )}
                       </div>
                       
-                      {/* Main Comment */}
-                      <p className="text-gray-700 leading-relaxed">{msg.feedback.comment}</p>
-                      
-                      {/* Grammar Analysis */}
-                      {hasGrammarIssues && (
-                        <div className="pt-2 border-t border-gray-200/50">
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
-                              <path d="M12 20h9"></path>
-                              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-                            </svg>
-                            <span className="font-semibold text-gray-700 text-[10px] uppercase tracking-wide">Grammar</span>
-                          </div>
-                          <p className="text-gray-600">{msg.feedback.grammar}</p>
+                      {/* Expandable content */}
+                      <div 
+                        className={`transition-all duration-300 ease-in-out ${
+                          isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0 overflow-hidden'
+                        }`}
+                      >
+                        <div className="px-3 pb-3 space-y-2 border-t border-gray-200/50">
+                          {/* Main Comment */}
+                          <p className="text-gray-700 leading-relaxed pt-2">{msg.feedback.comment}</p>
+                          
+                          {/* Grammar Analysis */}
+                          {hasGrammarIssues && (
+                            <div className="pt-2 border-t border-gray-200/50">
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
+                                  <path d="M12 20h9"></path>
+                                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                                </svg>
+                                <span className="font-semibold text-gray-700 text-[10px] uppercase tracking-wide">Grammar</span>
+                              </div>
+                              <p className="text-gray-600">{msg.feedback.grammar}</p>
+                            </div>
+                          )}
+                          
+                          {/* Native Expression */}
+                          {hasNativeExpression && (
+                            <div className="pt-2 border-t border-gray-200/50">
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <span className="text-[10px]">💬</span>
+                                <span className="font-semibold text-gray-700 text-[10px] uppercase tracking-wide">Native Way</span>
+                              </div>
+                              <p className="text-gray-600 italic">"{msg.feedback.native_expression}"</p>
+                            </div>
+                          )}
                         </div>
-                      )}
-                      
-                      {/* Native Expression */}
-                      {hasNativeExpression && (
-                        <div className="pt-2 border-t border-gray-200/50">
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <span className="text-[10px]">💬</span>
-                            <span className="font-semibold text-gray-700 text-[10px] uppercase tracking-wide">Native Way</span>
-                          </div>
-                          <p className="text-gray-600 italic">"{msg.feedback.native_expression}"</p>
-                        </div>
-                      )}
+                      </div>
                     </div>
                   );
                 })()}
@@ -1485,53 +1530,91 @@ IMPORTANT:
 
       {/* Goal Complete Notification */}
       {showGoalComplete && (
-        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top fade-in duration-500">
-          <div className="relative">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm animate-in fade-in duration-300">
+          {/* Confetti particles */}
+          <div className="absolute inset-0 overflow-hidden pointer-events-none">
+            {[...Array(20)].map((_, i) => (
+              <div
+                key={i}
+                className="absolute confetti-fall"
+                style={{
+                  left: `${Math.random() * 100}%`,
+                  top: `-${Math.random() * 20}%`,
+                  width: '8px',
+                  height: '8px',
+                  backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6'][Math.floor(Math.random() * 5)],
+                  borderRadius: Math.random() > 0.5 ? '50%' : '0',
+                  animationDelay: `${Math.random() * 3}s`,
+                  animationDuration: `${2 + Math.random() * 2}s`,
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Celebration card */}
+          <div className="relative max-w-sm mx-4 animate-in zoom-in duration-500">
             {/* Glow effect */}
-            <div className="absolute inset-0 bg-green-500/30 blur-2xl rounded-3xl"></div>
+            <div className="absolute inset-0 bg-green-500/30 blur-3xl rounded-3xl animate-pulse"></div>
             
             {/* Main card */}
-            <div className="relative bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-2xl p-4 pr-5 shadow-2xl border border-green-400/50 backdrop-blur-xl min-w-[280px]">
-              {/* Close button */}
-              <button
-                onClick={() => setShowGoalComplete(false)}
-                className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
-              >
-                <X size={14} strokeWidth={2.5} />
-              </button>
-
-              {/* Success icon */}
-              <div className="flex items-start gap-3">
-                <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0 animate-bounce">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                  </svg>
+            <div className="relative bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-3xl p-6 shadow-2xl border-2 border-green-400/50 backdrop-blur-xl">
+              {/* Success icon with ping animation */}
+              <div className="flex justify-center mb-4">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-white/30 rounded-full animate-ping"></div>
+                  <div className="relative w-20 h-20 rounded-full bg-white/20 flex items-center justify-center animate-bounce">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                      <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
+                  </div>
                 </div>
+              </div>
 
-                <div className="flex-1 pt-1">
-                  <h4 className="font-bold text-base mb-1">Goal Achieved!</h4>
-                  <p className="text-sm text-white/90 leading-relaxed mb-3">
-                    {isLiveActive 
-                      ? 'Conversation completed successfully. You can end the call now.'
-                      : 'Conversation completed successfully!'}
-                  </p>
+              {/* Message */}
+              <div className="text-center mb-6">
+                <h2 className="text-2xl font-bold mb-2">🎉 Goal Achieved!</h2>
+                <p className="text-white/90 text-sm leading-relaxed">
+                  {isLiveActive 
+                    ? 'Excellent work! You successfully completed the conversation.'
+                    : 'Congratulations! You completed all the goals successfully.'}
+                </p>
+              </div>
 
-                  {/* Action button */}
-                  {isLiveActive && (
+              {/* Action buttons */}
+              <div className="space-y-2">
+                {isLiveActive ? (
+                  <button
+                    onClick={() => {
+                      stopLiveSession();
+                      setIsLiveActive(false);
+                      setShowGoalComplete(false);
+                    }}
+                    className="w-full bg-white/90 hover:bg-white text-green-600 font-semibold py-3 px-4 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2"
+                  >
+                    <PhoneOff size={18} strokeWidth={2.5} />
+                    <span>End Call</span>
+                  </button>
+                ) : (
+                  <>
                     <button
                       onClick={() => {
-                        stopLiveSession();
-                        setIsLiveActive(false);
                         setShowGoalComplete(false);
                       }}
-                      className="w-full bg-white/20 hover:bg-white/30 active:bg-white/40 text-white font-semibold py-2.5 px-4 rounded-xl transition-all backdrop-blur-sm border border-white/30 flex items-center justify-center gap-2"
+                      className="w-full bg-white/20 hover:bg-white/30 text-white font-semibold py-3 px-4 rounded-xl transition-all border border-white/30 backdrop-blur-sm"
                     >
-                      <PhoneOff size={16} strokeWidth={2.5} />
-                      <span>End Call</span>
+                      Continue Chatting
                     </button>
-                  )}
-                </div>
+                    <button
+                      onClick={() => {
+                        onFinish();
+                      }}
+                      className="w-full bg-white/90 hover:bg-white text-green-600 font-semibold py-3 px-4 rounded-xl transition-all shadow-lg"
+                    >
+                      View Results
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>
