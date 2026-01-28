@@ -343,7 +343,8 @@ export default function CameraScreen({
         const tempCtx = tempCanvas.getContext('2d');
         tempCtx?.drawImage(canvasRef.current, 0, 0, w, h);
 
-        onCapture(tempCanvas.toDataURL('image/jpeg', 0.7), location);
+        // 优化：使用更高效的压缩质量，在质量和大小之间取得更好平衡
+        onCapture(tempCanvas.toDataURL('image/jpeg', 0.8), location);
       }
     }
   };

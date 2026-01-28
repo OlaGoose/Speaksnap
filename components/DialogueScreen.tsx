@@ -48,10 +48,46 @@ export default function DialogueScreen({
   const [showGoalComplete, setShowGoalComplete] = useState(false);
   const [conversationGoals, setConversationGoals] = useState<string[]>([]);
   const conversationTextRef = useRef<string>('');
+  // 打字动画状态
+  const [typingMessageId, setTypingMessageId] = useState<string | null>(null);
+  const [displayedText, setDisplayedText] = useState<string>('');
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const autoPlayAudioRef = useRef(false);
   const lastPlayedMessageIdRef = useRef<string | null>(null);
 
   // 检测对话目标完成的通用函数
+  // 打字动画效果 - 逐字显示AI响应
+  const typeMessage = useCallback((messageId: string, fullText: string) => {
+    setTypingMessageId(messageId);
+    setDisplayedText('');
+    
+    let currentIndex = 0;
+    const typeNextChar = () => {
+      if (currentIndex < fullText.length) {
+        setDisplayedText(fullText.slice(0, currentIndex + 1));
+        currentIndex++;
+        // 根据字符类型调整速度：标点符号稍慢，其他字符快速
+        const char = fullText[currentIndex - 1];
+        const delay = /[.,!?;:]/.test(char) ? 100 : 20;
+        typingTimeoutRef.current = setTimeout(typeNextChar, delay);
+      } else {
+        setTypingMessageId(null);
+        setDisplayedText('');
+      }
+    };
+    
+    typeNextChar();
+  }, []);
+
+  // 清理打字动画
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const checkGoalCompletion = useCallback((text: string) => {
     conversationTextRef.current += ' ' + text;
     
@@ -624,7 +660,9 @@ IMPORTANT:
     ]);
 
     try {
-      const history = messages.map((m) => ({
+      // 优化：只发送最近10轮对话（20条消息），大幅减少token消耗
+      const recentMessages = messages.slice(-20);
+      const history = recentMessages.map((m) => ({
         role: m.speaker === 'ai' ? 'model' : 'user',
         text: m.text,
       }));
@@ -658,23 +696,30 @@ IMPORTANT:
         ];
       }
 
-      // Add AI response
+      // Add AI response with typing animation
       if (result.next_response) {
+        const aiMessageId = (Date.now() + 1).toString();
         updatedMessages = [
           ...updatedMessages,
           {
-            id: (Date.now() + 1).toString(),
+            id: aiMessageId,
             speaker: 'ai' as const,
             text: result.next_response,
           },
         ];
         
+        // Update state first
+        setMessages(updatedMessages);
+        
+        // Then trigger typing animation for better UX
+        typeMessage(aiMessageId, result.next_response);
+        
         // Check goal completion in text chat mode
         checkGoalCompletion(result.next_response);
+      } else {
+        // No AI response, just update messages
+        setMessages(updatedMessages);
       }
-
-      // Update state
-      setMessages(updatedMessages);
 
       if (result.next_hints && result.next_hints.length > 0) {
         setHints(result.next_hints);
@@ -691,7 +736,21 @@ IMPORTANT:
       }
     } catch (error) {
       console.error('Dialogue error:', error);
-      alert('Failed to get response. Please try again.');
+      
+      // 更友好的错误提示
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const isNetworkError = errorMessage.includes('fetch') || errorMessage.includes('network');
+      
+      if (isNetworkError) {
+        alert('⚠️ Network connection issue. Please check your internet and try again.');
+      } else {
+        alert('❌ Failed to get AI response. Please try again.\n\nIf the problem persists, try refreshing the page.');
+      }
+      
+      // 移除失败的用户消息，让用户可以重新发送
+      setMessages((prev) => prev.filter((m) => m.id !== userMsgId));
+      // 恢复输入框内容
+      setInputValue(textToSend);
     } finally {
       setIsProcessing(false);
     }
@@ -1155,7 +1214,12 @@ IMPORTANT:
             ) : (
               <div className="flex flex-col items-start max-w-[90%]">
                 <div className="message-text text-[#191D20] text-[15px] font-medium leading-relaxed px-1 selection:bg-blue-200 selection:text-black">
-                  {msg.text}
+                  {/* 显示打字动画或完整文本 */}
+                  {typingMessageId === msg.id ? displayedText : msg.text}
+                  {/* 打字光标 */}
+                  {typingMessageId === msg.id && (
+                    <span className="inline-block w-[2px] h-[1.2em] bg-blue-500 ml-0.5 animate-pulse" />
+                  )}
                 </div>
               </div>
             )}
@@ -1163,8 +1227,17 @@ IMPORTANT:
         ))}
 
         {isProcessing && (
-          <div className="flex items-start px-1 animate-pulse">
-            <div className="text-gray-400 text-sm font-medium">Thinking...</div>
+          <div className="flex items-start gap-2 px-1">
+            <div className="flex items-center gap-2 bg-gradient-to-r from-blue-50 to-purple-50 rounded-2xl px-4 py-2.5 shadow-sm border border-blue-100/50">
+              <div className="flex gap-1">
+                <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+              <span className="text-sm font-medium bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                AI is thinking...
+              </span>
+            </div>
           </div>
         )}
 
@@ -1526,12 +1599,22 @@ IMPORTANT:
             )}
           </div>
 
+          {/* 字符计数提示（长文本时显示） */}
+          {inputValue.length > 100 && (
+            <span className={`text-[10px] font-medium transition-colors ${
+              inputValue.length > 200 ? 'text-orange-500' : 'text-gray-400'
+            }`}>
+              {inputValue.length}
+            </span>
+          )}
+
           <button
             onClick={handleVoiceInput}
             disabled={!isVoiceSupported}
+            title={isRecording ? 'Stop recording' : 'Start voice input'}
             className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed ${
               isRecording
-                ? 'bg-blue-500 text-white scale-110 shadow-lg shadow-blue-500/30'
+                ? 'bg-blue-500 text-white scale-110 shadow-lg shadow-blue-500/30 animate-pulse'
                 : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600 active:scale-95'
             }`}
           >
@@ -1540,17 +1623,26 @@ IMPORTANT:
 
           <button
             onClick={handleSend}
-            disabled={!inputValue.trim()}
+            disabled={!inputValue.trim() || isProcessing}
             className={`
-              flex items-center justify-center h-9 px-4 rounded-lg text-sm font-bold transition-all
+              flex items-center justify-center gap-2 h-9 px-4 rounded-lg text-sm font-bold transition-all
               ${
-                inputValue.trim()
+                isProcessing
+                  ? 'bg-gray-300 text-gray-500 cursor-wait'
+                  : inputValue.trim()
                   ? 'bg-black text-white shadow-md hover:bg-gray-800 active:scale-95'
                   : 'bg-gray-100 text-gray-400 cursor-not-allowed'
               }
             `}
           >
-            <span>Go</span>
+            {isProcessing ? (
+              <>
+                <Loader2 size={14} className="animate-spin" />
+                <span>Sending...</span>
+              </>
+            ) : (
+              <span>Go</span>
+            )}
           </button>
         </div>
       </div>

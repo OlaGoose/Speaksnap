@@ -871,19 +871,26 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
         <button
           onClick={handleAnalyze}
           disabled={!text.trim() || isAnalyzing}
-          className="w-full h-14 bg-gradient-to-r from-gray-900 to-black text-white rounded-2xl font-semibold text-base shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:scale-100 hover:shadow-xl active:scale-[0.98] transition-all border border-white/10"
+          className="w-full h-14 bg-gradient-to-r from-gray-900 to-black text-white rounded-2xl font-semibold text-base shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 disabled:scale-100 disabled:cursor-not-allowed hover:shadow-xl active:scale-[0.98] transition-all border border-white/10 relative overflow-hidden"
         >
-          {isAnalyzing ? (
-            <>
-              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              <span>Analyzing...</span>
-            </>
-          ) : (
-            <>
-              <Sparkles size={18} className="text-yellow-300" />
-              <span>Analyze & Improve</span>
-            </>
+          {/* 分析时的动态背景 */}
+          {isAnalyzing && (
+            <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-purple-600/20 to-blue-600/20 animate-pulse" />
           )}
+          
+          <div className="relative flex items-center gap-2">
+            {isAnalyzing ? (
+              <>
+                <Loader2 size={18} className="animate-spin text-blue-300" />
+                <span>Analyzing with AI...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles size={18} className="text-yellow-300" />
+                <span>Analyze & Improve</span>
+              </>
+            )}
+          </div>
         </button>
       </div>
 
