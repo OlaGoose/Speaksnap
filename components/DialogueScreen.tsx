@@ -411,7 +411,7 @@ IMPORTANT:
       {
         id: '1',
         speaker: 'ai' as const,
-        text: `Hello! Welcome to ${scenario.location}. ${scenario.situation}`,
+        text: '',
       },
     ];
     setMessages(initialMessages);
@@ -1531,26 +1531,6 @@ IMPORTANT:
       {/* Goal Complete Notification */}
       {showGoalComplete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm animate-in fade-in duration-300">
-          {/* Confetti particles */}
-          <div className="absolute inset-0 overflow-hidden pointer-events-none">
-            {[...Array(20)].map((_, i) => (
-              <div
-                key={i}
-                className="absolute confetti-fall"
-                style={{
-                  left: `${Math.random() * 100}%`,
-                  top: `-${Math.random() * 20}%`,
-                  width: '8px',
-                  height: '8px',
-                  backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6'][Math.floor(Math.random() * 5)],
-                  borderRadius: Math.random() > 0.5 ? '50%' : '0',
-                  animationDelay: `${Math.random() * 3}s`,
-                  animationDuration: `${2 + Math.random() * 2}s`,
-                }}
-              />
-            ))}
-          </div>
-
           {/* Celebration card */}
           <div className="relative max-w-sm mx-4 animate-in zoom-in duration-500">
             {/* Glow effect */}
@@ -1562,7 +1542,7 @@ IMPORTANT:
               <div className="flex justify-center mb-4">
                 <div className="relative">
                   <div className="absolute inset-0 bg-white/30 rounded-full animate-ping"></div>
-                  <div className="relative w-20 h-20 rounded-full bg-white/20 flex items-center justify-center animate-bounce">
+                  <div className="relative w-20 h-20 rounded-full bg-white/20 flex items-center justify-center">
                     <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                       <polyline points="22 4 12 14.01 9 11.01"></polyline>
