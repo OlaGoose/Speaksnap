@@ -44,6 +44,58 @@ export default function DialogueScreen({
   const [autoPlayAudio, setAutoPlayAudio] = useState(false);
   const [showAudioToast, setShowAudioToast] = useState(false);
   const [isLiveActive, setIsLiveActive] = useState(false);
+  const [goalProgress, setGoalProgress] = useState<number>(0);
+  const [showGoalComplete, setShowGoalComplete] = useState(false);
+  const [conversationGoals, setConversationGoals] = useState<string[]>([]);
+  const conversationTextRef = useRef<string>('');
+
+  // 检测对话目标完成的通用函数
+  const checkGoalCompletion = useCallback((text: string) => {
+    conversationTextRef.current += ' ' + text;
+    
+    const completionPhrases = [
+      'Have a great day!',
+      'Enjoy your meal!',
+      'Have a safe flight!',
+      'Enjoy your stay!',
+      'Happy reading!',
+      'Stay motivated!',
+      'The doctor will see you soon!',
+      'All done!',
+      'Your package is on its way!'
+    ];
+
+    const isGoalComplete = completionPhrases.some(phrase => 
+      text.toLowerCase().includes(phrase.toLowerCase())
+    );
+
+    if (isGoalComplete && !showGoalComplete) {
+      setShowGoalComplete(true);
+      setGoalProgress(100);
+    } else if (!showGoalComplete) {
+      // 根据对话自然进展估算进度
+      const progressKeywords = [
+        { words: ['hello', 'hi', 'hey'], weight: 10 },
+        { words: ['yes', 'okay', 'sure', 'alright'], weight: 20 },
+        { words: ['please', 'could', 'would like'], weight: 15 },
+        { words: ['thank', 'thanks'], weight: 25 },
+        { words: ['perfect', 'great', 'good'], weight: 20 }
+      ];
+      
+      const lowerText = conversationTextRef.current.toLowerCase();
+      let calculatedProgress = 0;
+      
+      progressKeywords.forEach(({ words, weight }) => {
+        if (words.some(word => lowerText.includes(word))) {
+          calculatedProgress = Math.min(calculatedProgress + weight, 90);
+        }
+      });
+      
+      if (calculatedProgress > goalProgress) {
+        setGoalProgress(calculatedProgress);
+      }
+    }
+  }, [goalProgress, showGoalComplete]);
 
   // Gemini Live Integration - 构建场景和NPC角色的系统指令
   const buildSystemInstruction = () => {
@@ -60,6 +112,71 @@ export default function DialogueScreen({
       'Bank': 'a professional bank teller',
       'Post Office': 'a helpful post office clerk',
     }[scenario.location] || 'a helpful assistant';
+
+    // 定义场景目标
+    const scenarioGoals = {
+      'Coffee Shop': {
+        goals: ['Take order', 'Confirm preferences', 'Process payment'],
+        completion: 'Your order is ready! Have a great day!',
+        steps: 'Guide the user through: 1) Greeting and asking what they want, 2) Confirming size/customization, 3) Mentioning the price and payment method'
+      },
+      'Restaurant': {
+        goals: ['Seat customer', 'Take order', 'Handle special requests'],
+        completion: 'Your order will be right out! Enjoy your meal!',
+        steps: 'Guide the user through: 1) Welcome and seating, 2) Menu recommendations and taking order, 3) Confirming special dietary needs or preferences'
+      },
+      'Airport': {
+        goals: ['Check-in', 'Luggage handling', 'Gate information'],
+        completion: 'You\'re all set! Have a safe flight!',
+        steps: 'Guide the user through: 1) Checking booking details, 2) Luggage weight and tags, 3) Providing boarding pass and gate info'
+      },
+      'Hotel': {
+        goals: ['Check-in', 'Room preferences', 'Hotel amenities'],
+        completion: 'Your room is ready! Enjoy your stay!',
+        steps: 'Guide the user through: 1) Verifying reservation, 2) Confirming room type and preferences, 3) Explaining hotel facilities and WiFi'
+      },
+      'Supermarket': {
+        goals: ['Find items', 'Provide directions', 'Checkout assistance'],
+        completion: 'Found everything you need! Have a nice day!',
+        steps: 'Guide the user through: 1) Asking what they\'re looking for, 2) Directing them to aisles, 3) Offering help with checkout or bags'
+      },
+      'Library': {
+        goals: ['Book search', 'Library card', 'Return information'],
+        completion: 'All set! Happy reading!',
+        steps: 'Guide the user through: 1) Finding the book they need, 2) Checking out with library card, 3) Explaining due dates and return process'
+      },
+      'Gym': {
+        goals: ['Membership check', 'Equipment guidance', 'Workout plan'],
+        completion: 'Great workout plan! Stay motivated!',
+        steps: 'Guide the user through: 1) Checking membership status, 2) Showing equipment locations, 3) Suggesting workout routines based on their goals'
+      },
+      'Hospital': {
+        goals: ['Check-in', 'Insurance verification', 'Department directions'],
+        completion: 'You\'re all checked in! The doctor will see you soon!',
+        steps: 'Guide the user through: 1) Patient information and reason for visit, 2) Verifying insurance, 3) Directing to the correct department'
+      },
+      'Bank': {
+        goals: ['Account inquiry', 'Transaction processing', 'Documentation'],
+        completion: 'Transaction complete! Is there anything else I can help you with?',
+        steps: 'Guide the user through: 1) Verifying identity and account, 2) Processing transaction (deposit/withdrawal/transfer), 3) Providing receipts or confirmations'
+      },
+      'Post Office': {
+        goals: ['Package details', 'Shipping options', 'Payment'],
+        completion: 'Your package is on its way! Have a great day!',
+        steps: 'Guide the user through: 1) Getting package information (destination, weight), 2) Offering shipping options (speed, tracking), 3) Processing payment'
+      }
+    };
+
+    const currentScenario = scenarioGoals[scenario.location as keyof typeof scenarioGoals] || {
+      goals: ['Assist customer', 'Answer questions', 'Complete transaction'],
+      completion: 'All done! Have a great day!',
+      steps: 'Guide the conversation naturally toward completing the customer\'s needs'
+    };
+
+    // 保存目标用于UI显示
+    if (conversationGoals.length === 0) {
+      setConversationGoals(currentScenario.goals);
+    }
 
     const instruction = `You are ${npcRole}. 
 
@@ -78,151 +195,19 @@ USER LEVEL: ${userLevel}
 - Intermediate: Use everyday vocabulary with some idiomatic expressions
 - Advanced: Use natural native expressions and varied vocabulary
 
-CONVERSATION GOAL:
-- Actively guide the user to complete the scenario goal: ${scenario.context}
-- Ask relevant questions to move the conversation forward
-- Provide helpful information and suggestions
-- When the main objective is accomplished (e.g., order placed, reservation made, information provided), politely wrap up the conversation
-- Call the "end_conversation" function when:
-  * The scenario goal has been achieved
-  * The user explicitly wants to end the conversation
-  * The conversation has naturally reached a conclusion
+CONVERSATION GOALS:
+${currentScenario.steps}
 
 IMPORTANT:
 - Keep responses brief and natural (like real conversation)
 - Don't over-explain unless asked
 - React naturally to what the user says
-- Be proactive in achieving the conversation goal
-- End gracefully with a friendly goodbye before calling end_conversation`;
+- Actively guide the conversation toward completing the goals
+- When all goals are accomplished, end with: "${currentScenario.completion}"
+- This completion phrase signals the conversation objective is complete`;
 
     return instruction;
   };
-
-  // Define the end_conversation tool for Live API
-  const liveTools = [
-    {
-      functionDeclarations: [
-        {
-          name: "end_conversation",
-          description: "Call this function when the conversation goal has been achieved or the user wants to end the conversation. This will gracefully end the live voice call.",
-          parameters: {
-            type: "object",
-            properties: {
-              reason: {
-                type: "string",
-                description: "Brief reason for ending the conversation (e.g., 'goal achieved', 'user requested', 'natural conclusion')"
-              },
-              summary: {
-                type: "string",
-                description: "A one-sentence summary of what was accomplished in the conversation"
-              }
-            },
-            required: ["reason", "summary"]
-          }
-        }
-      ]
-    }
-  ];
-
-  // Handle live text transcript
-  const handleLiveText = useCallback((text: string, role: 'user' | 'model') => {
-    const newMessage: DialogueLine = {
-      id: `live_${Date.now()}_${Math.random()}`,
-      speaker: role === 'user' ? 'user' : 'ai',
-      text: text,
-    };
-    
-    setMessages(prev => {
-      // Avoid duplicate messages
-      const lastMessage = prev[prev.length - 1];
-      if (lastMessage && lastMessage.text === text && lastMessage.speaker === newMessage.speaker) {
-        return prev;
-      }
-      return [...prev, newMessage];
-    });
-  }, []);
-
-  // Handle function calls from Live API
-  const handleFunctionCall = useCallback((functionName: string, args: any) => {
-    console.log(`Function called: ${functionName}`, args);
-    
-    if (functionName === 'end_conversation') {
-      // AI decided to end the conversation
-      const { reason, summary } = args;
-      
-      // Add a system message about the conversation ending
-      const endMessage: DialogueLine = {
-        id: `end_${Date.now()}`,
-        speaker: 'ai',
-        text: `Thank you for the conversation! ${summary || 'Have a great day!'}`,
-      };
-      
-      setMessages(prev => {
-        const updatedMessages = [...prev, endMessage];
-        
-        // Wait a moment for the message to be added, then disconnect
-        setTimeout(() => {
-          // Save the conversation
-          try {
-            const scenarios = storage.getItem<Scenario[]>('speakSnapScenarios') || [];
-            const scenarioIndex = scenarios.findIndex((s: Scenario) => s.id === scenario.id);
-            
-            if (scenarioIndex !== -1) {
-              const userMessagesWithFeedback = updatedMessages.filter(
-                (m) => m.speaker === 'user' && m.feedback?.score
-              );
-              const avgScore = userMessagesWithFeedback.length > 0
-                ? userMessagesWithFeedback.reduce((sum, m) => sum + (m.feedback!.score), 0) / userMessagesWithFeedback.length
-                : 0;
-              
-              const dialogueRecord = {
-                id: currentDialogueId,
-                messages: updatedMessages,
-                timestamp: Date.now(),
-                user_level: userLevel,
-                is_completed: true,
-                average_score: Math.round(avgScore),
-              };
-              
-              const dialogues = scenarios[scenarioIndex].dialogues || [];
-              const dialogueIndex = dialogues.findIndex((d: any) => d.id === currentDialogueId);
-              
-              if (dialogueIndex === -1) {
-                dialogues.unshift(dialogueRecord);
-              } else {
-                dialogues[dialogueIndex] = dialogueRecord;
-              }
-              
-              const completedDialogues = dialogues.filter((d: any) => d.is_completed);
-              scenarios[scenarioIndex].dialogues = dialogues;
-              scenarios[scenarioIndex].total_attempts = completedDialogues.length;
-              scenarios[scenarioIndex].best_score = Math.max(
-                ...completedDialogues.map((d: any) => d.average_score || 0),
-                0
-              );
-              scenarios[scenarioIndex].last_practiced = Date.now();
-              
-              storage.setItem('speakSnapScenarios', scenarios);
-            }
-          } catch (error) {
-            console.error('Failed to save conversation:', error);
-          }
-          
-          // Now safe to call hook methods
-          setIsLiveActive(false);
-          
-          // Show a toast notification
-          const toast = document.createElement('div');
-          toast.className = 'fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white px-6 py-3 rounded-full shadow-2xl font-semibold animate-in fade-in slide-in-from-top';
-          toast.textContent = `✓ Conversation completed: ${reason}`;
-          document.body.appendChild(toast);
-          setTimeout(() => toast.remove(), 3000);
-        }, 500);
-        
-        return updatedMessages;
-      });
-    }
-  }, [scenario.id, currentDialogueId, userLevel]);
 
   const { 
     isActive: geminiLiveActive, 
@@ -234,7 +219,6 @@ IMPORTANT:
     apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY || '',
     systemInstruction: buildSystemInstruction(),
     voiceName: 'Kore', // 可以根据场景选择不同声音：Puck, Charon, Kore, Fenrir, Aoide
-    tools: liveTools,
     onError: (err) => {
       console.error("Gemini Live Error:", err);
       setIsLiveActive(false);
@@ -242,88 +226,26 @@ IMPORTANT:
     onInterrupted: () => {
       console.log("AI was interrupted by user");
     },
-    onTextReceived: handleLiveText,
-    onFunctionCall: handleFunctionCall,
+    onTextReceived: (text) => {
+      checkGoalCompletion(text);
+    }
   });
 
-  const handleToggleLive = useCallback(() => {
+  const handleToggleLive = () => {
     if (isLiveActive) {
-      // Manually ending the call
-      const endMessage: DialogueLine = {
-        id: `end_${Date.now()}`,
-        speaker: 'ai',
-        text: 'Live call ended. Feel free to continue typing if you need anything else!',
-      };
-      
-      setMessages(prev => {
-        const updatedMessages = [...prev, endMessage];
-        
-        // Save conversation when manually ending
-        setTimeout(() => {
-          try {
-            const scenarios = storage.getItem<Scenario[]>('speakSnapScenarios') || [];
-            const scenarioIndex = scenarios.findIndex((s: Scenario) => s.id === scenario.id);
-            
-            if (scenarioIndex !== -1) {
-              const userMessagesWithFeedback = updatedMessages.filter(
-                (m) => m.speaker === 'user' && m.feedback?.score
-              );
-              const avgScore = userMessagesWithFeedback.length > 0
-                ? userMessagesWithFeedback.reduce((sum, m) => sum + (m.feedback!.score), 0) / userMessagesWithFeedback.length
-                : 0;
-              
-              const dialogueRecord = {
-                id: currentDialogueId,
-                messages: updatedMessages,
-                timestamp: Date.now(),
-                user_level: userLevel,
-                is_completed: false,
-                average_score: Math.round(avgScore),
-              };
-              
-              const dialogues = scenarios[scenarioIndex].dialogues || [];
-              const dialogueIndex = dialogues.findIndex((d: any) => d.id === currentDialogueId);
-              
-              if (dialogueIndex === -1) {
-                dialogues.unshift(dialogueRecord);
-              } else {
-                dialogues[dialogueIndex] = dialogueRecord;
-              }
-              
-              const completedDialogues = dialogues.filter((d: any) => d.is_completed);
-              scenarios[scenarioIndex].dialogues = dialogues;
-              scenarios[scenarioIndex].total_attempts = completedDialogues.length;
-              scenarios[scenarioIndex].best_score = Math.max(
-                ...completedDialogues.map((d: any) => d.average_score || 0),
-                0
-              );
-              scenarios[scenarioIndex].last_practiced = Date.now();
-              
-              storage.setItem('speakSnapScenarios', scenarios);
-            }
-          } catch (error) {
-            console.error('Failed to save conversation:', error);
-          }
-        }, 100);
-        
-        return updatedMessages;
-      });
-      
       stopLiveSession();
       setIsLiveActive(false);
+      setGoalProgress(0);
+      setShowGoalComplete(false);
+      conversationTextRef.current = '';
     } else {
-      // Starting live call
-      const startMessage: DialogueLine = {
-        id: `start_${Date.now()}`,
-        speaker: 'ai',
-        text: '🎙️ Live voice call started. Speak naturally, I\'m listening!',
-      };
-      setMessages(prev => [...prev, startMessage]);
-      
       startLiveSession();
       setIsLiveActive(true);
+      setGoalProgress(0);
+      setShowGoalComplete(false);
+      conversationTextRef.current = '';
     }
-  }, [isLiveActive, stopLiveSession, startLiveSession, scenario.id, currentDialogueId, userLevel]);
+  };
 
   // Selection State
   const [selectionMenu, setSelectionMenu] = useState<{
@@ -388,62 +310,6 @@ IMPORTANT:
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isProcessing]);
-
-  // Auto-save during live conversation
-  useEffect(() => {
-    if (isLiveActive && messages.length > 0) {
-      // Debounce saves during live mode
-      const saveTimer = setTimeout(() => {
-        try {
-          const scenarios = storage.getItem<Scenario[]>('speakSnapScenarios') || [];
-          const scenarioIndex = scenarios.findIndex((s: Scenario) => s.id === scenario.id);
-          
-          if (scenarioIndex !== -1) {
-            const userMessagesWithFeedback = messages.filter(
-              (m) => m.speaker === 'user' && m.feedback?.score
-            );
-            const avgScore = userMessagesWithFeedback.length > 0
-              ? userMessagesWithFeedback.reduce((sum, m) => sum + (m.feedback!.score), 0) / userMessagesWithFeedback.length
-              : 0;
-            
-            const dialogueRecord = {
-              id: currentDialogueId,
-              messages: messages,
-              timestamp: Date.now(),
-              user_level: userLevel,
-              is_completed: false,
-              average_score: Math.round(avgScore),
-            };
-            
-            const dialogues = scenarios[scenarioIndex].dialogues || [];
-            const dialogueIndex = dialogues.findIndex((d: any) => d.id === currentDialogueId);
-            
-            if (dialogueIndex === -1) {
-              dialogues.unshift(dialogueRecord);
-            } else {
-              dialogues[dialogueIndex] = dialogueRecord;
-            }
-            
-            const completedDialogues = dialogues.filter((d: any) => d.is_completed);
-            scenarios[scenarioIndex].dialogues = dialogues;
-            scenarios[scenarioIndex].total_attempts = completedDialogues.length;
-            scenarios[scenarioIndex].best_score = Math.max(
-              ...completedDialogues.map((d: any) => d.average_score || 0),
-              0
-            );
-            scenarios[scenarioIndex].last_practiced = Date.now();
-            
-            storage.setItem('speakSnapScenarios', scenarios);
-            console.log('✅ Auto-saved live conversation');
-          }
-        } catch (error) {
-          console.error('Failed to auto-save:', error);
-        }
-      }, 2000); // Save 2 seconds after last message
-      
-      return () => clearTimeout(saveTimer);
-    }
-  }, [isLiveActive, messages, scenario.id, currentDialogueId, userLevel]);
 
   // Disable browser native text selection toolbar on mobile
   useEffect(() => {
@@ -729,6 +595,9 @@ IMPORTANT:
             text: result.next_response,
           },
         ];
+        
+        // Check goal completion in text chat mode
+        checkGoalCompletion(result.next_response);
         
         // Auto-play AI response if enabled
         if (autoPlayAudio) {
@@ -1085,6 +954,66 @@ IMPORTANT:
               {scenario.situation}
             </p>
           </div>
+
+          {/* Conversation Goals - Only show when Live is active */}
+          {isLiveActive && conversationGoals.length > 0 && (
+            <div className="mt-6 w-full max-w-sm animate-in fade-in slide-in-from-top duration-500">
+              <div className="bg-white/80 backdrop-blur-md rounded-2xl p-4 shadow-lg border border-gray-200/50">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                      </svg>
+                    </div>
+                    <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                      Conversation Goals
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                    {Math.round(goalProgress)}%
+                  </span>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mb-3">
+                  <div 
+                    className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-700 ease-out"
+                    style={{ width: `${goalProgress}%` }}
+                  ></div>
+                </div>
+
+                {/* Goals List */}
+                <div className="space-y-2">
+                  {conversationGoals.map((goal, idx) => {
+                    const isComplete = goalProgress >= ((idx + 1) / conversationGoals.length) * 100;
+                    return (
+                      <div key={idx} className="flex items-center gap-2 text-xs">
+                        <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
+                          isComplete 
+                            ? 'bg-green-500' 
+                            : 'bg-gray-200'
+                        }`}>
+                          {isComplete && (
+                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12"></polyline>
+                            </svg>
+                          )}
+                        </div>
+                        <span className={`transition-colors duration-300 ${
+                          isComplete ? 'text-gray-700 font-medium' : 'text-gray-500'
+                        }`}>
+                          {goal}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Messages */}
@@ -1362,6 +1291,57 @@ IMPORTANT:
         </div>
       )}
 
+      {/* Goal Complete Notification */}
+      {showGoalComplete && isLiveActive && (
+        <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top fade-in duration-500">
+          <div className="relative">
+            {/* Glow effect */}
+            <div className="absolute inset-0 bg-green-500/30 blur-2xl rounded-3xl"></div>
+            
+            {/* Main card */}
+            <div className="relative bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-2xl p-4 pr-5 shadow-2xl border border-green-400/50 backdrop-blur-xl min-w-[280px]">
+              {/* Close button */}
+              <button
+                onClick={() => setShowGoalComplete(false)}
+                className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors"
+              >
+                <X size={14} strokeWidth={2.5} />
+              </button>
+
+              {/* Success icon */}
+              <div className="flex items-start gap-3">
+                <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0 animate-bounce">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                  </svg>
+                </div>
+
+                <div className="flex-1 pt-1">
+                  <h4 className="font-bold text-base mb-1">Goal Achieved!</h4>
+                  <p className="text-sm text-white/90 leading-relaxed mb-3">
+                    Conversation completed successfully. You can end the call now.
+                  </p>
+
+                  {/* Action button */}
+                  <button
+                    onClick={() => {
+                      stopLiveSession();
+                      setIsLiveActive(false);
+                      setShowGoalComplete(false);
+                    }}
+                    className="w-full bg-white/20 hover:bg-white/30 active:bg-white/40 text-white font-semibold py-2.5 px-4 rounded-xl transition-all backdrop-blur-sm border border-white/30 flex items-center justify-center gap-2"
+                  >
+                    <PhoneOff size={16} strokeWidth={2.5} />
+                    <span>End Call</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Gemini Live Call Button - Floating Bottom Right */}
       <div className="absolute bottom-32 right-6 z-40">
         <button
@@ -1436,21 +1416,8 @@ IMPORTANT:
 
       {/* Bottom Input Area */}
       <div className="absolute bottom-0 left-0 right-0 bg-white p-3 pb-6 border-t border-black/5 z-40 rounded-t-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
-        {/* Live Mode Indicator */}
-        {isLiveActive && (
-          <div className="mb-3 bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-xl p-3 animate-in fade-in slide-in-from-bottom">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-              <span className="text-sm font-semibold text-red-900">Live Voice Mode Active</span>
-            </div>
-            <p className="text-xs text-red-700 mt-1 leading-relaxed">
-              Speak naturally - all conversation is being transcribed below. Tap the phone button to end the call.
-            </p>
-          </div>
-        )}
-        
         {/* Suggestions */}
-        {!isLiveActive && showSuggestions && hints.length > 0 && (
+        {showSuggestions && hints.length > 0 && (
           <div className="mb-3 flex flex-col animate-in slide-in-from-bottom fade-in">
             <div className="flex items-center justify-between px-1 mb-1.5">
               <div className="flex items-center gap-1.5 text-gray-500">
@@ -1483,9 +1450,7 @@ IMPORTANT:
 
         {/* Input Bar */}
         <div className={`w-full bg-white rounded-xl border transition-all flex items-center p-1.5 pl-4 gap-2 ${
-          isLiveActive
-            ? 'border-gray-200 opacity-50 cursor-not-allowed'
-            : isRecording 
+          isRecording 
             ? 'border-blue-300 shadow-[0_0_0_3px_rgba(59,130,246,0.1)]' 
             : 'border-gray-200 focus-within:border-gray-300 focus-within:shadow-sm'
         }`}>
@@ -1504,20 +1469,9 @@ IMPORTANT:
                 }
               }}
               onKeyDown={handleKeyDown}
-              disabled={isLiveActive}
-              placeholder={
-                isLiveActive 
-                  ? '🎙️ Using Live Voice Mode...' 
-                  : (inputValue || interimText) 
-                  ? '' 
-                  : (isRecording ? 'Listening...' : 'Ask the tutor...')
-              }
+              placeholder={(inputValue || interimText) ? '' : (isRecording ? 'Listening...' : 'Ask the tutor...')}
               className={`w-full bg-transparent text-[16px] outline-none min-w-0 leading-normal ${
-                isLiveActive 
-                  ? 'cursor-not-allowed' 
-                  : interimText 
-                  ? 'text-transparent caret-primary-900' 
-                  : 'text-primary-900 placeholder:text-gray-400'
+                interimText ? 'text-transparent caret-primary-900' : 'text-primary-900 placeholder:text-gray-400'
               }`}
             />
             {/* 可见的文本叠加层 - 带样式区分，防止溢出 */}
@@ -1534,7 +1488,7 @@ IMPORTANT:
 
           <button
             onClick={handleVoiceInput}
-            disabled={!isVoiceSupported || isLiveActive}
+            disabled={!isVoiceSupported}
             className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed ${
               isRecording
                 ? 'bg-blue-500 text-white scale-110 shadow-lg shadow-blue-500/30'
@@ -1546,11 +1500,11 @@ IMPORTANT:
 
           <button
             onClick={handleSend}
-            disabled={!inputValue.trim() || isLiveActive}
+            disabled={!inputValue.trim()}
             className={`
               flex items-center justify-center h-9 px-4 rounded-lg text-sm font-bold transition-all
               ${
-                inputValue.trim() && !isLiveActive
+                inputValue.trim()
                   ? 'bg-black text-white shadow-md hover:bg-gray-800 active:scale-95'
                   : 'bg-gray-100 text-gray-400 cursor-not-allowed'
               }
