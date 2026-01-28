@@ -886,8 +886,25 @@ IMPORTANT:
     <div className="flex flex-col h-full w-full bg-primary-50 relative overflow-hidden">
       {/* Header */}
       <div className="absolute top-0 left-0 right-0 z-30 flex justify-between items-start p-4 pt-6 bg-gradient-to-b from-primary-50 via-primary-50/90 to-transparent pointer-events-none">
-        {/* Auto-play Audio Toggle - Enhanced UI */}
-        <button
+        {/* Left side: Scenario Image + Auto button */}
+        <div className="flex items-center gap-3">
+          {/* Scenario Image - Small, top left */}
+          <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-md bg-white ring-2 ring-white transform transition-transform duration-300 hover:scale-105 pointer-events-auto">
+            {scenario.image_url ? (
+              <img
+                src={scenario.image_url}
+                alt={scenario.location}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full bg-gray-50 flex items-center justify-center text-gray-300">
+                <MapPin size={16} />
+              </div>
+            )}
+          </div>
+          
+          {/* Auto-play Audio Toggle - Enhanced UI */}
+          <button
           onClick={handleToggleAutoPlay}
           className={`relative group h-9 rounded-full flex items-center gap-2 transition-all duration-300 pointer-events-auto active:scale-95 touch-manipulation overflow-hidden ${
             autoPlayAudio 
@@ -930,9 +947,10 @@ IMPORTANT:
           <span className={`relative z-10 text-xs font-bold tracking-wide transition-all duration-300 ${
             autoPlayAudio ? 'opacity-100' : 'opacity-70 group-hover:opacity-100'
           }`}>
-            {autoPlayAudio ? 'Auto ON' : 'Auto OFF'}
+            {autoPlayAudio ? 'ON' : 'OFF'}
           </span>
         </button>
+        </div>
 
         <button
           onClick={onBack}
@@ -978,25 +996,6 @@ IMPORTANT:
 
         {/* Scenario Intro */}
         <div className="flex flex-col items-center justify-center w-full mb-8 animate-in fade-in slide-in-from-bottom duration-700">
-          <div className="relative mb-5">
-            <div className="w-24 h-24 rounded-[32px] overflow-hidden shadow-float bg-white ring-4 ring-white transform transition-transform duration-500 hover:scale-105">
-              {scenario.image_url ? (
-                <img
-                  src={scenario.image_url}
-                  alt={scenario.location}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full bg-gray-50 flex items-center justify-center text-gray-300">
-                  <MapPin size={24} />
-                </div>
-              )}
-            </div>
-            <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-1 shadow-sm">
-              <div className="w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-white animate-pulse" />
-            </div>
-          </div>
-
           <div className="text-center px-4 max-w-[85%]">
             <h3 className="text-primary-900 font-bold text-lg tracking-tight mb-1">
               {scenario.location}
@@ -1005,67 +1004,67 @@ IMPORTANT:
               {scenario.situation}
             </p>
           </div>
+        </div>
 
-          {/* Conversation Goals - Only show when Live is active */}
-          {isLiveActive && conversationGoals.length > 0 && (
-            <div className="mt-6 w-full max-w-sm animate-in fade-in slide-in-from-top duration-500">
-              <div className="bg-white/80 backdrop-blur-md rounded-2xl p-4 shadow-lg border border-gray-200/50">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                      </svg>
-                    </div>
-                    <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">
-                      Conversation Goals
-                    </span>
+        {/* Conversation Goals - Sticky position, sticks to top when scrolling */}
+        {conversationGoals.length > 0 && (
+          <div className="sticky top-20 z-30 mb-6 flex justify-center w-full animate-in fade-in slide-in-from-top duration-500">
+            <div className="w-full max-w-sm bg-white backdrop-blur-md rounded-2xl p-4 shadow-lg border border-gray-200/50">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                      <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                    </svg>
                   </div>
-                  <span className="text-[10px] font-semibold text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
-                    {Math.round(goalProgress)}%
+                  <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                    Conversation Goals
                   </span>
                 </div>
+                <span className="text-[10px] font-semibold text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                  {Math.round(goalProgress)}%
+                </span>
+              </div>
 
-                {/* Progress Bar */}
-                <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mb-3">
-                  <div 
-                    className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-700 ease-out"
-                    style={{ width: `${goalProgress}%` }}
-                  ></div>
-                </div>
+              {/* Progress Bar */}
+              <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden mb-3">
+                <div 
+                  className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-700 ease-out"
+                  style={{ width: `${goalProgress}%` }}
+                ></div>
+              </div>
 
-                {/* Goals List */}
-                <div className="space-y-2">
-                  {conversationGoals.map((goal, idx) => {
-                    const isComplete = goalProgress >= ((idx + 1) / conversationGoals.length) * 100;
-                    return (
-                      <div key={idx} className="flex items-center gap-2 text-xs">
-                        <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
-                          isComplete 
-                            ? 'bg-green-500' 
-                            : 'bg-gray-200'
-                        }`}>
-                          {isComplete && (
-                            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="20 6 9 17 4 12"></polyline>
-                            </svg>
-                          )}
-                        </div>
-                        <span className={`transition-colors duration-300 ${
-                          isComplete ? 'text-gray-700 font-medium' : 'text-gray-500'
-                        }`}>
-                          {goal}
-                        </span>
+              {/* Goals List */}
+              <div className="space-y-2">
+                {conversationGoals.map((goal, idx) => {
+                  const isComplete = goalProgress >= ((idx + 1) / conversationGoals.length) * 100;
+                  return (
+                    <div key={idx} className="flex items-center gap-2 text-xs">
+                      <div className={`w-4 h-4 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
+                        isComplete 
+                          ? 'bg-green-500' 
+                          : 'bg-gray-200'
+                      }`}>
+                        {isComplete && (
+                          <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                          </svg>
+                        )}
                       </div>
-                    );
-                  })}
-                </div>
+                      <span className={`transition-colors duration-300 ${
+                        isComplete ? 'text-gray-700 font-medium' : 'text-gray-500'
+                      }`}>
+                        {goal}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Messages */}
         {messages.map((msg) => (
@@ -1343,7 +1342,7 @@ IMPORTANT:
       )}
 
       {/* Goal Complete Notification */}
-      {showGoalComplete && isLiveActive && (
+      {showGoalComplete && (
         <div className="fixed top-24 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-top fade-in duration-500">
           <div className="relative">
             {/* Glow effect */}
@@ -1371,21 +1370,25 @@ IMPORTANT:
                 <div className="flex-1 pt-1">
                   <h4 className="font-bold text-base mb-1">Goal Achieved!</h4>
                   <p className="text-sm text-white/90 leading-relaxed mb-3">
-                    Conversation completed successfully. You can end the call now.
+                    {isLiveActive 
+                      ? 'Conversation completed successfully. You can end the call now.'
+                      : 'Conversation completed successfully!'}
                   </p>
 
                   {/* Action button */}
-                  <button
-                    onClick={() => {
-                      stopLiveSession();
-                      setIsLiveActive(false);
-                      setShowGoalComplete(false);
-                    }}
-                    className="w-full bg-white/20 hover:bg-white/30 active:bg-white/40 text-white font-semibold py-2.5 px-4 rounded-xl transition-all backdrop-blur-sm border border-white/30 flex items-center justify-center gap-2"
-                  >
-                    <PhoneOff size={16} strokeWidth={2.5} />
-                    <span>End Call</span>
-                  </button>
+                  {isLiveActive && (
+                    <button
+                      onClick={() => {
+                        stopLiveSession();
+                        setIsLiveActive(false);
+                        setShowGoalComplete(false);
+                      }}
+                      className="w-full bg-white/20 hover:bg-white/30 active:bg-white/40 text-white font-semibold py-2.5 px-4 rounded-xl transition-all backdrop-blur-sm border border-white/30 flex items-center justify-center gap-2"
+                    >
+                      <PhoneOff size={16} strokeWidth={2.5} />
+                      <span>End Call</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1394,7 +1397,7 @@ IMPORTANT:
       )}
 
       {/* Gemini Live Call Button - Floating Bottom Right */}
-      <div className="absolute bottom-32 right-6 z-40">
+      <div className="absolute bottom-36 right-6 z-40">
         <button
           onClick={handleToggleLive}
           disabled={geminiLiveState === 'connecting'}
@@ -1453,33 +1456,23 @@ IMPORTANT:
       <div className="absolute bottom-0 left-0 right-0 bg-white p-3 pb-6 border-t border-black/5 z-40 rounded-t-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
         {/* Suggestions */}
         {showSuggestions && hints.length > 0 && (
-          <div className="mb-3 flex flex-col animate-in slide-in-from-bottom fade-in">
-            <div className="flex items-center justify-between px-1 mb-1.5">
-              <div className="flex items-center gap-1.5 text-gray-500">
-                <Lightbulb size={14} className="text-yellow-600" fill="currentColor" />
-                <span className="text-[11px] font-medium tracking-wide text-gray-500 uppercase">
-                  Suggestions
-                </span>
-              </div>
+          <div className="mb-2.5 flex items-center gap-1.5 overflow-x-auto no-scrollbar animate-in slide-in-from-bottom fade-in">
+            <Lightbulb size={12} className="text-yellow-600 fill-current shrink-0" />
+            {hints.map((hint, idx) => (
               <button
-                onClick={() => setShowSuggestions(false)}
-                className="p-0.5 hover:bg-gray-100 rounded-full text-gray-400 transition-colors"
+                key={idx}
+                onClick={() => setInputValue(hint)}
+                className="suggestion-btn h-[22px] px-2.5 rounded-[6px] bg-[#F0F4F9] text-[#1F1F1F] text-[10px] font-medium hover:bg-[#E2E7EB] transition-colors whitespace-nowrap shrink-0"
               >
-                <X size={14} />
+                {hint}
               </button>
-            </div>
-
-            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-              {hints.map((hint, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setInputValue(hint)}
-                  className="h-7 px-3 rounded-[8px] bg-[#F0F4F9] text-[#1F1F1F] text-[11px] font-medium hover:bg-[#E2E7EB] transition-colors whitespace-nowrap shrink-0"
-                >
-                  {hint}
-                </button>
-              ))}
-            </div>
+            ))}
+            <button
+              onClick={() => setShowSuggestions(false)}
+              className="suggestion-btn p-0.5 hover:bg-gray-100 rounded-full text-gray-400 transition-colors shrink-0 ml-auto"
+            >
+              <X size={12} />
+            </button>
           </div>
         )}
 
