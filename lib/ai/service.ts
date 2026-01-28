@@ -26,7 +26,11 @@ const doubao =
     : null;
 
 const openaiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || '';
-const openai = openaiKey ? new OpenAI({ apiKey: openaiKey }) : null;
+const openai = openaiKey ? new OpenAI({ 
+  apiKey: openaiKey,
+  timeout: 30000, // 30 seconds default timeout
+  maxRetries: 2, // Retry on failure
+}) : null;
 
 const geminiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
 const gemini = geminiKey ? new GoogleGenerativeAI(geminiKey) : null;
@@ -84,29 +88,89 @@ Return JSON:
   let lastError: any = null;
 
   // Skip Doubao for image analysis - it doesn't support vision API
-  // Doubao will be skipped in favor of OpenAI and Gemini which have proper vision support
+  // Priority: Gemini -> OpenAI (both have proper vision support)
 
-  // Try OpenAI (prioritize for image analysis)
+  // Try Gemini (prioritize for image analysis - better quality and cost)
+  if ((AI_PROVIDER === 'gemini' || AI_PROVIDER === 'auto') && gemini) {
+    try {
+      console.log('🔄 Analyzing image with Gemini Vision...');
+      const model = gemini.getGenerativeModel({ 
+        model: 'gemini-2.5-flash',
+        generationConfig: {
+          maxOutputTokens: 2048,
+          temperature: 0.7,
+        },
+      });
+
+      // Add timeout control (30 seconds)
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Gemini request timeout after 30s')), 30000);
+      });
+
+      const result = await Promise.race([
+        model.generateContent([
+          prompt,
+          {
+            inlineData: {
+              mimeType: 'image/jpeg',
+              data: cleanBase64,
+            },
+          },
+        ]),
+        timeoutPromise,
+      ]);
+
+      const text = result.response.text();
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('No JSON found');
+
+      console.log('✅ Gemini Vision analysis successful');
+      return validateAnalysisResponse(JSON.parse(jsonMatch[0]));
+    } catch (error: any) {
+      lastError = error;
+      if (error.message?.includes('API key') || error.message?.includes('401') || error.message?.includes('403')) {
+        console.log('ℹ️ Gemini skipped (API key issue)');
+      } else if (error.message?.includes('timeout')) {
+        console.warn('❌ Gemini analysis timeout');
+      } else if (error.message?.includes('fetch failed')) {
+        console.warn('❌ Gemini network error - check your internet connection');
+      } else {
+        console.warn('❌ Gemini analysis failed:', error.message);
+      }
+    }
+  }
+
+  // Try OpenAI as fallback
   if ((AI_PROVIDER === 'openai' || AI_PROVIDER === 'auto') && openai) {
     try {
-      console.log('🔄 Analyzing image with OpenAI Vision...');
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: 'You are a scenario generator. Always return valid JSON.' },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: prompt },
-              {
-                type: 'image_url',
-                image_url: { url: `data:image/jpeg;base64,${cleanBase64}` },
-              },
-            ],
-          },
-        ],
-        response_format: { type: 'json_object' },
+      console.log('🔄 Trying OpenAI Vision...');
+      
+      // Add timeout control (30 seconds)
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('OpenAI request timeout after 30s')), 30000);
       });
+
+      const response = await Promise.race([
+        openai.chat.completions.create({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: 'You are a scenario generator. Always return valid JSON.' },
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: prompt },
+                {
+                  type: 'image_url',
+                  image_url: { url: `data:image/jpeg;base64,${cleanBase64}` },
+                },
+              ],
+            },
+          ],
+          response_format: { type: 'json_object' },
+          timeout: 30000, // 30 seconds
+        }),
+        timeoutPromise,
+      ]);
 
       const text = response.choices[0]?.message?.content;
       if (!text) throw new Error('Empty response');
@@ -115,44 +179,29 @@ Return JSON:
       return validateAnalysisResponse(JSON.parse(text));
     } catch (error: any) {
       lastError = error;
-      if (error.message?.includes('API key') || error.message?.includes('401')) {
+      if (error.message?.includes('API key') || error.message?.includes('401') || error.message?.includes('403')) {
         console.log('ℹ️ OpenAI skipped (API key issue)');
+      } else if (error.message?.includes('timeout')) {
+        console.warn('❌ OpenAI analysis timeout');
+      } else if (error.message?.includes('Connection error') || error.message?.includes('fetch failed')) {
+        console.warn('❌ OpenAI network error - check your internet connection');
       } else {
         console.warn('❌ OpenAI analysis failed:', error.message);
       }
     }
   }
 
-  // Try Gemini
-  if (gemini) {
-    try {
-      console.log('🔄 Trying Gemini...');
-      const model = gemini.getGenerativeModel({ model: 'gemini-2.5-flash' });
-
-      const result = await model.generateContent([
-        prompt,
-        {
-          inlineData: {
-            mimeType: 'image/jpeg',
-            data: cleanBase64,
-          },
-        },
-      ]);
-
-      const text = result.response.text();
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error('No JSON found');
-
-      return validateAnalysisResponse(JSON.parse(jsonMatch[0]));
-    } catch (error: any) {
-      lastError = error;
-      console.warn('❌ Gemini analysis failed:', error.message);
-    }
+  // Provide user-friendly error message
+  const errorMsg = lastError?.message || 'All AI providers failed';
+  if (errorMsg.includes('timeout')) {
+    throw new Error('Image analysis timeout. Please check your internet connection and try again.');
+  } else if (errorMsg.includes('fetch failed') || errorMsg.includes('Connection error') || errorMsg.includes('network error')) {
+    throw new Error('Network connection failed. Please check your internet connection and try again.');
+  } else if (errorMsg.includes('API key')) {
+    throw new Error('AI service configuration error. Please contact support.');
+  } else {
+    throw new Error('Unable to analyze image. Please try again or use a different image.');
   }
-
-  throw new Error(
-    lastError?.message || 'All AI providers failed to analyze the image'
-  );
 }
 
 /**
@@ -271,7 +320,7 @@ Return JSON:
 
   let lastError: any = null;
 
-  // Try Doubao
+  // Try Doubao (priority 1)
   if ((AI_PROVIDER === 'doubao' || AI_PROVIDER === 'auto') && doubao) {
     try {
       console.log('🔥 Trying Doubao audio analysis...');
@@ -293,7 +342,28 @@ Return JSON:
     }
   }
 
-  // Try OpenAI
+  // Try Gemini (priority 2)
+  if ((AI_PROVIDER === 'gemini' || AI_PROVIDER === 'auto') && gemini) {
+    try {
+      console.log('🔄 Trying Gemini audio analysis...');
+      const model = gemini.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('No JSON found');
+      console.log('✅ Gemini audio analysis successful');
+      return validateAnalysisResponse(JSON.parse(jsonMatch[0]));
+    } catch (error: any) {
+      lastError = error;
+      if (error.message?.includes('API key') || error.message?.includes('401') || error.message?.includes('403')) {
+        console.log('ℹ️ Gemini skipped (API key issue)');
+      } else {
+        console.warn('❌ Gemini audio analysis failed:', error.message);
+      }
+    }
+  }
+
+  // Try OpenAI (priority 3 - fallback)
   if ((AI_PROVIDER === 'openai' || AI_PROVIDER === 'auto') && openai) {
     try {
       console.log('🔄 Trying OpenAI audio analysis...');
@@ -316,23 +386,6 @@ Return JSON:
       } else {
         console.warn('❌ OpenAI audio analysis failed:', error.message);
       }
-    }
-  }
-
-  // Try Gemini
-  if (gemini) {
-    try {
-      console.log('🔄 Trying Gemini audio analysis...');
-      const model = gemini.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      const jsonMatch = text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) throw new Error('No JSON found');
-      console.log('✅ Gemini audio analysis successful');
-      return validateAnalysisResponse(JSON.parse(jsonMatch[0]));
-    } catch (error: any) {
-      lastError = error;
-      console.warn('❌ Gemini audio analysis failed:', error.message);
     }
   }
 
@@ -416,7 +469,7 @@ Return JSON:
 
   let lastError: any = null;
 
-  // Try Doubao
+  // Try Doubao (priority 1)
   if ((AI_PROVIDER === 'doubao' || AI_PROVIDER === 'auto') && doubao) {
     try {
       console.log('🔥 Trying Doubao dialogue...');
@@ -442,31 +495,8 @@ Return JSON:
     }
   }
 
-  // Try OpenAI
-  if (AI_PROVIDER === 'auto' && openai) {
-    try {
-      console.log('🔄 Trying OpenAI dialogue...');
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages,
-        response_format: { type: 'json_object' },
-      });
-      const text = response.choices[0]?.message?.content;
-      if (!text) throw new Error('Empty response from OpenAI');
-      return validateDialogueResponse(JSON.parse(text));
-    } catch (error: any) {
-      lastError = error;
-      // Don't log API key errors as warnings - they're configuration issues
-      if (error.message?.includes('API key') || error.message?.includes('401') || error.message?.includes('403')) {
-        console.log('ℹ️ OpenAI skipped (API key issue)');
-      } else {
-        console.warn('❌ OpenAI dialogue failed:', error.message);
-      }
-    }
-  }
-
-  // Try Gemini
-  if (gemini) {
+  // Try Gemini (priority 2)
+  if ((AI_PROVIDER === 'gemini' || AI_PROVIDER === 'auto') && gemini) {
     try {
       console.log('🔄 Trying Gemini dialogue...');
       const model = gemini.getGenerativeModel({ 
@@ -541,9 +571,36 @@ Return JSON:
       }
     } catch (error: any) {
       lastError = error;
-      console.warn('❌ Gemini dialogue failed:', error.message);
-      if (error.stack) {
-        console.warn('Stack trace:', error.stack);
+      if (error.message?.includes('API key') || error.message?.includes('401') || error.message?.includes('403')) {
+        console.log('ℹ️ Gemini skipped (API key issue)');
+      } else {
+        console.warn('❌ Gemini dialogue failed:', error.message);
+        if (error.stack) {
+          console.warn('Stack trace:', error.stack);
+        }
+      }
+    }
+  }
+
+  // Try OpenAI (priority 3 - fallback)
+  if ((AI_PROVIDER === 'openai' || AI_PROVIDER === 'auto') && openai) {
+    try {
+      console.log('🔄 Trying OpenAI dialogue...');
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages,
+        response_format: { type: 'json_object' },
+      });
+      const text = response.choices[0]?.message?.content;
+      if (!text) throw new Error('Empty response from OpenAI');
+      console.log('✅ OpenAI dialogue successful');
+      return validateDialogueResponse(JSON.parse(text));
+    } catch (error: any) {
+      lastError = error;
+      if (error.message?.includes('API key') || error.message?.includes('401') || error.message?.includes('403')) {
+        console.log('ℹ️ OpenAI skipped (API key issue)');
+      } else {
+        console.warn('❌ OpenAI dialogue failed:', error.message);
       }
     }
   }
@@ -660,6 +717,7 @@ export async function translateText(text: string): Promise<string> {
   const prompt = `Translate to Chinese (Simplified): "${text}"`;
 
   try {
+    // Try Doubao (priority 1)
     if (doubao) {
       const response = await doubao.chat([{ role: 'user', content: prompt }], {
         maxTokens: 1000, // Translation should be concise
@@ -667,17 +725,19 @@ export async function translateText(text: string): Promise<string> {
       });
       return response.choices[0]?.message?.content || 'Translation failed';
     }
+    // Try Gemini (priority 2)
+    if (gemini) {
+      const model = gemini.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    }
+    // Try OpenAI (priority 3 - fallback)
     if (openai) {
       const response = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
       });
       return response.choices[0]?.message?.content || 'Translation failed';
-    }
-    if (gemini) {
-      const model = gemini.getGenerativeModel({ model: 'gemini-2.5-flash' });
-      const result = await model.generateContent(prompt);
-      return result.response.text();
     }
   } catch (error) {
     console.error('Translation error:', error);
@@ -690,6 +750,7 @@ export async function optimizeText(text: string): Promise<string> {
   const prompt = `Make this English more natural and native: "${text}"`;
 
   try {
+    // Try Doubao (priority 1)
     if (doubao) {
       const response = await doubao.chat([{ role: 'user', content: prompt }], {
         maxTokens: 1000, // Optimization should be concise
@@ -697,17 +758,19 @@ export async function optimizeText(text: string): Promise<string> {
       });
       return response.choices[0]?.message?.content || text;
     }
+    // Try Gemini (priority 2)
+    if (gemini) {
+      const model = gemini.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    }
+    // Try OpenAI (priority 3 - fallback)
     if (openai) {
       const response = await openai.chat.completions.create({
         model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: prompt }],
       });
       return response.choices[0]?.message?.content || text;
-    }
-    if (gemini) {
-      const model = gemini.getGenerativeModel({ model: 'gemini-2.5-flash' });
-      const result = await model.generateContent(prompt);
-      return result.response.text();
     }
   } catch (error) {
     console.error('Optimization error:', error);

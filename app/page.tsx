@@ -47,9 +47,11 @@ export default function Home() {
         }),
       });
 
-      if (!response.ok) throw new Error('Analysis failed');
-
       const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Analysis failed');
+      }
 
       const newScenario: Scenario = {
         id: Date.now().toString(),
@@ -76,11 +78,20 @@ export default function Home() {
       setCurrentDialogueId(undefined); // New dialogue
       setIsAnalyzing(false);
       setCurrentScreen(Screen.DIALOGUE);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to analyze image:', error);
       setIsAnalyzing(false);
       setCurrentScreen(Screen.CAMERA);
-      alert('Could not analyze image. Please try again.');
+      
+      // Show user-friendly error message
+      const errorMsg = error?.message || 'Unknown error';
+      if (errorMsg.includes('timeout')) {
+        alert('Image analysis timeout. Please check your internet connection and try again.');
+      } else if (errorMsg.includes('network') || errorMsg.includes('connection')) {
+        alert('Network connection failed. Please check your internet and try again.');
+      } else {
+        alert('Could not analyze image. Please try again with a different image.');
+      }
     }
   };
 
@@ -99,9 +110,11 @@ export default function Home() {
         }),
       });
 
-      if (!response.ok) throw new Error('Analysis failed');
-
       const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Analysis failed');
+      }
 
       const newScenario: Scenario = {
         id: Date.now().toString(),
@@ -127,11 +140,20 @@ export default function Home() {
       setCurrentDialogueId(undefined); // New dialogue
       setIsAnalyzing(false);
       setCurrentScreen(Screen.DIALOGUE);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to analyze audio:', error);
       setIsAnalyzing(false);
       setCurrentScreen(Screen.CAMERA);
-      alert('Could not understand audio. Please try again.');
+      
+      // Show user-friendly error message
+      const errorMsg = error?.message || 'Unknown error';
+      if (errorMsg.includes('timeout')) {
+        alert('Audio analysis timeout. Please check your internet connection and try again.');
+      } else if (errorMsg.includes('network') || errorMsg.includes('connection')) {
+        alert('Network connection failed. Please check your internet and try again.');
+      } else {
+        alert('Could not understand audio. Please try recording again.');
+      }
     }
   };
 
