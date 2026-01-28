@@ -48,6 +48,8 @@ export default function DialogueScreen({
   const [showGoalComplete, setShowGoalComplete] = useState(false);
   const [conversationGoals, setConversationGoals] = useState<string[]>([]);
   const conversationTextRef = useRef<string>('');
+  const autoPlayAudioRef = useRef(false);
+  const lastPlayedMessageIdRef = useRef<string | null>(null);
 
   // 检测对话目标完成的通用函数
   const checkGoalCompletion = useCallback((text: string) => {
@@ -276,6 +278,14 @@ IMPORTANT:
       
       if (existingDialogue) {
         setMessages(existingDialogue.messages);
+        // Reset last played message ID when loading existing dialogue
+        // This prevents auto-playing old messages, only new ones will play
+        const lastAiMessage = existingDialogue.messages
+          .filter((msg: DialogueLine) => msg.speaker === 'ai')
+          .slice(-1)[0];
+        if (lastAiMessage) {
+          lastPlayedMessageIdRef.current = lastAiMessage.id;
+        }
         return;
       }
     }
@@ -290,6 +300,9 @@ IMPORTANT:
     ];
     setMessages(initialMessages);
     setHints(['Hello!', 'Hi there!', 'Good to meet you!']);
+    
+    // Reset last played message ID for new dialogue
+    lastPlayedMessageIdRef.current = null;
     
     // Save initial state
     saveDialogueProgress(initialMessages, false);
@@ -517,11 +530,59 @@ IMPORTANT:
   const handleToggleAutoPlay = () => {
     const newState = !autoPlayAudio;
     setAutoPlayAudio(newState);
+    autoPlayAudioRef.current = newState;
     
     // Show toast feedback
     setShowAudioToast(true);
     setTimeout(() => setShowAudioToast(false), 2000);
   };
+
+  // Sync autoPlayAudio ref when state changes
+  useEffect(() => {
+    const wasEnabled = autoPlayAudioRef.current;
+    autoPlayAudioRef.current = autoPlayAudio;
+    
+    // When auto-play is enabled, reset last played message ID
+    // so the current latest AI message can be played if it exists
+    if (!wasEnabled && autoPlayAudio) {
+      lastPlayedMessageIdRef.current = null;
+    }
+  }, [autoPlayAudio]);
+
+  // Auto-play AI messages when enabled
+  useEffect(() => {
+    if (!autoPlayAudioRef.current) return;
+
+    // Find the last AI message that hasn't been played
+    const lastAiMessage = messages
+      .filter(msg => msg.speaker === 'ai')
+      .slice(-1)[0];
+
+    if (!lastAiMessage || lastAiMessage.id === lastPlayedMessageIdRef.current) {
+      return;
+    }
+
+    // Stop any ongoing speech
+    window.speechSynthesis.cancel();
+
+    // Play the new AI message with a slight delay for better UX
+    const timeoutId = setTimeout(() => {
+      if (autoPlayAudioRef.current && lastAiMessage.text) {
+        const utterance = new SpeechSynthesisUtterance(lastAiMessage.text);
+        utterance.lang = 'en-US';
+        utterance.rate = 0.9;
+        utterance.onend = () => {
+          lastPlayedMessageIdRef.current = lastAiMessage.id;
+        };
+        utterance.onerror = () => {
+          lastPlayedMessageIdRef.current = lastAiMessage.id;
+        };
+        window.speechSynthesis.speak(utterance);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [messages, autoPlayAudio]);
 
   const handleVoiceInput = () => {
     if (!isVoiceSupported) {
@@ -598,16 +659,6 @@ IMPORTANT:
         
         // Check goal completion in text chat mode
         checkGoalCompletion(result.next_response);
-        
-        // Auto-play AI response if enabled
-        if (autoPlayAudio) {
-          setTimeout(() => {
-            const utterance = new SpeechSynthesisUtterance(result.next_response);
-            utterance.lang = 'en-US';
-            utterance.rate = 0.9;
-            window.speechSynthesis.speak(utterance);
-          }, 500); // Slight delay for better UX
-        }
       }
 
       // Update state
