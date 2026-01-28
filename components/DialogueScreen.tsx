@@ -1045,7 +1045,7 @@ IMPORTANT:
           {/* Auto-play Audio Toggle - Enhanced UI */}
           <button
           onClick={handleToggleAutoPlay}
-          className={`relative group h-9 rounded-full flex items-center gap-2 transition-all duration-300 pointer-events-auto active:scale-95 touch-manipulation overflow-hidden ${
+          className={`relative group h-8 rounded-full flex items-center gap-2 transition-all duration-300 pointer-events-auto active:scale-95 touch-manipulation overflow-hidden ${
             autoPlayAudio 
               ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-lg shadow-emerald-500/30 pr-3 pl-2.5' 
               : 'bg-white/95 text-gray-500 hover:text-gray-700 hover:bg-white shadow-md hover:shadow-lg pr-3 pl-2.5 border border-gray-200/50'
