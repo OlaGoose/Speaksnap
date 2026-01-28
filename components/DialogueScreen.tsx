@@ -78,14 +78,151 @@ USER LEVEL: ${userLevel}
 - Intermediate: Use everyday vocabulary with some idiomatic expressions
 - Advanced: Use natural native expressions and varied vocabulary
 
+CONVERSATION GOAL:
+- Actively guide the user to complete the scenario goal: ${scenario.context}
+- Ask relevant questions to move the conversation forward
+- Provide helpful information and suggestions
+- When the main objective is accomplished (e.g., order placed, reservation made, information provided), politely wrap up the conversation
+- Call the "end_conversation" function when:
+  * The scenario goal has been achieved
+  * The user explicitly wants to end the conversation
+  * The conversation has naturally reached a conclusion
+
 IMPORTANT:
 - Keep responses brief and natural (like real conversation)
 - Don't over-explain unless asked
 - React naturally to what the user says
-- Guide the conversation based on the scenario context`;
+- Be proactive in achieving the conversation goal
+- End gracefully with a friendly goodbye before calling end_conversation`;
 
     return instruction;
   };
+
+  // Define the end_conversation tool for Live API
+  const liveTools = [
+    {
+      functionDeclarations: [
+        {
+          name: "end_conversation",
+          description: "Call this function when the conversation goal has been achieved or the user wants to end the conversation. This will gracefully end the live voice call.",
+          parameters: {
+            type: "object",
+            properties: {
+              reason: {
+                type: "string",
+                description: "Brief reason for ending the conversation (e.g., 'goal achieved', 'user requested', 'natural conclusion')"
+              },
+              summary: {
+                type: "string",
+                description: "A one-sentence summary of what was accomplished in the conversation"
+              }
+            },
+            required: ["reason", "summary"]
+          }
+        }
+      ]
+    }
+  ];
+
+  // Handle live text transcript
+  const handleLiveText = useCallback((text: string, role: 'user' | 'model') => {
+    const newMessage: DialogueLine = {
+      id: `live_${Date.now()}_${Math.random()}`,
+      speaker: role === 'user' ? 'user' : 'ai',
+      text: text,
+    };
+    
+    setMessages(prev => {
+      // Avoid duplicate messages
+      const lastMessage = prev[prev.length - 1];
+      if (lastMessage && lastMessage.text === text && lastMessage.speaker === newMessage.speaker) {
+        return prev;
+      }
+      return [...prev, newMessage];
+    });
+  }, []);
+
+  // Handle function calls from Live API
+  const handleFunctionCall = useCallback((functionName: string, args: any) => {
+    console.log(`Function called: ${functionName}`, args);
+    
+    if (functionName === 'end_conversation') {
+      // AI decided to end the conversation
+      const { reason, summary } = args;
+      
+      // Add a system message about the conversation ending
+      const endMessage: DialogueLine = {
+        id: `end_${Date.now()}`,
+        speaker: 'ai',
+        text: `Thank you for the conversation! ${summary || 'Have a great day!'}`,
+      };
+      
+      setMessages(prev => {
+        const updatedMessages = [...prev, endMessage];
+        
+        // Wait a moment for the message to be added, then disconnect
+        setTimeout(() => {
+          // Save the conversation
+          try {
+            const scenarios = storage.getItem<Scenario[]>('speakSnapScenarios') || [];
+            const scenarioIndex = scenarios.findIndex((s: Scenario) => s.id === scenario.id);
+            
+            if (scenarioIndex !== -1) {
+              const userMessagesWithFeedback = updatedMessages.filter(
+                (m) => m.speaker === 'user' && m.feedback?.score
+              );
+              const avgScore = userMessagesWithFeedback.length > 0
+                ? userMessagesWithFeedback.reduce((sum, m) => sum + (m.feedback!.score), 0) / userMessagesWithFeedback.length
+                : 0;
+              
+              const dialogueRecord = {
+                id: currentDialogueId,
+                messages: updatedMessages,
+                timestamp: Date.now(),
+                user_level: userLevel,
+                is_completed: true,
+                average_score: Math.round(avgScore),
+              };
+              
+              const dialogues = scenarios[scenarioIndex].dialogues || [];
+              const dialogueIndex = dialogues.findIndex((d: any) => d.id === currentDialogueId);
+              
+              if (dialogueIndex === -1) {
+                dialogues.unshift(dialogueRecord);
+              } else {
+                dialogues[dialogueIndex] = dialogueRecord;
+              }
+              
+              const completedDialogues = dialogues.filter((d: any) => d.is_completed);
+              scenarios[scenarioIndex].dialogues = dialogues;
+              scenarios[scenarioIndex].total_attempts = completedDialogues.length;
+              scenarios[scenarioIndex].best_score = Math.max(
+                ...completedDialogues.map((d: any) => d.average_score || 0),
+                0
+              );
+              scenarios[scenarioIndex].last_practiced = Date.now();
+              
+              storage.setItem('speakSnapScenarios', scenarios);
+            }
+          } catch (error) {
+            console.error('Failed to save conversation:', error);
+          }
+          
+          // Now safe to call hook methods
+          setIsLiveActive(false);
+          
+          // Show a toast notification
+          const toast = document.createElement('div');
+          toast.className = 'fixed top-20 left-1/2 -translate-x-1/2 z-50 bg-green-600 text-white px-6 py-3 rounded-full shadow-2xl font-semibold animate-in fade-in slide-in-from-top';
+          toast.textContent = `✓ Conversation completed: ${reason}`;
+          document.body.appendChild(toast);
+          setTimeout(() => toast.remove(), 3000);
+        }, 500);
+        
+        return updatedMessages;
+      });
+    }
+  }, [scenario.id, currentDialogueId, userLevel]);
 
   const { 
     isActive: geminiLiveActive, 
@@ -97,24 +234,96 @@ IMPORTANT:
     apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY || '',
     systemInstruction: buildSystemInstruction(),
     voiceName: 'Kore', // 可以根据场景选择不同声音：Puck, Charon, Kore, Fenrir, Aoide
+    tools: liveTools,
     onError: (err) => {
       console.error("Gemini Live Error:", err);
       setIsLiveActive(false);
     },
     onInterrupted: () => {
       console.log("AI was interrupted by user");
-    }
+    },
+    onTextReceived: handleLiveText,
+    onFunctionCall: handleFunctionCall,
   });
 
-  const handleToggleLive = () => {
+  const handleToggleLive = useCallback(() => {
     if (isLiveActive) {
+      // Manually ending the call
+      const endMessage: DialogueLine = {
+        id: `end_${Date.now()}`,
+        speaker: 'ai',
+        text: 'Live call ended. Feel free to continue typing if you need anything else!',
+      };
+      
+      setMessages(prev => {
+        const updatedMessages = [...prev, endMessage];
+        
+        // Save conversation when manually ending
+        setTimeout(() => {
+          try {
+            const scenarios = storage.getItem<Scenario[]>('speakSnapScenarios') || [];
+            const scenarioIndex = scenarios.findIndex((s: Scenario) => s.id === scenario.id);
+            
+            if (scenarioIndex !== -1) {
+              const userMessagesWithFeedback = updatedMessages.filter(
+                (m) => m.speaker === 'user' && m.feedback?.score
+              );
+              const avgScore = userMessagesWithFeedback.length > 0
+                ? userMessagesWithFeedback.reduce((sum, m) => sum + (m.feedback!.score), 0) / userMessagesWithFeedback.length
+                : 0;
+              
+              const dialogueRecord = {
+                id: currentDialogueId,
+                messages: updatedMessages,
+                timestamp: Date.now(),
+                user_level: userLevel,
+                is_completed: false,
+                average_score: Math.round(avgScore),
+              };
+              
+              const dialogues = scenarios[scenarioIndex].dialogues || [];
+              const dialogueIndex = dialogues.findIndex((d: any) => d.id === currentDialogueId);
+              
+              if (dialogueIndex === -1) {
+                dialogues.unshift(dialogueRecord);
+              } else {
+                dialogues[dialogueIndex] = dialogueRecord;
+              }
+              
+              const completedDialogues = dialogues.filter((d: any) => d.is_completed);
+              scenarios[scenarioIndex].dialogues = dialogues;
+              scenarios[scenarioIndex].total_attempts = completedDialogues.length;
+              scenarios[scenarioIndex].best_score = Math.max(
+                ...completedDialogues.map((d: any) => d.average_score || 0),
+                0
+              );
+              scenarios[scenarioIndex].last_practiced = Date.now();
+              
+              storage.setItem('speakSnapScenarios', scenarios);
+            }
+          } catch (error) {
+            console.error('Failed to save conversation:', error);
+          }
+        }, 100);
+        
+        return updatedMessages;
+      });
+      
       stopLiveSession();
       setIsLiveActive(false);
     } else {
+      // Starting live call
+      const startMessage: DialogueLine = {
+        id: `start_${Date.now()}`,
+        speaker: 'ai',
+        text: '🎙️ Live voice call started. Speak naturally, I\'m listening!',
+      };
+      setMessages(prev => [...prev, startMessage]);
+      
       startLiveSession();
       setIsLiveActive(true);
     }
-  };
+  }, [isLiveActive, stopLiveSession, startLiveSession, scenario.id, currentDialogueId, userLevel]);
 
   // Selection State
   const [selectionMenu, setSelectionMenu] = useState<{
@@ -179,6 +388,62 @@ IMPORTANT:
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isProcessing]);
+
+  // Auto-save during live conversation
+  useEffect(() => {
+    if (isLiveActive && messages.length > 0) {
+      // Debounce saves during live mode
+      const saveTimer = setTimeout(() => {
+        try {
+          const scenarios = storage.getItem<Scenario[]>('speakSnapScenarios') || [];
+          const scenarioIndex = scenarios.findIndex((s: Scenario) => s.id === scenario.id);
+          
+          if (scenarioIndex !== -1) {
+            const userMessagesWithFeedback = messages.filter(
+              (m) => m.speaker === 'user' && m.feedback?.score
+            );
+            const avgScore = userMessagesWithFeedback.length > 0
+              ? userMessagesWithFeedback.reduce((sum, m) => sum + (m.feedback!.score), 0) / userMessagesWithFeedback.length
+              : 0;
+            
+            const dialogueRecord = {
+              id: currentDialogueId,
+              messages: messages,
+              timestamp: Date.now(),
+              user_level: userLevel,
+              is_completed: false,
+              average_score: Math.round(avgScore),
+            };
+            
+            const dialogues = scenarios[scenarioIndex].dialogues || [];
+            const dialogueIndex = dialogues.findIndex((d: any) => d.id === currentDialogueId);
+            
+            if (dialogueIndex === -1) {
+              dialogues.unshift(dialogueRecord);
+            } else {
+              dialogues[dialogueIndex] = dialogueRecord;
+            }
+            
+            const completedDialogues = dialogues.filter((d: any) => d.is_completed);
+            scenarios[scenarioIndex].dialogues = dialogues;
+            scenarios[scenarioIndex].total_attempts = completedDialogues.length;
+            scenarios[scenarioIndex].best_score = Math.max(
+              ...completedDialogues.map((d: any) => d.average_score || 0),
+              0
+            );
+            scenarios[scenarioIndex].last_practiced = Date.now();
+            
+            storage.setItem('speakSnapScenarios', scenarios);
+            console.log('✅ Auto-saved live conversation');
+          }
+        } catch (error) {
+          console.error('Failed to auto-save:', error);
+        }
+      }, 2000); // Save 2 seconds after last message
+      
+      return () => clearTimeout(saveTimer);
+    }
+  }, [isLiveActive, messages, scenario.id, currentDialogueId, userLevel]);
 
   // Disable browser native text selection toolbar on mobile
   useEffect(() => {
@@ -1154,16 +1419,38 @@ IMPORTANT:
         
         {/* Live Call Status Label */}
         {isLiveActive && (
-          <div className="absolute -top-10 left-1/2 -translate-x-1/2 whitespace-nowrap bg-black/80 text-white text-xs px-3 py-1.5 rounded-full font-medium animate-in fade-in slide-in-from-bottom">
-            🎙️ Live Call
+          <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap">
+            <div className="relative">
+              {/* Glow effect */}
+              <div className="absolute inset-0 bg-red-500/30 blur-xl rounded-full animate-pulse"></div>
+              
+              {/* Main label */}
+              <div className="relative flex items-center gap-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs pl-2.5 pr-3 py-1.5 rounded-full font-semibold shadow-2xl border border-red-400/50 backdrop-blur-sm animate-in fade-in slide-in-from-bottom duration-300">
+                <span className="text-[10px] animate-pulse">🔴</span>
+                <span className="tracking-wide">LIVE</span>
+              </div>
+            </div>
           </div>
         )}
       </div>
 
       {/* Bottom Input Area */}
       <div className="absolute bottom-0 left-0 right-0 bg-white p-3 pb-6 border-t border-black/5 z-40 rounded-t-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
+        {/* Live Mode Indicator */}
+        {isLiveActive && (
+          <div className="mb-3 bg-gradient-to-r from-red-50 to-pink-50 border border-red-200 rounded-xl p-3 animate-in fade-in slide-in-from-bottom">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+              <span className="text-sm font-semibold text-red-900">Live Voice Mode Active</span>
+            </div>
+            <p className="text-xs text-red-700 mt-1 leading-relaxed">
+              Speak naturally - all conversation is being transcribed below. Tap the phone button to end the call.
+            </p>
+          </div>
+        )}
+        
         {/* Suggestions */}
-        {showSuggestions && hints.length > 0 && (
+        {!isLiveActive && showSuggestions && hints.length > 0 && (
           <div className="mb-3 flex flex-col animate-in slide-in-from-bottom fade-in">
             <div className="flex items-center justify-between px-1 mb-1.5">
               <div className="flex items-center gap-1.5 text-gray-500">
@@ -1196,7 +1483,9 @@ IMPORTANT:
 
         {/* Input Bar */}
         <div className={`w-full bg-white rounded-xl border transition-all flex items-center p-1.5 pl-4 gap-2 ${
-          isRecording 
+          isLiveActive
+            ? 'border-gray-200 opacity-50 cursor-not-allowed'
+            : isRecording 
             ? 'border-blue-300 shadow-[0_0_0_3px_rgba(59,130,246,0.1)]' 
             : 'border-gray-200 focus-within:border-gray-300 focus-within:shadow-sm'
         }`}>
@@ -1215,9 +1504,20 @@ IMPORTANT:
                 }
               }}
               onKeyDown={handleKeyDown}
-              placeholder={(inputValue || interimText) ? '' : (isRecording ? 'Listening...' : 'Ask the tutor...')}
+              disabled={isLiveActive}
+              placeholder={
+                isLiveActive 
+                  ? '🎙️ Using Live Voice Mode...' 
+                  : (inputValue || interimText) 
+                  ? '' 
+                  : (isRecording ? 'Listening...' : 'Ask the tutor...')
+              }
               className={`w-full bg-transparent text-[16px] outline-none min-w-0 leading-normal ${
-                interimText ? 'text-transparent caret-primary-900' : 'text-primary-900 placeholder:text-gray-400'
+                isLiveActive 
+                  ? 'cursor-not-allowed' 
+                  : interimText 
+                  ? 'text-transparent caret-primary-900' 
+                  : 'text-primary-900 placeholder:text-gray-400'
               }`}
             />
             {/* 可见的文本叠加层 - 带样式区分，防止溢出 */}
@@ -1234,7 +1534,7 @@ IMPORTANT:
 
           <button
             onClick={handleVoiceInput}
-            disabled={!isVoiceSupported}
+            disabled={!isVoiceSupported || isLiveActive}
             className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-300 disabled:opacity-30 disabled:cursor-not-allowed ${
               isRecording
                 ? 'bg-blue-500 text-white scale-110 shadow-lg shadow-blue-500/30'
@@ -1246,11 +1546,11 @@ IMPORTANT:
 
           <button
             onClick={handleSend}
-            disabled={!inputValue.trim()}
+            disabled={!inputValue.trim() || isLiveActive}
             className={`
               flex items-center justify-center h-9 px-4 rounded-lg text-sm font-bold transition-all
               ${
-                inputValue.trim()
+                inputValue.trim() && !isLiveActive
                   ? 'bg-black text-white shadow-md hover:bg-gray-800 active:scale-95'
                   : 'bg-gray-100 text-gray-400 cursor-not-allowed'
               }

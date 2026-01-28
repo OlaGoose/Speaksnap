@@ -8,8 +8,11 @@ interface UseGeminiLiveOptions {
   apiKey: string;
   systemInstruction?: string;
   voiceName?: string;
+  tools?: any[];
   onError?: (error: string) => void;
   onInterrupted?: () => void;
+  onTextReceived?: (text: string, role: 'user' | 'model') => void;
+  onFunctionCall?: (functionName: string, args: any) => void;
 }
 
 interface UseGeminiLiveReturn {
@@ -28,8 +31,11 @@ export function useGeminiLive({
   apiKey,
   systemInstruction = "You are a helpful, concise AI assistant. You answer briefly and clearly.",
   voiceName = 'Kore',
+  tools = [],
   onError,
   onInterrupted,
+  onTextReceived,
+  onFunctionCall,
 }: UseGeminiLiveOptions): UseGeminiLiveReturn {
   const [isActive, setIsActive] = useState(false);
   const [connectionState, setConnectionState] = useState<'connected' | 'disconnected' | 'connecting'>('disconnected');
@@ -175,35 +181,51 @@ export function useGeminiLive({
             };
           },
           onmessage: async (message: LiveServerMessage) => {
-            // Handle Audio Output
-            const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-            if (base64Audio && outputAudioContextRef.current && outputNodeRef.current) {
-              const ctx = outputAudioContextRef.current;
+            // Process all parts from model response
+            const parts = message.serverContent?.modelTurn?.parts || [];
+            
+            for (const part of parts) {
+              // Handle Audio Output
+              if (part.inlineData?.data && outputAudioContextRef.current && outputNodeRef.current) {
+                const ctx = outputAudioContextRef.current;
+                
+                // Ensure playback time is continuous
+                nextStartTimeRef.current = Math.max(
+                  nextStartTimeRef.current,
+                  ctx.currentTime
+                );
+
+                const audioBuffer = await decodeAudioData(
+                  decode(part.inlineData.data),
+                  ctx,
+                  24000,
+                  1
+                );
+
+                const bufferSource = ctx.createBufferSource();
+                bufferSource.buffer = audioBuffer;
+                bufferSource.connect(outputNodeRef.current);
+                
+                bufferSource.onended = () => {
+                  audioSourcesRef.current.delete(bufferSource);
+                };
+
+                bufferSource.start(nextStartTimeRef.current);
+                nextStartTimeRef.current += audioBuffer.duration;
+                audioSourcesRef.current.add(bufferSource);
+              }
               
-              // Ensure playback time is continuous
-              nextStartTimeRef.current = Math.max(
-                nextStartTimeRef.current,
-                ctx.currentTime
-              );
-
-              const audioBuffer = await decodeAudioData(
-                decode(base64Audio),
-                ctx,
-                24000,
-                1
-              );
-
-              const bufferSource = ctx.createBufferSource();
-              bufferSource.buffer = audioBuffer;
-              bufferSource.connect(outputNodeRef.current);
+              // Handle Text Output
+              if (part.text) {
+                console.log("Model text:", part.text);
+                onTextReceived?.(part.text, 'model');
+              }
               
-              bufferSource.onended = () => {
-                audioSourcesRef.current.delete(bufferSource);
-              };
-
-              bufferSource.start(nextStartTimeRef.current);
-              nextStartTimeRef.current += audioBuffer.duration;
-              audioSourcesRef.current.add(bufferSource);
+              // Handle Function Call
+              if (part.functionCall && part.functionCall.name) {
+                console.log("Function call:", part.functionCall.name, part.functionCall.args);
+                onFunctionCall?.(part.functionCall.name, part.functionCall.args || {});
+              }
             }
 
             // Handle Interruptions
@@ -229,6 +251,7 @@ export function useGeminiLive({
             voiceConfig: { prebuiltVoiceConfig: { voiceName } }
           },
           systemInstruction,
+          tools: tools.length > 0 ? tools : undefined,
         },
       });
 
