@@ -1139,7 +1139,7 @@ IMPORTANT:
                     window.speechSynthesis.speak(utterance);
                   }}
                   onTouchStart={(e) => e.stopPropagation()}
-                  className="group p-1 hover:bg-gray-100 active:bg-gray-200 transition-all rounded-full touch-manipulation"
+                  className="selection-toolbar-btn group p-1 hover:bg-gray-100 active:bg-gray-200 transition-all rounded-full touch-manipulation min-h-0 min-w-0"
                   title="Play audio"
                   aria-label="Play audio"
                 >
@@ -1164,7 +1164,7 @@ IMPORTANT:
                     }, 1000);
                   }}
                   onTouchStart={(e) => e.stopPropagation()}
-                  className="group p-1 hover:bg-gray-100 active:bg-gray-200 transition-all rounded-full touch-manipulation"
+                  className="selection-toolbar-btn group p-1 hover:bg-gray-100 active:bg-gray-200 transition-all rounded-full touch-manipulation min-h-0 min-w-0"
                   title="Copy text"
                   aria-label="Copy text"
                 >
@@ -1179,7 +1179,7 @@ IMPORTANT:
                     handleTranslate();
                   }}
                   onTouchStart={(e) => e.stopPropagation()}
-                  className="group p-1 hover:bg-blue-50 active:bg-blue-100 transition-all rounded-full touch-manipulation"
+                  className="selection-toolbar-btn group p-1 hover:bg-blue-50 active:bg-blue-100 transition-all rounded-full touch-manipulation min-h-0 min-w-0"
                   title="Translate"
                   aria-label="Translate"
                 >
@@ -1194,7 +1194,7 @@ IMPORTANT:
                     handleOptimize();
                   }}
                   onTouchStart={(e) => e.stopPropagation()}
-                  className="group p-1 hover:bg-purple-50 active:bg-purple-100 transition-all rounded-full touch-manipulation"
+                  className="selection-toolbar-btn group p-1 hover:bg-purple-50 active:bg-purple-100 transition-all rounded-full touch-manipulation min-h-0 min-w-0"
                   title="AI Optimize"
                   aria-label="AI Optimize"
                 >
@@ -1209,7 +1209,7 @@ IMPORTANT:
                     handleAddToFlashcard();
                   }}
                   onTouchStart={(e) => e.stopPropagation()}
-                  className="group p-1 hover:bg-green-50 active:bg-green-100 transition-all rounded-full touch-manipulation"
+                  className="selection-toolbar-btn group p-1 hover:bg-green-50 active:bg-green-100 transition-all rounded-full touch-manipulation min-h-0 min-w-0"
                   title="Save to Flashcard"
                   aria-label="Save to Flashcard"
                 >
@@ -1396,22 +1396,6 @@ IMPORTANT:
             <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white"></div>
           )}
         </button>
-        
-        {/* Live Call Status Label */}
-        {isLiveActive && (
-          <div className="absolute -top-12 left-1/2 -translate-x-1/2 whitespace-nowrap">
-            <div className="relative">
-              {/* Glow effect */}
-              <div className="absolute inset-0 bg-red-500/30 blur-xl rounded-full animate-pulse"></div>
-              
-              {/* Main label */}
-              <div className="relative flex items-center gap-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white text-xs pl-2.5 pr-3 py-1.5 rounded-full font-semibold shadow-2xl border border-red-400/50 backdrop-blur-sm animate-in fade-in slide-in-from-bottom duration-300">
-                <span className="text-[10px] animate-pulse">🔴</span>
-                <span className="tracking-wide">LIVE</span>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Bottom Input Area */}

@@ -308,13 +308,20 @@ body {
 
   /* Optimize touch targets - minimum 44x44px */
   /* Exclude elements inside scrollable containers to avoid touch-action conflicts */
-  button:not(.flashcard-scroll button):not(.flashcard-scroll *), 
-  a:not(.flashcard-scroll a):not(.flashcard-scroll *), 
-  [role="button"]:not(.flashcard-scroll [role="button"]):not(.flashcard-scroll *) {
+  /* Exclude selection toolbar buttons to maintain compact size */
+  button:not(.flashcard-scroll button):not(.flashcard-scroll *):not(.selection-toolbar-btn), 
+  a:not(.flashcard-scroll a):not(.flashcard-scroll *):not(.selection-toolbar-btn), 
+  [role="button"]:not(.flashcard-scroll [role="button"]):not(.flashcard-scroll *):not(.selection-toolbar-btn) {
     -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
     touch-action: manipulation;
     min-height: 44px;
     min-width: 44px;
+  }
+  
+  /* Selection toolbar buttons - compact size for mobile */
+  .selection-toolbar-btn {
+    min-height: auto !important;
+    min-width: auto !important;
   }
 
   /* Prevent zoom on input focus */

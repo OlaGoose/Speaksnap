@@ -917,7 +917,7 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
                     window.speechSynthesis.speak(utterance);
                   }}
                   onTouchStart={(e) => e.stopPropagation()}
-                  className="group p-1 hover:bg-gray-100 active:bg-gray-200 transition-all rounded-full touch-manipulation"
+                  className="selection-toolbar-btn group p-1 hover:bg-gray-100 active:bg-gray-200 transition-all rounded-full touch-manipulation min-h-0 min-w-0"
                   title="Play audio"
                   aria-label="Play audio"
                 >
@@ -935,7 +935,7 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
                     handleTranslate();
                   }}
                   onTouchStart={(e) => e.stopPropagation()}
-                  className="group p-1 hover:bg-blue-50 active:bg-blue-100 transition-all rounded-full touch-manipulation"
+                  className="selection-toolbar-btn group p-1 hover:bg-blue-50 active:bg-blue-100 transition-all rounded-full touch-manipulation min-h-0 min-w-0"
                   title="Translate"
                   aria-label="Translate"
                 >
@@ -950,7 +950,7 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
                     handleOptimize();
                   }}
                   onTouchStart={(e) => e.stopPropagation()}
-                  className="group p-1 hover:bg-purple-50 active:bg-purple-100 transition-all rounded-full touch-manipulation"
+                  className="selection-toolbar-btn group p-1 hover:bg-purple-50 active:bg-purple-100 transition-all rounded-full touch-manipulation min-h-0 min-w-0"
                   title="AI Optimize"
                   aria-label="AI Optimize"
                 >
@@ -965,7 +965,7 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
                     handleAddToFlashcard();
                   }}
                   onTouchStart={(e) => e.stopPropagation()}
-                  className="group p-1 hover:bg-green-50 active:bg-green-100 transition-all rounded-full touch-manipulation"
+                  className="selection-toolbar-btn group p-1 hover:bg-green-50 active:bg-green-100 transition-all rounded-full touch-manipulation min-h-0 min-w-0"
                   title="Save to Flashcard"
                   aria-label="Save to Flashcard"
                 >
