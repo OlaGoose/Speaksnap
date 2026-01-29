@@ -158,7 +158,7 @@ export function useGeminiLive({
 
       // 5. Setup Processor for Streaming (Best Practice: 20-40ms chunks)
       // 512 samples at 16kHz ≈ 32ms, optimal for low latency
-      const processor = inputCtx.createScriptProcessor(512, 1, 1);
+      const processor = inputCtx.createScriptProcessor(4096, 1, 1);
       processorRef.current = processor;
       
       source.connect(processor);
