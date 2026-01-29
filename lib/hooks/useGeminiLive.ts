@@ -8,9 +8,15 @@ interface UseGeminiLiveOptions {
   apiKey: string;
   systemInstruction?: string;
   voiceName?: string;
+  languageCode?: string; // e.g., 'en-US', 'zh-CN'
+  enableTranscription?: boolean; // Enable audio transcription
+  enableContextCompression?: boolean; // Enable context compression for long sessions
   onError?: (error: string) => void;
   onInterrupted?: () => void;
-  onTextReceived?: (text: string) => void;
+  onTextReceived?: (text: string) => void; // For general text output
+  onInputTranscription?: (text: string) => void; // User's speech transcription
+  onOutputTranscription?: (text: string) => void; // Model's speech transcription
+  onTurnComplete?: () => void; // When a turn is complete
 }
 
 interface UseGeminiLiveReturn {
@@ -24,14 +30,26 @@ interface UseGeminiLiveReturn {
 /**
  * Gemini Multimodal Live API Hook
  * 使用官方 @google/genai SDK 实现低延迟实时语音交互
+ * 
+ * 最佳实践：
+ * - 使用 20-40ms 音频块（512 采样 @16kHz ≈ 32ms）
+ * - 启用音频转写以获取实时文本
+ * - 为长会话启用上下文压缩
+ * - 指定语言代码以提高性能
  */
 export function useGeminiLive({
   apiKey,
   systemInstruction = "You are a helpful, concise AI assistant. You answer briefly and clearly.",
   voiceName = 'Kore',
+  languageCode = 'en-US',
+  enableTranscription = false,
+  enableContextCompression = false,
   onError,
   onInterrupted,
   onTextReceived,
+  onInputTranscription,
+  onOutputTranscription,
+  onTurnComplete,
 }: UseGeminiLiveOptions): UseGeminiLiveReturn {
   const [isActive, setIsActive] = useState(false);
   const [connectionState, setConnectionState] = useState<'connected' | 'disconnected' | 'connecting'>('disconnected');
@@ -138,8 +156,9 @@ export function useGeminiLive({
       source.connect(analyser);
       analyserRef.current = analyser;
 
-      // 5. Setup Processor for Streaming
-      const processor = inputCtx.createScriptProcessor(4096, 1, 1);
+      // 5. Setup Processor for Streaming (Best Practice: 20-40ms chunks)
+      // 512 samples at 16kHz ≈ 32ms, optimal for low latency
+      const processor = inputCtx.createScriptProcessor(512, 1, 1);
       processorRef.current = processor;
       
       source.connect(processor);
@@ -177,46 +196,74 @@ export function useGeminiLive({
             };
           },
           onmessage: async (message: LiveServerMessage) => {
-            // Handle Text Output (for goal tracking)
-            const textOutput = message.serverContent?.modelTurn?.parts?.find((part: any) => part.text);
-            if (textOutput?.text) {
-              onTextReceived?.(textOutput.text);
+            const serverContent = message.serverContent;
+            if (!serverContent) return;
+
+            // Handle User Input Transcription
+            // Note: SDK types may not include all fields, use safe access
+            const userTranscription = (serverContent as any).userTranscription;
+            if (userTranscription?.parts) {
+              for (const part of userTranscription.parts) {
+                if (part.text) {
+                  console.log("User transcription:", part.text);
+                  onInputTranscription?.(part.text);
+                }
+              }
             }
 
-            // Handle Audio Output
-            const base64Audio = message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
-            if (base64Audio && outputAudioContextRef.current && outputNodeRef.current) {
-              const ctx = outputAudioContextRef.current;
-              
-              // Ensure playback time is continuous
-              nextStartTimeRef.current = Math.max(
-                nextStartTimeRef.current,
-                ctx.currentTime
-              );
+            // Handle Model Turn (Output Audio + Transcription)
+            const modelTurn = serverContent.modelTurn;
+            if (modelTurn?.parts) {
+              for (const part of modelTurn.parts) {
+                // Handle Text (Output Transcription or General Text)
+                if (part.text) {
+                  console.log("Model text:", part.text);
+                  onTextReceived?.(part.text);
+                  onOutputTranscription?.(part.text);
+                }
 
-              const audioBuffer = await decodeAudioData(
-                decode(base64Audio),
-                ctx,
-                24000,
-                1
-              );
+                // Handle Audio Output
+                if (part.inlineData?.data && outputAudioContextRef.current && outputNodeRef.current) {
+                  const base64Audio = part.inlineData.data;
+                  const ctx = outputAudioContextRef.current;
+                  
+                  // Ensure playback time is continuous
+                  nextStartTimeRef.current = Math.max(
+                    nextStartTimeRef.current,
+                    ctx.currentTime
+                  );
 
-              const bufferSource = ctx.createBufferSource();
-              bufferSource.buffer = audioBuffer;
-              bufferSource.connect(outputNodeRef.current);
-              
-              bufferSource.onended = () => {
-                audioSourcesRef.current.delete(bufferSource);
-              };
+                  const audioBuffer = await decodeAudioData(
+                    decode(base64Audio),
+                    ctx,
+                    24000,
+                    1
+                  );
 
-              bufferSource.start(nextStartTimeRef.current);
-              nextStartTimeRef.current += audioBuffer.duration;
-              audioSourcesRef.current.add(bufferSource);
+                  const bufferSource = ctx.createBufferSource();
+                  bufferSource.buffer = audioBuffer;
+                  bufferSource.connect(outputNodeRef.current);
+                  
+                  bufferSource.onended = () => {
+                    audioSourcesRef.current.delete(bufferSource);
+                  };
+
+                  bufferSource.start(nextStartTimeRef.current);
+                  nextStartTimeRef.current += audioBuffer.duration;
+                  audioSourcesRef.current.add(bufferSource);
+                }
+              }
             }
 
-            // Handle Interruptions
-            if (message.serverContent?.interrupted) {
-              console.log("Model interrupted");
+            // Handle Turn Completion
+            if (serverContent.turnComplete) {
+              console.log("Turn complete");
+              onTurnComplete?.();
+            }
+
+            // Handle Interruptions (Critical: Must stop client audio immediately)
+            if (serverContent.interrupted) {
+              console.log("Model interrupted - stopping audio playback");
               stopAudio();
               onInterrupted?.();
             }
@@ -232,12 +279,33 @@ export function useGeminiLive({
           }
         },
         config: {
-          responseModalities: [Modality.AUDIO],
+          // Include TEXT modality when transcription is enabled
+          responseModalities: enableTranscription 
+            ? [Modality.AUDIO, Modality.TEXT] 
+            : [Modality.AUDIO],
+          
+          // Speech configuration
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName } }
           },
+          
+          // System instruction
           systemInstruction,
-        },
+          
+          // Enable audio transcription for both input and output
+          ...(enableTranscription && {
+            inputAudioTranscription: {},
+            outputAudioTranscription: {},
+          }),
+          
+          // Additional config options (may not be in SDK types yet)
+          ...(languageCode && { languageCode }),
+          ...(enableContextCompression && {
+            contextWindowCompressionConfig: {
+              enabled: true,
+            },
+          }),
+        } as any,
       });
 
       sessionPromiseRef.current = sessionPromise;
@@ -253,7 +321,23 @@ export function useGeminiLive({
       setConnectionState('disconnected');
       stopLiveSession();
     }
-  }, [isActive, connectionState, apiKey, systemInstruction, voiceName, onError, onInterrupted, stopAudio, stopLiveSession]);
+  }, [
+    isActive, 
+    connectionState, 
+    apiKey, 
+    systemInstruction, 
+    voiceName, 
+    languageCode,
+    enableTranscription,
+    enableContextCompression,
+    onError, 
+    onInterrupted, 
+    onInputTranscription,
+    onOutputTranscription,
+    onTurnComplete,
+    stopAudio, 
+    stopLiveSession
+  ]);
 
   // Cleanup on unmount
   useEffect(() => {
