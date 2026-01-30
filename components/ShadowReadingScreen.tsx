@@ -171,8 +171,14 @@ export default function ShadowReadingScreen({ userLevel }: ShadowReadingScreenPr
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const options: MediaRecorderOptions = {};
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      });
+      const options: MediaRecorderOptions = { audioBitsPerSecond: 128000 };
       if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
         options.mimeType = 'audio/webm;codecs=opus';
       } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
@@ -197,7 +203,8 @@ export default function ShadowReadingScreen({ userLevel }: ShadowReadingScreenPr
         setState('has_recording');
       };
 
-      mr.start(100);
+      // 250ms timeslice: more reliable data on Safari/iOS; 100ms can yield empty chunks
+      mr.start(250);
       setState('recording');
     } catch (e) {
       console.error(e);
@@ -373,11 +380,11 @@ export default function ShadowReadingScreen({ userLevel }: ShadowReadingScreenPr
                 <div className="flex flex-col items-center gap-4">
                   {state === 'recording' ? (
                     <>
-                      <div className="flex gap-1.5">
-                        {[0.1, 0.2, 0.15, 0.25, 0.18, 0.22, 0.12].map((d, i) => (
+                      <div className="flex items-end justify-center gap-1 h-8" aria-hidden>
+                        {[0, 0.12, 0.08, 0.16, 0.06, 0.14, 0.1, 0.18, 0.04].map((d, i) => (
                           <div
                             key={i}
-                            className="w-1.5 h-4 bg-red-500 rounded-full recording-wave"
+                            className="w-1 h-5 rounded-full bg-apple-blue recording-wave shadow-sm"
                             style={{ animationDelay: `${d}s` }}
                           />
                         ))}
@@ -386,7 +393,7 @@ export default function ShadowReadingScreen({ userLevel }: ShadowReadingScreenPr
                       <button
                         type="button"
                         onClick={stopRecording}
-                        className="flex items-center gap-2 px-5 py-3 bg-red-500 text-white rounded-xl font-semibold text-sm active:scale-95 transition-transform"
+                        className="flex items-center gap-2 px-5 py-3 bg-apple-blue text-white rounded-xl font-semibold text-sm active:scale-95 transition-transform shadow-sm"
                       >
                         <Square size={18} />
                         Stop
