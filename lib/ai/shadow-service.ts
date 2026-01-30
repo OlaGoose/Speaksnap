@@ -45,12 +45,13 @@ export async function generateDailyChallenge(
     { "topic": "string", "text": "string" }
   `;
 
-  // Note: Use gemini-3-flash-preview to avoid RPC errors with googleSearch
+  // Note: Use gemini-3-flash-preview to avoid RPC errors with googleSearch; 60s timeout for googleSearch
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: prompt,
     config: {
       tools: [{ googleSearch: {} }],
+      httpOptions: { timeout: 60000 },
     },
   });
 
@@ -83,6 +84,7 @@ export async function generateReferenceAudio(
           prebuiltVoiceConfig: { voiceName: 'Kore' },
         },
       },
+      httpOptions: { timeout: 60000 },
     },
   });
 
@@ -126,7 +128,7 @@ export async function analyzeShadowReading(
     }
   `;
 
-  // Note: Use gemini-3-flash-preview for stable audio analysis
+  // Note: Use gemini-3-flash-preview for stable audio analysis; 60s timeout
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: [
@@ -141,6 +143,7 @@ export async function analyzeShadowReading(
         ],
       },
     ],
+    config: { httpOptions: { timeout: 60000 } },
   });
 
   const responseText = response.text;

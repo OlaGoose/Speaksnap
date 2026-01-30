@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+
+export const maxDuration = 60;
 import { generateDailyChallenge, generateReferenceAudio } from '@/lib/ai/shadow-service';
 import type { UserLevel } from '@/lib/types';
 
