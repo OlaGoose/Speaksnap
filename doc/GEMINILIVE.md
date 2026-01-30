@@ -14,7 +14,8 @@
 - `enableTranscription?: boolean` - 启用/禁用音频转写
 - `onInputTranscription?: (text: string) => void` - 用户语音转写回调
 - `onOutputTranscription?: (text: string) => void` - AI 语音转写回调
-- `onTurnComplete?: () => void` - 对话轮次完成回调
+- `onUserTurnComplete?: (userText: string) => void` - 用户说完时回调（AI 开始输出时触发，用于先出用户气泡）
+- `onTurnComplete?: (userText: string, aiText: string) => void` - AI 说完时回调（轮次结束，用于出 AI 气泡）
 
 **实现细节：**
 ```typescript
@@ -156,7 +157,8 @@ interface UseGeminiLiveOptions {
   enableContextCompression?: boolean;              // 启用压缩
   onInputTranscription?: (text: string) => void;   // 用户转写
   onOutputTranscription?: (text: string) => void;  // AI 转写
-  onTurnComplete?: () => void;                     // 轮次完成
+  onUserTurnComplete?: (userText: string) => void;   // 用户说完（AI 开始时触发）
+  onTurnComplete?: (userText: string, aiText: string) => void;  // AI 说完（轮次结束）
 }
 ```
 
@@ -255,9 +257,9 @@ const {
     // 显示 AI 说的话
   },
   
-  onTurnComplete: () => {
-    console.log('Turn complete');
-    // 更新 UI 状态
+  onTurnComplete: (userText, aiText) => {
+    console.log('Turn complete', { userText, aiText });
+    // 可将本轮追加到聊天记录
   },
   
   onInterrupted: () => {
@@ -291,7 +293,7 @@ const {
    → 如果是音频：解码并排队播放
   ↓
 3. 检查轮次完成 (turnComplete)
-   → onTurnComplete()
+   → onTurnComplete(userText, aiText)
   ↓
 4. 检查中断 (interrupted)
    → stopAudio() + onInterrupted()
@@ -461,10 +463,10 @@ RESPOND IN ENGLISH. YOU MUST RESPOND UNMISTAKABLY IN ENGLISH.
       console.log('Received text:', text);
     },
     
-    // 对话轮次完成
-    onTurnComplete: () => {
-      console.log('Turn complete');
-      // 可以在这里触发 UI 更新或其他逻辑
+    // 对话轮次完成（带本轮用户/AI 转写文本）
+    onTurnComplete: (userText, aiText) => {
+      console.log('Turn complete', { userText, aiText });
+      // 可将本轮追加到聊天记录
     },
   });
 

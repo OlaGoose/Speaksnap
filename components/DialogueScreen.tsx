@@ -49,6 +49,8 @@ export default function DialogueScreen({
   const [showGoalComplete, setShowGoalComplete] = useState(false);
   const [conversationGoals, setConversationGoals] = useState<string[]>([]);
   const conversationTextRef = useRef<string>('');
+  const [liveUserText, setLiveUserText] = useState('');
+  const [liveAiText, setLiveAiText] = useState('');
   // 打字动画状态
   const [typingMessageId, setTypingMessageId] = useState<string | null>(null);
   const [displayedText, setDisplayedText] = useState<string>('');
@@ -335,7 +337,8 @@ IMPORTANT:
   } = useGeminiLive({
     apiKey: process.env.NEXT_PUBLIC_GEMINI_API_KEY || '',
     systemInstruction: buildSystemInstruction(),
-    voiceName: 'Kore', // 可以根据场景选择不同声音：Puck, Charon, Kore, Fenrir, Aoide
+    voiceName: 'Kore',
+    enableTranscription: true,
     onError: (err) => {
       console.error("Gemini Live Error:", err);
       setIsLiveActive(false);
@@ -343,15 +346,27 @@ IMPORTANT:
     onInterrupted: () => {
       console.log("AI was interrupted by user");
     },
-    onTextReceived: (text) => {
-      checkGoalCompletion(text);
-    }
+    onInputTranscription: (accumulated) => setLiveUserText(accumulated),
+    onOutputTranscription: (accumulated) => setLiveAiText(accumulated),
+    onUserTurnComplete: (userText) => {
+      const t = (userText ?? '').trim();
+      if (t) setMessages((prev) => [...prev, { id: Date.now().toString(), speaker: 'user', text: t }]);
+    },
+    onTurnComplete: (_userText, aiText) => {
+      const t = (aiText ?? '').trim();
+      if (t) setMessages((prev) => [...prev, { id: `${Date.now()}`, speaker: 'ai', text: t }]);
+      setLiveUserText('');
+      setLiveAiText('');
+    },
+    onTextReceived: (text) => checkGoalCompletion(text),
   });
 
   const handleToggleLive = () => {
     if (isLiveActive) {
       stopLiveSession();
       setIsLiveActive(false);
+      setLiveUserText('');
+      setLiveAiText('');
       setGoalProgress(0);
       setShowGoalComplete(false);
       conversationTextRef.current = '';

@@ -16,7 +16,8 @@ interface UseGeminiLiveOptions {
   onTextReceived?: (text: string) => void; // For general text output
   onInputTranscription?: (text: string) => void; // User's speech transcription
   onOutputTranscription?: (text: string) => void; // Model's speech transcription
-  onTurnComplete?: () => void; // When a turn is complete
+  onUserTurnComplete?: (userText: string) => void; // User finished speaking (emit user bubble when AI starts)
+  onTurnComplete?: (userText: string, aiText: string) => void; // AI finished (emit AI bubble)
 }
 
 interface UseGeminiLiveReturn {
@@ -49,6 +50,7 @@ export function useGeminiLive({
   onTextReceived,
   onInputTranscription,
   onOutputTranscription,
+  onUserTurnComplete,
   onTurnComplete,
 }: UseGeminiLiveOptions): UseGeminiLiveReturn {
   const [isActive, setIsActive] = useState(false);
@@ -70,6 +72,10 @@ export function useGeminiLive({
   // API Session
   const sessionPromiseRef = useRef<Promise<any> | null>(null);
   const closeSessionRef = useRef<(() => void) | null>(null);
+  const sessionOpenRef = useRef(false);
+  const currentInputTranscriptRef = useRef('');
+  const currentOutputTranscriptRef = useRef('');
+  const userFlushedThisTurnRef = useRef(false);
 
   // Helper to stop all audio
   const stopAudio = useCallback(() => {
@@ -87,7 +93,11 @@ export function useGeminiLive({
 
   const stopLiveSession = useCallback(() => {
     console.log("Disconnecting...");
-    
+    sessionOpenRef.current = false;
+    currentInputTranscriptRef.current = '';
+    currentOutputTranscriptRef.current = '';
+    userFlushedThisTurnRef.current = false;
+
     // Close the Live API session
     if (closeSessionRef.current) {
       closeSessionRef.current();
@@ -173,25 +183,22 @@ export function useGeminiLive({
         callbacks: {
           onopen: () => {
             console.log('Gemini Live Session Opened');
+            sessionOpenRef.current = true;
             setIsActive(true);
             setConnectionState('connected');
             
-            // Start processing audio only when connected
             processor.onaudioprocess = (e) => {
+              if (!sessionOpenRef.current) return;
               const inputData = e.inputBuffer.getChannelData(0);
               const pcmBlob = createPcmBlob(inputData);
-              
-              // Calculate volume for visualizer
               let sum = 0;
-              for (let i = 0; i < inputData.length; i++) {
-                sum += inputData[i] * inputData[i];
-              }
-              const rms = Math.sqrt(sum / inputData.length);
-              // Normalize roughly for visual effect
-              setVolume(Math.min(rms * 5, 1)); 
-
+              for (let i = 0; i < inputData.length; i++) sum += inputData[i] * inputData[i];
+              setVolume(Math.min(Math.sqrt(sum / inputData.length) * 5, 1));
               sessionPromise.then((session) => {
-                session.sendRealtimeInput({ media: pcmBlob });
+                if (!sessionOpenRef.current) return;
+                try {
+                  session.sendRealtimeInput({ media: pcmBlob });
+                } catch (_) {}
               });
             };
           },
@@ -199,90 +206,88 @@ export function useGeminiLive({
             const serverContent = message.serverContent;
             if (!serverContent) return;
 
-            // Handle User Input Transcription
-            // Note: SDK types may not include all fields, use safe access
-            const userTranscription = (serverContent as any).userTranscription;
-            if (userTranscription?.parts) {
-              for (const part of userTranscription.parts) {
-                if (part.text) {
-                  console.log("User transcription:", part.text);
-                  onInputTranscription?.(part.text);
-                }
-              }
+            const sc = serverContent as {
+              inputTranscription?: { text?: string };
+              outputTranscription?: { text?: string };
+              turnComplete?: boolean;
+              interrupted?: boolean;
+              modelTurn?: { parts?: Array<{ text?: string; inlineData?: { data?: string } }> };
+            };
+
+            // 1. User bubble: when AI first outputs (user has “finished” from our perspective)
+            const hasAiOutput = !!(sc.outputTranscription?.text || sc.modelTurn?.parts?.length);
+            if (hasAiOutput && !userFlushedThisTurnRef.current && currentInputTranscriptRef.current) {
+              onUserTurnComplete?.(currentInputTranscriptRef.current);
+              currentInputTranscriptRef.current = '';
+              userFlushedThisTurnRef.current = true;
             }
 
-            // Handle Model Turn (Output Audio + Transcription)
-            const modelTurn = serverContent.modelTurn;
-            if (modelTurn?.parts) {
-              for (const part of modelTurn.parts) {
-                // Handle Text (Output Transcription or General Text)
-                if (part.text) {
-                  console.log("Model text:", part.text);
-                  onTextReceived?.(part.text);
-                  onOutputTranscription?.(part.text);
-                }
-
-                // Handle Audio Output
-                if (part.inlineData?.data && outputAudioContextRef.current && outputNodeRef.current) {
-                  const base64Audio = part.inlineData.data;
-                  const ctx = outputAudioContextRef.current;
-                  
-                  // Ensure playback time is continuous
-                  nextStartTimeRef.current = Math.max(
-                    nextStartTimeRef.current,
-                    ctx.currentTime
-                  );
-
-                  const audioBuffer = await decodeAudioData(
-                    decode(base64Audio),
-                    ctx,
-                    24000,
-                    1
-                  );
-
-                  const bufferSource = ctx.createBufferSource();
-                  bufferSource.buffer = audioBuffer;
-                  bufferSource.connect(outputNodeRef.current);
-                  
-                  bufferSource.onended = () => {
-                    audioSourcesRef.current.delete(bufferSource);
-                  };
-
-                  bufferSource.start(nextStartTimeRef.current);
-                  nextStartTimeRef.current += audioBuffer.duration;
-                  audioSourcesRef.current.add(bufferSource);
-                }
-              }
+            // 2. Transcription (accumulate and stream UI)
+            if (sc.inputTranscription?.text) {
+              currentInputTranscriptRef.current += sc.inputTranscription.text;
+              if (enableTranscription) console.log('[Live 用户]', currentInputTranscriptRef.current);
+              onInputTranscription?.(currentInputTranscriptRef.current);
             }
-
-            // Handle Turn Completion
-            if (serverContent.turnComplete) {
-              console.log("Turn complete");
-              onTurnComplete?.();
+            if (sc.outputTranscription?.text) {
+              currentOutputTranscriptRef.current += sc.outputTranscription.text;
+              if (enableTranscription) console.log('[Live AI]', currentOutputTranscriptRef.current);
+              onOutputTranscription?.(currentOutputTranscriptRef.current);
+              onTextReceived?.(sc.outputTranscription.text);
             }
-
-            // Handle Interruptions (Critical: Must stop client audio immediately)
-            if (serverContent.interrupted) {
-              console.log("Model interrupted - stopping audio playback");
+            if (sc.turnComplete) {
+              const userText = currentInputTranscriptRef.current;
+              const aiText = currentOutputTranscriptRef.current;
+              if (!userFlushedThisTurnRef.current && userText) onUserTurnComplete?.(userText);
+              currentInputTranscriptRef.current = '';
+              currentOutputTranscriptRef.current = '';
+              userFlushedThisTurnRef.current = false;
+              onTurnComplete?.(userText, aiText);
+            }
+            if (sc.interrupted) {
+              currentOutputTranscriptRef.current = '';
+              userFlushedThisTurnRef.current = false;
               stopAudio();
               onInterrupted?.();
+            }
+
+            // 2. Audio output (modelTurn.parts[].inlineData)
+            const modelTurn = sc.modelTurn;
+            if (modelTurn?.parts) {
+              for (const part of modelTurn.parts) {
+                if (!part.inlineData?.data || !outputAudioContextRef.current || !outputNodeRef.current) continue;
+                const ctx = outputAudioContextRef.current;
+                nextStartTimeRef.current = Math.max(nextStartTimeRef.current, ctx.currentTime);
+                const audioBuffer = await decodeAudioData(
+                  decode(part.inlineData.data),
+                  ctx,
+                  24000,
+                  1
+                );
+                const bufferSource = ctx.createBufferSource();
+                bufferSource.buffer = audioBuffer;
+                bufferSource.connect(outputNodeRef.current);
+                bufferSource.onended = () => audioSourcesRef.current.delete(bufferSource);
+                bufferSource.start(nextStartTimeRef.current);
+                nextStartTimeRef.current += audioBuffer.duration;
+                audioSourcesRef.current.add(bufferSource);
+              }
             }
           },
           onclose: () => {
             console.log("Session closed");
+            sessionOpenRef.current = false;
             stopLiveSession();
           },
           onerror: (err) => {
             console.error("Session error:", err);
+            sessionOpenRef.current = false;
             onError?.("Connection lost or error occurred.");
             stopLiveSession();
           }
         },
         config: {
-          // Include TEXT modality when transcription is enabled
-          responseModalities: enableTranscription 
-            ? [Modality.AUDIO, Modality.TEXT] 
-            : [Modality.AUDIO],
+          // live 方式：仅 AUDIO，转写由 input/outputAudioTranscription 提供
+          responseModalities: [Modality.AUDIO],
           
           // Speech configuration
           speechConfig: {
@@ -334,6 +339,7 @@ export function useGeminiLive({
     onInterrupted, 
     onInputTranscription,
     onOutputTranscription,
+    onUserTurnComplete,
     onTurnComplete,
     stopAudio, 
     stopLiveSession
