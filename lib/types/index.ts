@@ -160,6 +160,10 @@ export interface ShadowWordAnalysis {
   status: 'good' | 'average' | 'poor';
   phonetic?: string;
   issue?: string;
+  refStartTime?: number; // Reference audio start time in seconds
+  refEndTime?: number; // Reference audio end time in seconds
+  userStartTime?: number; // User audio start time in seconds
+  userEndTime?: number; // User audio end time in seconds
 }
 
 export interface ShadowAnalysisResult {

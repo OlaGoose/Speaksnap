@@ -108,21 +108,36 @@ export async function analyzeShadowReading(
   const cleanMimeType = userMimeType.split(';')[0].trim();
 
   const prompt = `
-    Role: Strict Dialect Coach.
+    Role: Strict Dialect Coach with Audio Timing Analysis.
     Reference Text: "${referenceText}"
 
-    Task: Compare the "User Audio" directly against the "Reference Audio" (Native Speaker).
-    Identify differences in pronunciation, intonation, and rhythm. Be strict.
-
+    Task: 
+    1. Listen to both "Reference Audio" (Native Speaker) and "User Audio" (Student).
+    2. Compare pronunciation, intonation, and rhythm. Be strict.
+    3. For EACH word, estimate the time position (in seconds) where it appears in BOTH audios.
+    
     Output strictly valid JSON (no markdown) with this structure:
     {
-      "words": [{ "word": "string", "status": "good"|"average"|"poor", "issue": "string", "phonetic": "string" }],
+      "words": [
+        { 
+          "word": "string", 
+          "status": "good"|"average"|"poor", 
+          "issue": "string", 
+          "phonetic": "string",
+          "refStartTime": number (seconds, e.g., 0.5),
+          "refEndTime": number (seconds, e.g., 1.2),
+          "userStartTime": number (seconds, e.g., 0.8),
+          "userEndTime": number (seconds, e.g., 1.6)
+        }
+      ],
       "score": number (0-100),
       "fluency": "string",
       "pronunciation": { "strengths": ["string"], "weaknesses": ["string"] },
       "intonation": "string",
       "suggestions": "string"
     }
+    
+    IMPORTANT: Estimate timing accurately by listening to when each word is spoken in both audios.
   `;
 
   // Note: Use gemini-3-flash-preview for stable audio analysis; 60s timeout

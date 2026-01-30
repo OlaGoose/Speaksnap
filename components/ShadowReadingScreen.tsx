@@ -302,12 +302,11 @@ export default function ShadowReadingScreen({ userLevel }: ShadowReadingScreenPr
     }
   };
 
-  const playAudioSegment = (audioUrl: string, startTime: number, duration: number): Promise<void> => {
+  const playAudioSegment = (audioUrl: string, startTime: number, endTime: number): Promise<void> => {
     return new Promise((resolve) => {
       const audio = new Audio(audioUrl);
       audio.currentTime = Math.max(0, startTime);
       audio.play();
-      const endTime = startTime + duration;
       const checkTime = () => {
         if (audio.currentTime >= endTime) {
           audio.pause();
@@ -322,19 +321,44 @@ export default function ShadowReadingScreen({ userLevel }: ShadowReadingScreenPr
   const handleWordClick = useCallback(
     async (wordIndex: number, word: string) => {
       if (!refAudioUrl || !userAudioUrl || !analysis) return;
-      const totalWords = analysis.words.length;
-      const refDuration = refAudioDurationRef.current || 10;
-      const userDuration = userAudioDurationRef.current || 10;
-      // Estimate word position: linear interpolation based on index
-      const wordRatio = wordIndex / totalWords;
-      const refStart = wordRatio * refDuration;
-      const userStart = wordRatio * userDuration;
-      const segmentDuration = 0.8;
+      const wordData = analysis.words[wordIndex];
+      if (!wordData) return;
 
-      // Play reference segment, then user segment
-      await playAudioSegment(refAudioUrl, refStart, segmentDuration);
-      await new Promise((resolve) => setTimeout(resolve, 200));
-      await playAudioSegment(userAudioUrl, userStart, segmentDuration);
+      // Use precise timestamps if available, otherwise fall back to linear estimation
+      let userStart: number, userEnd: number, refStart: number, refEnd: number;
+
+      if (
+        typeof wordData.userStartTime === 'number' &&
+        typeof wordData.userEndTime === 'number' &&
+        typeof wordData.refStartTime === 'number' &&
+        typeof wordData.refEndTime === 'number'
+      ) {
+        // Use precise timestamps from Gemini
+        userStart = wordData.userStartTime;
+        userEnd = wordData.userEndTime;
+        refStart = wordData.refStartTime;
+        refEnd = wordData.refEndTime;
+      } else {
+        // Fallback: linear estimation
+        const totalWords = analysis.words.length;
+        const refDuration = refAudioDurationRef.current || 10;
+        const userDuration = userAudioDurationRef.current || 10;
+        const wordRatio = wordIndex / totalWords;
+        const segmentDuration = 0.8;
+        userStart = wordRatio * userDuration;
+        userEnd = userStart + segmentDuration;
+        refStart = wordRatio * refDuration;
+        refEnd = refStart + segmentDuration;
+      }
+
+      // Play user segment first, then reference segment (user wants to hear their pronunciation first)
+      try {
+        await playAudioSegment(userAudioUrl, userStart, userEnd);
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        await playAudioSegment(refAudioUrl, refStart, refEnd);
+      } catch (err) {
+        console.error('Error playing audio segment:', err);
+      }
     },
     [refAudioUrl, userAudioUrl, analysis]
   );
@@ -402,7 +426,9 @@ export default function ShadowReadingScreen({ userLevel }: ShadowReadingScreenPr
             {state === 'results' && analysis ? (
               <>
                 <WordAnalysisView words={analysis.words} onWordClick={handleWordClick} />
-                <p className="text-xs text-gray-400 text-center mt-2">Tap any word to compare pronunciation</p>
+                <p className="text-xs text-gray-400 text-center mt-2">
+                  Tap any word to hear: Your pronunciation → Reference pronunciation
+                </p>
               </>
             ) : (
               <h1 className="text-2xl md:text-3xl font-medium tracking-tight leading-tight text-primary-900 px-2">
