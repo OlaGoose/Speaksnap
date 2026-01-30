@@ -147,3 +147,29 @@ export interface DiaryProcessResult {
   extracted_patterns: Omit<SentencePattern, 'id' | 'timestamp'>[];
   flashcards: FlashcardGeneration[];
 }
+
+// Shadow Reading (影子跟读) types
+export interface ShadowDailyChallenge {
+  topic: string;
+  text: string;
+  sourceUrl?: string;
+}
+
+export interface ShadowWordAnalysis {
+  word: string;
+  status: 'good' | 'average' | 'poor';
+  phonetic?: string;
+  issue?: string;
+}
+
+export interface ShadowAnalysisResult {
+  score: number;
+  fluency: string;
+  words: ShadowWordAnalysis[];
+  pronunciation: {
+    strengths: string[];
+    weaknesses: string[];
+  };
+  intonation: string;
+  suggestions: string;
+}

@@ -219,6 +219,7 @@ export default function Home() {
                 setCurrentDialogueId(dialogueId);
                 setCurrentScreen(Screen.DIALOGUE);
               }}
+              userLevel={userLevel}
             />
           </Suspense>
         );

@@ -471,7 +471,7 @@ export default function CameraScreen({
   ];
 
   return (
-    <div className="relative h-full w-full bg-black overflow-hidden flex flex-col select-none text-white">
+    <div className="relative h-full w-full bg-black overflow-hidden flex flex-col select-none text-white [font-size:130%]">
       {/* Background Layer */}
       <div className="absolute inset-0 z-0 bg-black">
         {!error ? (
@@ -480,7 +480,7 @@ export default function CameraScreen({
             {!isCameraReady && (
               <div className="absolute inset-0 z-20 bg-black/80 flex items-center justify-center">
                 <div className="flex flex-col items-center gap-3">
-                  <Loader2 size={32} className="text-white animate-spin" />
+                  <Loader2 size={42} className="text-white animate-spin" />
                   <p className="text-white/80 text-sm font-medium">Initializing camera...</p>
                 </div>
               </div>
@@ -546,7 +546,7 @@ export default function CameraScreen({
 
               {isLocationEnabled && !isRecording && (
                 <div className="mt-4 flex items-center gap-2 text-white/50 text-sm">
-                  <MapPin size={14} />
+                  <MapPin size={23} />
                   <span>Location context active</span>
                 </div>
               )}
@@ -556,7 +556,7 @@ export default function CameraScreen({
           <div className="w-full h-full flex flex-col items-center justify-center p-6 text-white">
             <div className="text-center space-y-4 max-w-md">
               <div className="w-16 h-16 mx-auto rounded-full bg-red-500/20 flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-400">
+                <svg xmlns="http://www.w3.org/2000/svg" width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-400">
                   <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path>
                   <circle cx="12" cy="13" r="3"></circle>
                 </svg>
@@ -569,7 +569,7 @@ export default function CameraScreen({
                 onClick={handleRetryCamera}
                 className="mt-4 px-6 py-3 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 rounded-full text-white font-medium transition-all active:scale-95 flex items-center gap-2 mx-auto"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"></path>
                 </svg>
                 Retry
@@ -585,7 +585,7 @@ export default function CameraScreen({
           onClick={() => onNavigate(Screen.LIBRARY)}
           className="h-10 w-10 rounded-full bg-black/20 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-black/40 transition-all active:scale-95"
         >
-          <History size={18} />
+          <History size={23} />
         </button>
 
         <div className="flex items-center gap-2">
@@ -599,7 +599,7 @@ export default function CameraScreen({
             }`}
             title={isLocationEnabled ? 'Location Context: On' : 'Location Context: Off'}
           >
-            {isLocationEnabled ? <MapPin size={18} /> : <MapPinOff size={18} />}
+            {isLocationEnabled ? <MapPin size={23} /> : <MapPinOff size={23} />}
           </button>
 
           {/* Level Selector */}
@@ -608,9 +608,9 @@ export default function CameraScreen({
               onClick={() => setShowLevelMenu(!showLevelMenu)}
               className="h-10 px-4 rounded-full bg-black/20 backdrop-blur-md border border-white/10 flex items-center gap-2 text-white hover:bg-black/40 transition-all active:scale-95"
             >
-              <span className="text-xs font-semibold">{userLevel}</span>
+              <span className="text-sm font-semibold">{userLevel}</span>
               <ChevronDown
-                size={14}
+                size={18}
                 className={`transition-transform duration-300 ${
                   showLevelMenu ? 'rotate-180' : ''
                 }`}
@@ -633,7 +633,7 @@ export default function CameraScreen({
                     }`}
                   >
                     {l}
-                    {userLevel === l && <Check size={14} className="text-black" />}
+                    {userLevel === l && <Check size={18} className="text-black" />}
                   </button>
                 ))}
               </div>
@@ -708,7 +708,7 @@ export default function CameraScreen({
                   {m.id === 'camera' && isActive ? (
                     <div className="w-12 h-12 bg-white rounded-full active:scale-90 transition-transform flex items-center justify-center">
                       {isFetchingLocation && (
-                        <Loader2 size={24} className="text-black animate-spin" />
+                        <Loader2 size={31} className="text-black animate-spin" />
                       )}
                     </div>
                   ) : m.id === 'voice' && isActive ? (
@@ -720,18 +720,18 @@ export default function CameraScreen({
                       }`}
                     >
                       {isFetchingLocation && !isRecording ? (
-                        <Loader2 size={24} className="text-white animate-spin" />
+                        <Loader2 size={31} className="text-white animate-spin" />
                       ) : isRecording ? (
                         // Stop icon (square)
                         <div className="w-5 h-5 bg-white rounded-sm" />
                       ) : (
                         // Microphone icon
-                        <Mic size={24} className="text-white" />
+                        <Mic size={31} className="text-white" />
                       )}
                     </div>
                   ) : (
                     <m.icon
-                      size={isActive ? 28 : 20}
+                      size={isActive ? 36 : 26}
                       className={`transition-colors drop-shadow-md ${
                         isActive ? 'text-white' : 'text-white'
                       }`}
@@ -742,7 +742,7 @@ export default function CameraScreen({
                 {/* Floating Label */}
                 <span
                   className={`
-                    absolute bottom-0 text-[10px] font-bold uppercase tracking-[0.2em] text-white shadow-black/50 drop-shadow-sm
+                    absolute bottom-0 text-[13px] font-bold uppercase tracking-[0.2em] text-white shadow-black/50 drop-shadow-sm
                     transition-all duration-300 transform
                     ${isActive ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2'}
                   `}

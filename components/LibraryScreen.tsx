@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { Screen, Scenario, DialogueRecord } from '@/lib/types';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import { Screen, Scenario, DialogueRecord, UserLevel } from '@/lib/types';
 import {
   Camera,
   MapPin,
@@ -16,14 +16,19 @@ import {
   Play,
   Eye,
   Trash2,
+  Loader2,
 } from 'lucide-react';
 import FlashcardDeck from './FlashcardDeck';
 import DiaryEditor from './DiaryEditor';
 import { storage } from '@/lib/utils/storage';
+import { prefetchShadowChallenge } from '@/lib/shadowCache';
+
+const ShadowReadingScreen = lazy(() => import('./ShadowReadingScreen'));
 
 interface LibraryScreenProps {
   onNavigate: (screen: Screen) => void;
   onSelectScenario: (scenario: Scenario, dialogueId?: string) => void;
+  userLevel: UserLevel;
 }
 
 interface DiaryEntry {
@@ -34,8 +39,8 @@ interface DiaryEntry {
   timestamp: number;
 }
 
-export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryScreenProps) {
-  const [activeTab, setActiveTab] = useState<'scenarios' | 'flashcards' | 'diary'>('scenarios');
+export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel }: LibraryScreenProps) {
+  const [activeTab, setActiveTab] = useState<'scenarios' | 'flashcards' | 'diary' | 'shadow'>('scenarios');
   const [savedScenarios, setSavedScenarios] = useState<Scenario[]>([]);
   const [expandedScenarioId, setExpandedScenarioId] = useState<string | null>(null);
   const [isWritingDiary, setIsWritingDiary] = useState(false);
@@ -48,7 +53,11 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
     if (activeTab === 'diary') {
       loadDiaries();
     }
-  }, [activeTab]);
+    // Prefetch shadow challenge when user clicks Shadow tab
+    if (activeTab === 'shadow') {
+      prefetchShadowChallenge(userLevel);
+    }
+  }, [activeTab, userLevel]);
 
   const loadScenarios = useCallback(() => {
     const scenarios = storage.getItem<Scenario[]>('speakSnapScenarios');
@@ -159,17 +168,20 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
           >
             <ArrowLeft size={18} />
           </button>
-          <div className="flex-1 relative">
-            <input
-              type="text"
-              placeholder="Search scenarios..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full h-10 pl-10 pr-4 bg-white rounded-full border border-transparent shadow-float outline-none focus:border-gray-300 transition-all placeholder:text-gray-400 text-base"
-              aria-label="Search scenarios"
-            />
-            <Search className="absolute left-3.5 top-2.5 text-gray-400 pointer-events-none" size={16} />
-          </div>
+          {activeTab !== 'shadow' && (
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                placeholder="Search scenarios..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-10 pl-10 pr-4 bg-white rounded-full border border-transparent shadow-float outline-none focus:border-gray-300 transition-all placeholder:text-gray-400 text-base"
+                aria-label="Search scenarios"
+              />
+              <Search className="absolute left-3.5 top-2.5 text-gray-400 pointer-events-none" size={16} />
+            </div>
+          )}
+          {activeTab === 'shadow' && <div className="flex-1" />}
         </div>
 
         {/* Tabs */}
@@ -207,11 +219,34 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
           >
             Diary
           </button>
+          <button
+            onClick={() => setActiveTab('shadow')}
+            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all touch-manipulation min-h-[44px] ${
+              activeTab === 'shadow' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-gray-600'
+            }`}
+            role="tab"
+            aria-selected={activeTab === 'shadow'}
+            aria-label="Shadow reading tab"
+          >
+            Shadow
+          </button>
         </div>
       </div>
 
       {/* Content with optimized scrolling */}
-      <div className={`flex-1 px-4 pt-4 pb-24 safe-bottom ${activeTab === 'flashcards' ? 'overflow-hidden' : 'overflow-y-auto scroll-container'}`}>
+      <div className={`flex-1 px-4 pt-4 pb-24 safe-bottom ${activeTab === 'flashcards' ? 'overflow-hidden' : activeTab === 'shadow' ? 'overflow-hidden' : 'overflow-y-auto scroll-container'}`}>
+        {activeTab === 'shadow' && (
+          <Suspense
+            fallback={
+              <div className="h-full flex flex-col items-center justify-center p-8">
+                <Loader2 size={32} className="text-primary-900 animate-spin" />
+                <p className="text-sm text-gray-500 mt-2">Loading...</p>
+              </div>
+            }
+          >
+            <ShadowReadingScreen userLevel={userLevel} />
+          </Suspense>
+        )}
         {activeTab === 'scenarios' && (
           <div className="space-y-3 py-4 animate-in fade-in duration-300">
             {filteredScenarios.length === 0 ? (
@@ -597,7 +632,7 @@ export default function LibraryScreen({ onNavigate, onSelectScenario }: LibraryS
       </div>
 
       {/* FAB with safe area */}
-      {activeTab !== 'flashcards' && (
+      {activeTab !== 'flashcards' && activeTab !== 'shadow' && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-30 safe-bottom">
           {activeTab === 'diary' ? (
             <button
