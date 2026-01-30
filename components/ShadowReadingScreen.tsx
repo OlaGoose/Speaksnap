@@ -51,6 +51,8 @@ export default function ShadowReadingScreen({ userLevel }: ShadowReadingScreenPr
   const refAudioUrlRef = useRef<string | null>(null);
   const userAudioUrlRef = useRef<string | null>(null);
   const loadChallengeAbortRef = useRef<AbortController | null>(null);
+  const refAudioDurationRef = useRef<number>(0);
+  const userAudioDurationRef = useRef<number>(0);
 
   const loadChallenge = useCallback(async () => {
     setState('loading');
@@ -136,6 +138,11 @@ export default function ShadowReadingScreen({ userLevel }: ShadowReadingScreenPr
         if (refAudioUrlRef.current) URL.revokeObjectURL(refAudioUrlRef.current);
         refAudioUrlRef.current = blobUrl;
         setRefAudioUrl(blobUrl);
+        // Get audio duration for word-segment playback
+        const audio = new Audio(blobUrl);
+        audio.onloadedmetadata = () => {
+          refAudioDurationRef.current = audio.duration;
+        };
       }
       setState('ready');
     } catch (e) {
@@ -200,6 +207,11 @@ export default function ShadowReadingScreen({ userLevel }: ShadowReadingScreenPr
         userAudioUrlRef.current = url;
         setUserAudioBlob(blob);
         setUserAudioUrl(url);
+        // Get user audio duration
+        const audio = new Audio(url);
+        audio.onloadedmetadata = () => {
+          userAudioDurationRef.current = audio.duration;
+        };
         setState('has_recording');
       };
 
@@ -290,6 +302,43 @@ export default function ShadowReadingScreen({ userLevel }: ShadowReadingScreenPr
     }
   };
 
+  const playAudioSegment = (audioUrl: string, startTime: number, duration: number): Promise<void> => {
+    return new Promise((resolve) => {
+      const audio = new Audio(audioUrl);
+      audio.currentTime = Math.max(0, startTime);
+      audio.play();
+      const endTime = startTime + duration;
+      const checkTime = () => {
+        if (audio.currentTime >= endTime) {
+          audio.pause();
+          resolve();
+        }
+      };
+      audio.ontimeupdate = checkTime;
+      audio.onended = () => resolve();
+    });
+  };
+
+  const handleWordClick = useCallback(
+    async (wordIndex: number, word: string) => {
+      if (!refAudioUrl || !userAudioUrl || !analysis) return;
+      const totalWords = analysis.words.length;
+      const refDuration = refAudioDurationRef.current || 10;
+      const userDuration = userAudioDurationRef.current || 10;
+      // Estimate word position: linear interpolation based on index
+      const wordRatio = wordIndex / totalWords;
+      const refStart = wordRatio * refDuration;
+      const userStart = wordRatio * userDuration;
+      const segmentDuration = 0.8;
+
+      // Play reference segment, then user segment
+      await playAudioSegment(refAudioUrl, refStart, segmentDuration);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      await playAudioSegment(userAudioUrl, userStart, segmentDuration);
+    },
+    [refAudioUrl, userAudioUrl, analysis]
+  );
+
   if (state === 'loading') {
     return (
       <div className="h-full flex flex-col items-center justify-center p-8 bg-primary-50">
@@ -351,14 +400,17 @@ export default function ShadowReadingScreen({ userLevel }: ShadowReadingScreenPr
             </div>
 
             {state === 'results' && analysis ? (
-              <WordAnalysisView words={analysis.words} />
+              <>
+                <WordAnalysisView words={analysis.words} onWordClick={handleWordClick} />
+                <p className="text-xs text-gray-400 text-center mt-2">Tap any word to compare pronunciation</p>
+              </>
             ) : (
               <h1 className="text-2xl md:text-3xl font-medium tracking-tight leading-tight text-primary-900 px-2">
                 &quot;{challenge.text}&quot;
               </h1>
             )}
 
-            {refAudioUrl && state !== 'results' && (
+            {refAudioUrl && (
               <div className="flex justify-center">
                 <button
                   type="button"
@@ -537,7 +589,13 @@ export default function ShadowReadingScreen({ userLevel }: ShadowReadingScreenPr
   );
 }
 
-function WordAnalysisView({ words }: { words: ShadowWordAnalysis[] }) {
+function WordAnalysisView({
+  words,
+  onWordClick,
+}: {
+  words: ShadowWordAnalysis[];
+  onWordClick?: (wordIndex: number, word: string) => void;
+}) {
   return (
     <div className="flex flex-wrap gap-x-2 gap-y-3 leading-relaxed justify-center max-w-2xl mx-auto px-2">
       {words.map((w, idx) => {
@@ -547,17 +605,21 @@ function WordAnalysisView({ words }: { words: ShadowWordAnalysis[] }) {
         if (w.status === 'poor') {
           statusColor = 'text-red-600 font-semibold';
           statusDecor =
-            'decoration-red-200 underline decoration-2 underline-offset-4 cursor-help';
+            'decoration-red-200 underline decoration-2 underline-offset-4 cursor-pointer';
         } else if (w.status === 'average') {
           statusColor = 'text-amber-600';
           statusDecor =
-            'decoration-amber-200 underline decoration-2 underline-offset-4 cursor-help';
+            'decoration-amber-200 underline decoration-2 underline-offset-4 cursor-pointer';
         } else {
-          statusColor = 'text-emerald-700';
+          statusColor = 'text-emerald-700 cursor-pointer';
         }
 
         return (
-          <span key={idx} className="relative group inline-block">
+          <span
+            key={idx}
+            className="relative group inline-block"
+            onClick={() => onWordClick?.(idx, w.word)}
+          >
             <span className={`text-xl md:text-2xl transition-colors ${statusColor} ${statusDecor}`}>
               {w.word}
             </span>
