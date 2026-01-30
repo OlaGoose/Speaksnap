@@ -9,7 +9,7 @@ import type {
   ShadowDailyChallenge,
   ShadowAnalysisResult,
 } from '../types';
-import { addWavHeader, base64ToUint8Array, blobToBase64 } from '../utils/shadowAudio';
+import { addWavHeader, arrayBufferToBase64, base64ToUint8Array } from '../utils/shadowAudio';
 
 const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
@@ -98,9 +98,7 @@ export async function generateReferenceAudio(
 
   const pcmData = base64ToUint8Array(base64Audio);
   const wavBuffer = addWavHeader(pcmData, 24000);
-  const blob = new Blob([wavBuffer], { type: 'audio/wav' });
-  const wavBase64 = await blobToBase64(blob);
-
+  const wavBase64 = await arrayBufferToBase64(wavBuffer);
   return { base64: wavBase64 };
 }
 

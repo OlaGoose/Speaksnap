@@ -13,6 +13,26 @@ export function base64ToUint8Array(base64: string): Uint8Array {
   return bytes;
 }
 
+/**
+ * ArrayBuffer → base64. Safe in Node (Buffer) and browser (FileReader).
+ * Use this for server-side or shared code (e.g. API routes).
+ */
+export function arrayBufferToBase64(arrayBuffer: ArrayBuffer): Promise<string> {
+  if (typeof Buffer !== 'undefined') {
+    return Promise.resolve(Buffer.from(arrayBuffer).toString('base64'));
+  }
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      resolve(result.split(',')[1] || result);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(new Blob([arrayBuffer]));
+  });
+}
+
+/** Blob → base64. Browser-only (uses FileReader). Use in client components only. */
 export function blobToBase64(blob: Blob): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
