@@ -37,27 +37,22 @@ export async function generateDailyChallenge(
         : 'Use advanced vocabulary (C1). Nuanced, idiomatic expressions.';
 
   const prompt = `
-You are creating a short reading passage for an English learner. Do NOT use web search.
+You are creating a short reading passage for an English learner. Do NOT use web search. Do NOT write dialogue (no back-and-forth conversation, no "A said / B said").
 
-Generate a random, realistic scenario from Western daily life. Pick ONE theme each time from a wide range, for example:
-- At a café or coffee shop (ordering, small talk with barista)
-- Grocery shopping or at a market
-- At the pharmacy or doctor's office
-- At the bank, post office, or DMV
-- Chatting with a neighbor or colleague
-- Asking for directions or taking public transport
-- At the gym, park, or booking a class
-- Restaurant: reserving a table, ordering, or paying the bill
-- Returning an item or dealing with customer service
-- Weather, weekend plans, or casual catch-up with a friend
+Generate exactly one of these types at random (vary each time):
+- Personal monologue: one person describing a moment, a thought, or a routine (e.g. morning ritual, a decision, a memory).
+- Famous movie or speech quote: a short iconic 2–3 sentence passage that sounds like a film line or famous speech (you may invent something in that style; no need to cite).
+- Article or blog snippet: 3 sentences that read like the opening of a short article (lifestyle, culture, or how-to).
+- Popular science or news summary: 3 sentences that summarize a concept or a news-style fact in plain language.
+- Scene description: 3 sentences describing a place or situation in Western daily life (e.g. a street, a room, a commute) as if from a book or narration.
 
 Rules:
-- Write exactly 3 sentences that form a coherent mini-scenario. Sound like natural American or British everyday speech.
-- Target: ${level} learner. ${levelPrompt}
-- Vary the theme randomly; cover different situations over time.
+- Write exactly 3 sentences. No dialogue. Single voice or narrative only.
+- Sound natural in American or British English. Target: ${level} learner. ${levelPrompt}
+- Topic field: short label (e.g. "Morning routine", "Movie-style line", "News summary", "Street scene").
 
 Output strictly valid JSON only (no markdown, no explanation):
-{ "topic": "short theme name, e.g. Coffee shop order", "text": "Your three sentences here." }
+{ "topic": "short label", "text": "Your three sentences here." }
   `;
 
   const response = await ai.models.generateContent({

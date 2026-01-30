@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Check,
   AlertCircle,
+  RotateCw,
 } from 'lucide-react';
 import type { UserLevel } from '@/lib/types';
 import type {
@@ -267,6 +268,11 @@ export default function ShadowReadingScreen({ userLevel }: ShadowReadingScreenPr
     loadChallenge();
   };
 
+  const refreshChallenge = useCallback(() => {
+    clearShadowCache();
+    loadChallenge();
+  }, [loadChallenge]);
+
   const scrollToCard = (index: number) => {
     const container = cardsScrollRef.current;
     if (!container) return;
@@ -323,8 +329,18 @@ export default function ShadowReadingScreen({ userLevel }: ShadowReadingScreenPr
       <div className="flex-1 px-4 py-6 pb-32 safe-bottom">
         <div className="max-w-xl mx-auto space-y-6">
           <div className="text-center space-y-4">
-            <div className="inline-block px-3 py-1 bg-white rounded-full text-gray-500 text-[10px] uppercase tracking-widest font-bold shadow-float border border-black/5">
-              Today&apos;s Topic: {challenge.topic}
+            <div className="flex items-center justify-center gap-2">
+              <div className="inline-block px-3 py-1 bg-white rounded-full text-gray-500 text-[10px] uppercase tracking-widest font-bold shadow-float border border-black/5">
+                Today&apos;s Topic: {challenge.topic}
+              </div>
+              <button
+                type="button"
+                onClick={refreshChallenge}
+                className="p-1.5 rounded-full text-gray-400 hover:text-primary-900 hover:bg-white/80 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+                aria-label="Refresh challenge"
+              >
+                <RotateCw size={18} />
+              </button>
             </div>
 
             {state === 'results' && analysis ? (
@@ -361,7 +377,7 @@ export default function ShadowReadingScreen({ userLevel }: ShadowReadingScreenPr
                         {[0.1, 0.2, 0.15, 0.25, 0.18, 0.22, 0.12].map((d, i) => (
                           <div
                             key={i}
-                            className="w-1.5 h-6 bg-red-500 rounded-full recording-wave"
+                            className="w-1.5 h-4 bg-red-500 rounded-full recording-wave"
                             style={{ animationDelay: `${d}s` }}
                           />
                         ))}

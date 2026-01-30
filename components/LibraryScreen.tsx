@@ -53,11 +53,12 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel 
     if (activeTab === 'diary') {
       loadDiaries();
     }
-    // Prefetch shadow challenge when user clicks Shadow tab
-    if (activeTab === 'shadow') {
-      prefetchShadowChallenge(userLevel);
-    }
-  }, [activeTab, userLevel]);
+  }, [activeTab]);
+
+  // Preload shadow challenge as soon as Library mounts (do not wait for Shadow tab click)
+  useEffect(() => {
+    prefetchShadowChallenge(userLevel);
+  }, [userLevel]);
 
   const loadScenarios = useCallback(() => {
     const scenarios = storage.getItem<Scenario[]>('speakSnapScenarios');
