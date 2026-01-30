@@ -107,8 +107,20 @@ export default function ShadowReadingScreen({ userLevel }: ShadowReadingScreenPr
             body: JSON.stringify({ level: userLevel }),
             signal: ac.signal,
           });
-          data = await res.json();
-          if (!res.ok) throw new Error(data.error || 'Failed to load challenge');
+          const resData = (await res.json()) as {
+            topic?: string;
+            text?: string;
+            sourceUrl?: string;
+            refAudioBase64?: string;
+            error?: string;
+          };
+          if (!res.ok) throw new Error(resData.error || 'Failed to load challenge');
+          data = {
+            topic: resData.topic!,
+            text: resData.text!,
+            sourceUrl: resData.sourceUrl,
+            refAudioBase64: resData.refAudioBase64!,
+          };
         }
       }
 
