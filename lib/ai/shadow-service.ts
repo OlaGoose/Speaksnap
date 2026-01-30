@@ -31,42 +31,46 @@ export async function generateDailyChallenge(
 
   const levelPrompt =
     level === 'Beginner'
-      ? 'Use simple vocabulary (A2). Short sentences.'
+      ? 'Use simple vocabulary (A2). Short, clear sentences.'
       : level === 'Intermediate'
-        ? 'Use moderate vocabulary (B2). Standard sentences.'
-        : 'Use advanced vocabulary (C1). Nuanced expressions.';
+        ? 'Use moderate vocabulary (B2). Natural, everyday sentences.'
+        : 'Use advanced vocabulary (C1). Nuanced, idiomatic expressions.';
 
   const prompt = `
-    Find a trending news topic from today (tech/science/culture).
-    Summarize it into exactly 3 sentences for reading aloud.
-    Target Audience: ${level} English learner. ${levelPrompt}
+You are creating a short reading passage for an English learner. Do NOT use web search.
 
-    Output strictly valid JSON:
-    { "topic": "string", "text": "string" }
+Generate a random, realistic scenario from Western daily life. Pick ONE theme each time from a wide range, for example:
+- At a café or coffee shop (ordering, small talk with barista)
+- Grocery shopping or at a market
+- At the pharmacy or doctor's office
+- At the bank, post office, or DMV
+- Chatting with a neighbor or colleague
+- Asking for directions or taking public transport
+- At the gym, park, or booking a class
+- Restaurant: reserving a table, ordering, or paying the bill
+- Returning an item or dealing with customer service
+- Weather, weekend plans, or casual catch-up with a friend
+
+Rules:
+- Write exactly 3 sentences that form a coherent mini-scenario. Sound like natural American or British everyday speech.
+- Target: ${level} learner. ${levelPrompt}
+- Vary the theme randomly; cover different situations over time.
+
+Output strictly valid JSON only (no markdown, no explanation):
+{ "topic": "short theme name, e.g. Coffee shop order", "text": "Your three sentences here." }
   `;
 
-  // Note: Use gemini-3-flash-preview to avoid RPC errors with googleSearch; 60s timeout for googleSearch
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: prompt,
-    config: {
-      tools: [{ googleSearch: {} }],
-      httpOptions: { timeout: 60000 },
-    },
+    config: { httpOptions: { timeout: 30000 } },
   });
 
   const text = response.text;
   if (!text) throw new Error('No content generated');
 
   const data = parseJSON(text) as { topic: string; text: string };
-  let sourceUrl = '';
-  const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-  if (chunks?.length) {
-    const webChunk = chunks.find((c: { web?: { uri?: string } }) => c.web?.uri);
-    if (webChunk?.web?.uri) sourceUrl = webChunk.web.uri;
-  }
-
-  return { topic: data.topic, text: data.text, sourceUrl };
+  return { topic: data.topic, text: data.text, sourceUrl: '' };
 }
 
 export async function generateReferenceAudio(
