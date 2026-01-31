@@ -4,6 +4,9 @@ export const maxDuration = 60;
 import { generateDailyChallenge, generateReferenceAudio } from '@/lib/ai/shadow-service';
 import type { UserLevel, PracticeMode } from '@/lib/types';
 
+/** 雅思+中级：shadow 3 句话固定来自此文件 */
+const DEFAULT_IELTS_INTERMEDIATE_FILE_URI = 'https://generativelanguage.googleapis.com/v1beta/files/k5jgztapdkh3';
+
 export async function POST(request: NextRequest) {
   try {
     // Defensive: ensure request body can be parsed
@@ -35,7 +38,9 @@ export async function POST(request: NextRequest) {
             mimeType: typeof body.mimeType === 'string' ? body.mimeType : undefined,
             displayName: typeof body.displayName === 'string' ? body.displayName : undefined,
           }
-        : null;
+        : level === 'Intermediate' && mode === 'IELTS'
+          ? { uri: DEFAULT_IELTS_INTERMEDIATE_FILE_URI, mimeType: 'application/pdf' as const }
+          : null;
 
     const challenge = await generateDailyChallenge(level, mode, sourceFile);
     const { base64 } = await generateReferenceAudio(challenge.text);
