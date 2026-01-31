@@ -1,9 +1,11 @@
 /**
  * Shadow Reading (影子跟读) AI service.
  * Uses @google/genai for daily challenge, TTS, and accent analysis.
+ * Doubao is used as fallback for challenge text when Gemini times out or is unavailable.
  */
 
 import { GoogleGenAI, Modality } from '@google/genai';
+import { DoubaoProvider } from './doubao';
 import type {
   UserLevel,
   PracticeMode,
@@ -14,6 +16,16 @@ import { addWavHeader, arrayBufferToBase64, base64ToUint8Array } from '@/lib/uti
 
 const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
+
+const doubaoConfig = {
+  apiKey: process.env.NEXT_DOUBAO_API_KEY || '',
+  endpoint: process.env.NEXT_DOUBAO_CHAT_ENDPOINT || '',
+  model: process.env.NEXT_DOUBAO_CHAT_MODEL || '',
+};
+const doubao =
+  doubaoConfig.apiKey && doubaoConfig.endpoint && doubaoConfig.model
+    ? new DoubaoProvider(doubaoConfig)
+    : null;
 
 function parseJSON(text: string): Record<string, unknown> {
   try {
@@ -29,7 +41,11 @@ export async function generateDailyChallenge(
   level: UserLevel,
   mode: PracticeMode = 'Daily'
 ): Promise<ShadowDailyChallenge> {
-  if (!ai) throw new Error('Gemini API key not configured');
+  if (!ai && !doubao) {
+    throw new Error(
+      'No AI provider configured for Shadow. Set NEXT_PUBLIC_GEMINI_API_KEY or Doubao env vars (NEXT_DOUBAO_API_KEY, NEXT_DOUBAO_CHAT_ENDPOINT, NEXT_DOUBAO_CHAT_MODEL).'
+    );
+  }
 
   const levelPrompt =
     level === 'Beginner'
@@ -81,17 +97,51 @@ Output strictly valid JSON only (no markdown, no explanation):
 { "topic": "short label", "text": "Your three sentences here." }
   `;
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: prompt,
-    config: { httpOptions: { timeout: 60000 } },
-  });
+  // Try Gemini first
+  if (ai) {
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+        config: { httpOptions: { timeout: 60000 } },
+      });
+      const text = response.text;
+      if (text) {
+        const data = parseJSON(text) as { topic: string; text: string };
+        return { topic: data.topic, text: data.text, sourceUrl: '' };
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn('❌ Shadow challenge Gemini failed (trying Doubao fallback):', msg);
+    }
+  }
 
-  const text = response.text;
-  if (!text) throw new Error('No content generated');
+  // Doubao fallback when Gemini times out or is unavailable
+  if (doubao) {
+    try {
+      console.log('🔄 Shadow challenge using Doubao fallback...');
+      const response = await doubao.chat(
+        [{ role: 'user', content: prompt }],
+        { temperature: 0.7, maxTokens: 512 }
+      );
+      const text = response.choices?.[0]?.message?.content;
+      if (!text) throw new Error('Empty response from Doubao');
+      const parsed = DoubaoProvider.parseJSONResponse(text) as { topic?: string; text?: string };
+      const topic = parsed?.topic ?? 'Passage';
+      const textContent = parsed?.text ?? '';
+      if (!textContent) throw new Error('No text in Doubao response');
+      console.log('✅ Shadow challenge Doubao fallback successful');
+      return { topic, text: textContent, sourceUrl: '' };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn('❌ Shadow challenge Doubao fallback failed:', msg);
+      throw new Error(
+        'Failed to generate Shadow challenge. Gemini and Doubao both failed. Please check your network and API keys.'
+      );
+    }
+  }
 
-  const data = parseJSON(text) as { topic: string; text: string };
-  return { topic: data.topic, text: data.text, sourceUrl: '' };
+  throw new Error('No AI provider available for Shadow challenge.');
 }
 
 export async function generateReferenceAudio(

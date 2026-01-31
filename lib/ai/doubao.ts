@@ -21,10 +21,13 @@ export interface DoubaoResponse {
   };
 }
 
+const DEFAULT_VISION_TIMEOUT_MS = 60000;
+
 export class DoubaoProvider {
   private apiKey: string;
   private endpoint: string;
   private model: string;
+  private visionModel: string;
   private maxRetries: number = 3;
   private retryDelay: number = 1000;
 
@@ -32,12 +35,14 @@ export class DoubaoProvider {
     apiKey: string;
     endpoint: string;
     model: string;
+    visionModel?: string;
     maxRetries?: number;
     retryDelay?: number;
   }) {
     this.apiKey = config.apiKey;
     this.endpoint = config.endpoint;
     this.model = config.model;
+    this.visionModel = config.visionModel ?? config.model;
     if (config.maxRetries !== undefined) this.maxRetries = config.maxRetries;
     if (config.retryDelay !== undefined) this.retryDelay = config.retryDelay;
   }
@@ -126,6 +131,85 @@ export class DoubaoProvider {
     }
 
     throw lastError || new Error('Doubao API call failed after retries');
+  }
+
+  /**
+   * Vision: chat with image (VisualQuestionAnswering).
+   * Uses vision model and content array with image_url + text. Supports data URL for base64.
+   */
+  async chatWithImage(
+    prompt: string,
+    imageBase64: string,
+    options?: {
+      temperature?: number;
+      maxTokens?: number;
+      reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
+      timeoutMs?: number;
+    }
+  ): Promise<DoubaoResponse> {
+    const imageUrl = imageBase64.startsWith('data:')
+      ? imageBase64
+      : `data:image/jpeg;base64,${imageBase64}`;
+    const payload = {
+      model: this.visionModel,
+      max_completion_tokens: options?.maxTokens ?? 4096,
+      reasoning_effort: options?.reasoningEffort ?? 'medium',
+      temperature: options?.temperature ?? 0.7,
+      messages: [
+        {
+          role: 'user' as const,
+          content: [
+            { type: 'image_url' as const, image_url: { url: imageUrl } },
+            { type: 'text' as const, text: prompt },
+          ],
+        },
+      ],
+    };
+
+    const timeoutMs = options?.timeoutMs ?? DEFAULT_VISION_TIMEOUT_MS;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      console.log('🔥 Doubao Vision Request:', {
+        url: this.endpoint,
+        model: this.visionModel,
+        promptLength: prompt.length,
+      });
+      const response = await fetch(this.endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Doubao Vision API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorText: errorText.slice(0, 200),
+        });
+        throw new Error(
+          `Doubao Vision error (${response.status} ${response.statusText}): ${errorText}`
+        );
+      }
+      const data: DoubaoResponse = await response.json();
+      console.log('✅ Doubao Vision Success:', {
+        hasContent: !!data.choices?.[0]?.message?.content,
+        contentLength: data.choices?.[0]?.message?.content?.length ?? 0,
+      });
+      return data;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      if (err?.name === 'AbortError') {
+        throw new Error('Doubao Vision request timeout');
+      }
+      throw err;
+    }
   }
 
   /**

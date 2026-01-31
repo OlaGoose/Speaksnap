@@ -14,6 +14,7 @@ import {
   RotateCw,
   History,
   ChevronLeft as BackIcon,
+  Users,
 } from 'lucide-react';
 import type { UserLevel, PracticeMode } from '@/lib/types';
 import type {
@@ -24,6 +25,9 @@ import type {
 } from '@/lib/types';
 import { getCachedChallenge, getInFlightRequest, clearShadowCache } from '@/lib/shadowCache';
 import { getShadowHistory, addShadowHistoryEntry } from '@/lib/utils/shadowHistory';
+import { ShadowYouTubeCard } from './ShadowYouTubeCard';
+import { ShadowYouglishCard } from './ShadowYouglishCard';
+import { ShadowMultiAudioMode } from './ShadowMultiAudioMode';
 
 type ShadowState =
   | 'loading'
@@ -34,6 +38,8 @@ type ShadowState =
   | 'analyzing'
   | 'results';
 
+type AudioMode = 'single' | 'multi';
+
 interface ShadowReadingScreenProps {
   userLevel: UserLevel;
   practiceMode: PracticeMode;
@@ -41,6 +47,7 @@ interface ShadowReadingScreenProps {
 
 export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowReadingScreenProps) {
   const [state, setState] = useState<ShadowState>('loading');
+  const [audioMode, setAudioMode] = useState<AudioMode>('single');
   const [challenge, setChallenge] = useState<ShadowDailyChallenge | null>(null);
   const [refAudioBase64, setRefAudioBase64] = useState<string | null>(null);
   const [refAudioUrl, setRefAudioUrl] = useState<string | null>(null);
@@ -404,7 +411,7 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
     [refAudioUrl, userAudioUrl, analysis]
   );
 
-  if (state === 'loading') {
+  /* if (state === 'loading') {
     return (
       <div className="h-full flex flex-col items-center justify-center p-8 bg-primary-50">
         <div className="relative mb-6">
@@ -415,7 +422,7 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
         <p className="text-gray-500 text-sm">Adapting to {userLevel} level.</p>
       </div>
     );
-  }
+  } */
 
   if (state === 'error') {
     return (
@@ -435,6 +442,17 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
   }
 
   if (!challenge) return null;
+
+  // Multi-audio mode
+  if (audioMode === 'multi' && refAudioBase64) {
+    return (
+      <ShadowMultiAudioMode
+        challenge={challenge}
+        refAudioBase64={refAudioBase64}
+        onBack={() => setAudioMode('single')}
+      />
+    );
+  }
 
   const selectedEntry = selectedHistoryId
     ? historyEntries.find((e) => e.id === selectedHistoryId)
@@ -512,6 +530,8 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
       { id: 'feedback', title: "Coach's Feedback", type: 'feedback' as const },
       { id: 'strengths', title: 'Strengths', type: 'strengths' as const },
       { id: 'improvements', title: 'Improvements', type: 'improvements' as const },
+      { id: 'youtube', title: 'Pronunciation Guides', type: 'youtube' as const },
+      { id: 'youglish', title: 'Native Examples', type: 'youglish' as const },
     ];
     return (
       <div className="h-full bg-primary-50 flex flex-col overflow-y-auto overflow-x-hidden">
@@ -540,9 +560,18 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
             </p>
             <WordAnalysisView words={entryAnalysis.words} />
             <div className="flex overflow-x-auto gap-4 pb-2 snap-x snap-mandatory no-scrollbar">
-              {entryCards.map((_, index) => (
-                <div key={entryCards[index].id} className="flex-shrink-0 w-[85%] max-w-sm snap-center">
-                  <SummaryCard analysis={entryAnalysis} card={entryCards[index]} />
+              {entryCards.map((card, index) => (
+                <div key={card.id} className="flex-shrink-0 w-[85%] max-w-sm snap-center">
+                  {card.type === 'youtube' ? (
+                    <ShadowYouTubeCard
+                      weaknesses={entryAnalysis.pronunciation.weaknesses}
+                      title={card.title}
+                    />
+                  ) : card.type === 'youglish' ? (
+                    <ShadowYouglishCard words={entryAnalysis.words} title={card.title} />
+                  ) : (
+                    <SummaryCard analysis={entryAnalysis} card={card} />
+                  )}
                 </div>
               ))}
             </div>
@@ -570,6 +599,8 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
         { id: 'feedback', title: "Coach's Feedback", type: 'feedback' as const },
         { id: 'strengths', title: 'Strengths', type: 'strengths' as const },
         { id: 'improvements', title: 'Improvements', type: 'improvements' as const },
+        { id: 'youtube', title: 'Pronunciation Guides', type: 'youtube' as const },
+        { id: 'youglish', title: 'Native Examples', type: 'youglish' as const },
       ]
     : [];
 
@@ -607,6 +638,35 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
                 <RotateCw size={18} />
               </button>
             </div>
+            
+            {/* Mode Selector */}
+            {(state === 'ready' || state === 'results') && (
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setAudioMode('single')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    audioMode === 'single'
+                      ? 'bg-primary-900 text-white shadow-md'
+                      : 'bg-white text-gray-600 hover:bg-gray-50 border border-black/5'
+                  }`}
+                >
+                  Single Mode
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAudioMode('multi')}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                    audioMode === 'multi'
+                      ? 'bg-primary-900 text-white shadow-md'
+                      : 'bg-white text-gray-600 hover:bg-gray-50 border border-black/5'
+                  }`}
+                >
+                  <Users size={16} />
+                  Compare Mode
+                </button>
+              </div>
+            )}
 
             {state === 'results' && analysis ? (
               <>
@@ -723,7 +783,16 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
                       data-card-index={index}
                       className="flex-shrink-0 w-[85%] max-w-sm snap-center"
                     >
-                      <SummaryCard analysis={analysis} card={card} />
+                      {card.type === 'youtube' ? (
+                        <ShadowYouTubeCard
+                          weaknesses={analysis.pronunciation.weaknesses}
+                          title={card.title}
+                        />
+                      ) : card.type === 'youglish' ? (
+                        <ShadowYouglishCard words={analysis.words} title={card.title} />
+                      ) : (
+                        <SummaryCard analysis={analysis} card={card} />
+                      )}
                     </div>
                   ))}
                 </div>
@@ -865,7 +934,7 @@ function SummaryCard({
   card,
 }: {
   analysis: ShadowAnalysisResult;
-  card: { id: string; title: string; type: 'score' | 'feedback' | 'strengths' | 'improvements' };
+  card: { id: string; title: string; type: 'score' | 'feedback' | 'strengths' | 'improvements' | 'youtube' | 'youglish' };
 }) {
   const { type } = card;
 

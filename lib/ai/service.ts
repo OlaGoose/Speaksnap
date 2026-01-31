@@ -19,11 +19,16 @@ const doubaoConfig = {
   apiKey: process.env.NEXT_DOUBAO_API_KEY || '',
   endpoint: process.env.NEXT_DOUBAO_CHAT_ENDPOINT || '',
   model: process.env.NEXT_DOUBAO_CHAT_MODEL || '',
+  visionModel:
+    process.env.NEXT_DOUBAO_VISION_MODEL || process.env.NEXT_DOUBAO_CHAT_MODEL || '',
 };
 
 const doubao =
-  doubaoConfig.apiKey && doubaoConfig.endpoint
-    ? new DoubaoProvider(doubaoConfig)
+  doubaoConfig.apiKey && doubaoConfig.endpoint && doubaoConfig.model
+    ? new DoubaoProvider({
+        ...doubaoConfig,
+        visionModel: doubaoConfig.visionModel || doubaoConfig.model,
+      })
     : null;
 
 const openaiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || '';
@@ -120,8 +125,7 @@ Return JSON:
 
   let lastError: any = null;
 
-  // Skip Doubao for image analysis - it doesn't support vision API
-  // Priority: Gemini -> OpenAI (both have proper vision support)
+  // Priority: Gemini -> OpenAI -> Doubao (vision) as fallback
 
   // Try Gemini (prioritize for image analysis - better quality and cost)
   if ((AI_PROVIDER === 'gemini' || AI_PROVIDER === 'auto') && gemini) {
@@ -219,6 +223,40 @@ Return JSON:
         console.warn('❌ OpenAI network error - check your internet connection');
       } else {
         console.warn('❌ OpenAI analysis failed:', error.message);
+      }
+    }
+  }
+
+  // Try Doubao Vision as fallback when Gemini/OpenAI timeout or are unavailable
+  if ((AI_PROVIDER === 'doubao' || AI_PROVIDER === 'auto') && doubao) {
+    try {
+      console.log('🔄 Trying Doubao Vision (fallback)...');
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Doubao Vision request timeout')), 60000);
+      });
+      const result = await Promise.race([
+        doubao.chatWithImage(prompt, cleanBase64, {
+          reasoningEffort: 'medium',
+          maxTokens: 2048,
+          timeoutMs: 60000,
+        }),
+        timeoutPromise,
+      ]);
+      const text = result.choices?.[0]?.message?.content;
+      if (!text) throw new Error('Empty response from Doubao Vision');
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('No JSON in Doubao Vision response');
+      const parsed = DoubaoProvider.parseJSONResponse(jsonMatch[0]);
+      console.log('✅ Doubao Vision analysis successful (fallback)');
+      return validateAnalysisResponse(parsed);
+    } catch (error: any) {
+      lastError = error;
+      if (error.message?.includes('timeout')) {
+        console.warn('❌ Doubao Vision analysis timeout');
+      } else if (error.message?.includes('401') || error.message?.includes('403')) {
+        console.log('ℹ️ Doubao Vision skipped (API key issue)');
+      } else {
+        console.warn('❌ Doubao Vision analysis failed:', error.message);
       }
     }
   }
