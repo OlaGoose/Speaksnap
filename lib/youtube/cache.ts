@@ -139,9 +139,25 @@ export function clearAllCache(): void {
 
 // Auto-clear expired cache on module load (only in browser)
 if (typeof window !== 'undefined') {
-  // Run on load
-  setTimeout(() => clearExpiredCache(), 1000);
-  
-  // Run daily
-  setInterval(() => clearExpiredCache(), 24 * 60 * 60 * 1000);
+  try {
+    // Run on load
+    setTimeout(() => {
+      try {
+        clearExpiredCache();
+      } catch (e) {
+        console.warn('[YouTube Cache] Failed to auto-clear on load:', e);
+      }
+    }, 1000);
+    
+    // Run daily
+    setInterval(() => {
+      try {
+        clearExpiredCache();
+      } catch (e) {
+        console.warn('[YouTube Cache] Failed to auto-clear on interval:', e);
+      }
+    }, 24 * 60 * 60 * 1000);
+  } catch (e) {
+    console.warn('[YouTube Cache] Failed to set up auto-clear:', e);
+  }
 }

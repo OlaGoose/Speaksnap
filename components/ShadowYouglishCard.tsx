@@ -22,9 +22,11 @@ export function ShadowYouglishCard({ words, title = 'Native Examples' }: ShadowY
 
   // Filter words that need practice (poor or average status)
   const problemWords = React.useMemo(() => {
+    if (!words || !Array.isArray(words)) return [];
     return words
-      .filter((w) => w.status === 'poor' || w.status === 'average')
-      .map((w) => w.word);
+      .filter((w) => w && (w.status === 'poor' || w.status === 'average'))
+      .map((w) => w.word)
+      .filter((word) => word && typeof word === 'string' && word.trim().length > 0);
   }, [words]);
 
   // Load Youglish script
@@ -84,6 +86,14 @@ export function ShadowYouglishCard({ words, title = 'Native Examples' }: ShadowY
     }
 
     try {
+      // Validate that Youglish API is available
+      if (!(window as any).YG || !(window as any).YG.Widget) {
+        console.error('Youglish API not available');
+        setWidgetLoading(false);
+        setYouglishReady(false);
+        return;
+      }
+
       const widget = new (window as any).YG.Widget('youglish-shadow-widget', {
         width: containerRef.current?.offsetWidth || 300,
         components: 9,
@@ -93,6 +103,10 @@ export function ShadowYouglishCard({ words, title = 'Native Examples' }: ShadowY
           },
           onVideoChange: () => {
             // Video changed
+          },
+          onError: (error: any) => {
+            console.error('Youglish widget error:', error);
+            setWidgetLoading(false);
           },
         },
       });

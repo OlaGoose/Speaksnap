@@ -570,11 +570,11 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
                 <div key={card.id} className="flex-shrink-0 w-[85%] max-w-sm snap-center">
                   {card.type === 'youtube' ? (
                     <ShadowYouTubeCard
-                      weaknesses={entryAnalysis.pronunciation.weaknesses}
+                      weaknesses={entryAnalysis.pronunciation?.weaknesses || []}
                       title={card.title}
                     />
                   ) : card.type === 'youglish' ? (
-                    <ShadowYouglishCard words={entryAnalysis.words} title={card.title} />
+                    <ShadowYouglishCard words={entryAnalysis.words || []} title={card.title} />
                   ) : (
                     <SummaryCard analysis={entryAnalysis} card={card} />
                   )}
@@ -786,11 +786,11 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
                     >
                       {card.type === 'youtube' ? (
                         <ShadowYouTubeCard
-                          weaknesses={analysis.pronunciation.weaknesses}
+                          weaknesses={analysis.pronunciation?.weaknesses || []}
                           title={card.title}
                         />
                       ) : card.type === 'youglish' ? (
-                        <ShadowYouglishCard words={analysis.words} title={card.title} />
+                        <ShadowYouglishCard words={analysis.words || []} title={card.title} />
                       ) : (
                         <SummaryCard analysis={analysis} card={card} />
                       )}
@@ -983,32 +983,38 @@ function SummaryCard({
   }
 
   if (type === 'strengths') {
+    const strengths = analysis.pronunciation?.strengths || [];
     return (
       <div className="bg-white p-6 rounded-2xl shadow-float border border-black/5">
         <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
           Strengths
         </h4>
         <ul className="space-y-2">
-          {analysis.pronunciation.strengths.map((s, i) => (
-            <li key={i} className="flex items-start text-sm text-primary-900">
-              <Check size={16} className="text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-              {s}
-            </li>
-          ))}
+          {strengths.length > 0 ? (
+            strengths.map((s, i) => (
+              <li key={i} className="flex items-start text-sm text-primary-900">
+                <Check size={16} className="text-green-500 mr-2 flex-shrink-0 mt-0.5" />
+                {s}
+              </li>
+            ))
+          ) : (
+            <li className="text-sm text-gray-400 italic">Analysis data not available.</li>
+          )}
         </ul>
       </div>
     );
   }
 
   if (type === 'improvements') {
+    const weaknesses = analysis.pronunciation?.weaknesses || [];
     return (
       <div className="bg-white p-6 rounded-2xl shadow-float border border-black/5">
         <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
           Improvements
         </h4>
         <ul className="space-y-2">
-          {analysis.pronunciation.weaknesses.length > 0 ? (
-            analysis.pronunciation.weaknesses.map((w, i) => (
+          {weaknesses.length > 0 ? (
+            weaknesses.map((w, i) => (
               <li key={i} className="flex items-start text-sm text-primary-900">
                 <AlertCircle size={16} className="text-amber-500 mr-2 flex-shrink-0 mt-0.5" />
                 {w}

@@ -16,19 +16,19 @@ interface ShadowYouTubeCardProps {
 export function ShadowYouTubeCard({ weaknesses, title = 'Pronunciation Guides' }: ShadowYouTubeCardProps) {
   // Extract key pronunciation issues to search for (sanitize for URL / API)
   const searchQuery = React.useMemo(() => {
-    if (!weaknesses || weaknesses.length === 0) return null;
+    if (!weaknesses || !Array.isArray(weaknesses) || weaknesses.length === 0) return null;
     const firstIssue = weaknesses[0]
-      .replace(/[''""`]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 60);
+      ?.replace(/[''""`]/g, ' ')
+      ?.replace(/\s+/g, ' ')
+      ?.trim()
+      ?.slice(0, 60);
     if (!firstIssue) return null;
     return `english pronunciation ${firstIssue} tutorial`;
   }, [weaknesses]);
 
   const { videos, loading, error } = useYouTubeSearch(searchQuery, !!searchQuery);
 
-  if (!searchQuery || weaknesses.length === 0) {
+  if (!searchQuery || !weaknesses || weaknesses.length === 0) {
     return null;
   }
 
@@ -65,7 +65,7 @@ export function ShadowYouTubeCard({ weaknesses, title = 'Pronunciation Guides' }
           <div className="text-sm text-gray-600 space-y-2">
             <p className="font-medium">Focus areas to improve:</p>
             <ul className="list-disc list-inside space-y-1 text-gray-500">
-              {weaknesses.slice(0, 3).map((weakness, idx) => (
+              {weaknesses?.slice(0, 3).map((weakness, idx) => (
                 <li key={idx} className="text-sm">{weakness}</li>
               ))}
             </ul>
