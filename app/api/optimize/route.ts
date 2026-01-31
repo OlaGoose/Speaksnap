@@ -6,11 +6,11 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { text } = body;
 
-    if (!text) {
+    if (text == null || String(text).trim() === '') {
       return NextResponse.json({ error: 'Missing text' }, { status: 400 });
     }
 
-    const optimized = await optimizeText(text);
+    const optimized = await optimizeText(String(text).trim());
 
     return NextResponse.json({ optimized });
   } catch (error: any) {

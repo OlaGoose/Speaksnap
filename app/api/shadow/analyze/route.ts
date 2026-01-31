@@ -26,6 +26,14 @@ export async function POST(request: NextRequest) {
   } catch (error: unknown) {
     console.error('Shadow analyze API error:', error);
     const message = error instanceof Error ? error.message : 'Analysis failed';
-    return NextResponse.json({ error: message }, { status: 500 });
+    const isUnavailable =
+      message.includes('API key') ||
+      message.includes('No AI provider') ||
+      message.includes('GEMINI_API_KEY');
+    const status = isUnavailable ? 503 : 500;
+    const safeMessage = isUnavailable
+      ? 'AI service unavailable. Please check your API keys and try again.'
+      : message;
+    return NextResponse.json({ error: safeMessage }, { status });
   }
 }

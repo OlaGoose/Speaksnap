@@ -4,12 +4,13 @@
  */
 
 import { GoogleGenAI, Modality } from '@google/genai';
-import type { UserLevel, PracticeMode } from '../types';
 import type {
+  UserLevel,
+  PracticeMode,
   ShadowDailyChallenge,
   ShadowAnalysisResult,
-} from '../types';
-import { addWavHeader, arrayBufferToBase64, base64ToUint8Array } from '../utils/shadowAudio';
+} from '@/lib/types';
+import { addWavHeader, arrayBufferToBase64, base64ToUint8Array } from '@/lib/utils/shadowAudio';
 
 const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
@@ -83,7 +84,7 @@ Output strictly valid JSON only (no markdown, no explanation):
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: prompt,
-    config: { httpOptions: { timeout: 30000 } },
+    config: { httpOptions: { timeout: 60000 } },
   });
 
   const text = response.text;

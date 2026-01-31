@@ -20,15 +20,17 @@ export default function Home() {
 
   // Initial setup
   useEffect(() => {
-    // Load user level from localStorage
-    const savedLevel = storage.getItem<UserLevel>('speakSnapLevel');
-    if (savedLevel) {
-      setUserLevel(savedLevel);
-    }
-    const savedMode = storage.getItem<PracticeMode>('speakSnapPracticeMode');
-    if (savedMode) {
-      setPracticeMode(savedMode);
-    }
+    // Load user level and mode from IndexedDB
+    (async () => {
+      const savedLevel = await storage.getItem<UserLevel>('speakSnapLevel');
+      if (savedLevel) {
+        setUserLevel(savedLevel);
+      }
+      const savedMode = await storage.getItem<PracticeMode>('speakSnapPracticeMode');
+      if (savedMode) {
+        setPracticeMode(savedMode);
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -82,8 +84,8 @@ export default function Home() {
       };
 
       // Save new scenario immediately
-      const scenarios = storage.getItem<Scenario[]>('speakSnapScenarios') || [];
-      storage.setItem('speakSnapScenarios', [newScenario, ...scenarios]);
+      const scenarios = await storage.getItem<Scenario[]>('speakSnapScenarios') || [];
+      await storage.setItem('speakSnapScenarios', [newScenario, ...scenarios]);
 
       setCurrentScenario(newScenario);
       setCurrentDialogueId(undefined); // New dialogue
@@ -145,8 +147,8 @@ export default function Home() {
       };
 
       // Save new scenario immediately
-      const scenarios = storage.getItem<Scenario[]>('speakSnapScenarios') || [];
-      storage.setItem('speakSnapScenarios', [newScenario, ...scenarios]);
+      const scenarios = await storage.getItem<Scenario[]>('speakSnapScenarios') || [];
+      await storage.setItem('speakSnapScenarios', [newScenario, ...scenarios]);
 
       setCurrentScenario(newScenario);
       setCurrentDialogueId(undefined); // New dialogue

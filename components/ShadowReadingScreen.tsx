@@ -12,14 +12,18 @@ import {
   Check,
   AlertCircle,
   RotateCw,
+  History,
+  ChevronLeft as BackIcon,
 } from 'lucide-react';
 import type { UserLevel, PracticeMode } from '@/lib/types';
 import type {
   ShadowDailyChallenge,
   ShadowAnalysisResult,
   ShadowWordAnalysis,
+  ShadowHistoryEntry,
 } from '@/lib/types';
 import { getCachedChallenge, getInFlightRequest, clearShadowCache } from '@/lib/shadowCache';
+import { getShadowHistory, addShadowHistoryEntry } from '@/lib/utils/shadowHistory';
 
 type ShadowState =
   | 'loading'
@@ -46,6 +50,9 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
   const [error, setError] = useState<string | null>(null);
 
   const [summaryCardIndex, setSummaryCardIndex] = useState(0);
+  const [historyEntries, setHistoryEntries] = useState<ShadowHistoryEntry[]>([]);
+  const [historyView, setHistoryView] = useState<'closed' | 'list' | 'detail'>('closed');
+  const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
   const cardsScrollRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -56,6 +63,43 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
   const userAudioDurationRef = useRef<number>(0);
 
   const loadChallenge = useCallback(async () => {
+    // Sync cache check: avoid loading state when we have data (removes duplicate loading)
+    const cached = getCachedChallenge(userLevel, practiceMode);
+    if (cached) {
+      setError(null);
+      setAnalysis(null);
+      setUserAudioUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        userAudioUrlRef.current = null;
+        return null;
+      });
+      setUserAudioBlob(null);
+      setRefAudioUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        refAudioUrlRef.current = null;
+        return null;
+      });
+      setRefAudioBase64(null);
+      setChallenge({ topic: cached.topic, text: cached.text, sourceUrl: cached.sourceUrl });
+      setRefAudioBase64(cached.refAudioBase64);
+      if (cached.refAudioBase64) {
+        const binary = atob(cached.refAudioBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const blob = new Blob([bytes], { type: 'audio/wav' });
+        const blobUrl = URL.createObjectURL(blob);
+        if (refAudioUrlRef.current) URL.revokeObjectURL(refAudioUrlRef.current);
+        refAudioUrlRef.current = blobUrl;
+        setRefAudioUrl(blobUrl);
+        const audio = new Audio(blobUrl);
+        audio.onloadedmetadata = () => {
+          refAudioDurationRef.current = audio.duration;
+        };
+      }
+      setState('ready');
+      return;
+    }
+
     setState('loading');
     setError(null);
     setAnalysis(null);
@@ -76,58 +120,45 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
     const ac = new AbortController();
     loadChallengeAbortRef.current = ac;
     try {
-      // Check cache first
-      const cached = getCachedChallenge(userLevel, practiceMode);
       let data: { topic: string; text: string; sourceUrl?: string; refAudioBase64: string };
-      
-      if (cached) {
-        // Use cached data
+      const inFlight = getInFlightRequest();
+      if (inFlight) {
+        const result = await inFlight;
+        if (ac.signal.aborted) return;
         data = {
-          topic: cached.topic,
-          text: cached.text,
-          sourceUrl: cached.sourceUrl,
-          refAudioBase64: cached.refAudioBase64,
+          topic: result.topic,
+          text: result.text,
+          sourceUrl: result.sourceUrl,
+          refAudioBase64: result.refAudioBase64,
         };
       } else {
-        // Check if prefetch is in flight
-        const inFlight = getInFlightRequest();
-        if (inFlight) {
-          const result = await inFlight;
-          data = {
-            topic: result.topic,
-            text: result.text,
-            sourceUrl: result.sourceUrl,
-            refAudioBase64: result.refAudioBase64,
-          };
-        } else {
-          // Fetch fresh data
-          const url =
-            typeof window !== 'undefined'
-              ? `${window.location.origin}/api/shadow/challenge`
-              : '/api/shadow/challenge';
-          const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ level: userLevel, mode: practiceMode }),
-            signal: ac.signal,
-          });
-          const resData = (await res.json()) as {
-            topic?: string;
-            text?: string;
-            sourceUrl?: string;
-            refAudioBase64?: string;
-            error?: string;
-          };
-          if (!res.ok) throw new Error(resData.error || 'Failed to load challenge');
-          data = {
-            topic: resData.topic!,
-            text: resData.text!,
-            sourceUrl: resData.sourceUrl,
-            refAudioBase64: resData.refAudioBase64!,
-          };
-        }
+        const url =
+          typeof window !== 'undefined'
+            ? `${window.location.origin}/api/shadow/challenge`
+            : '/api/shadow/challenge';
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ level: userLevel, mode: practiceMode }),
+          signal: ac.signal,
+        });
+        const resData = (await res.json()) as {
+          topic?: string;
+          text?: string;
+          sourceUrl?: string;
+          refAudioBase64?: string;
+          error?: string;
+        };
+        if (!res.ok) throw new Error(resData.error || 'Failed to load challenge');
+        data = {
+          topic: resData.topic!,
+          text: resData.text!,
+          sourceUrl: resData.sourceUrl,
+          refAudioBase64: resData.refAudioBase64!,
+        };
       }
 
+      if (ac.signal.aborted) return;
       setChallenge({ topic: data.topic, text: data.text, sourceUrl: data.sourceUrl });
       setRefAudioBase64(data.refAudioBase64);
       if (data.refAudioBase64) {
@@ -139,7 +170,6 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
         if (refAudioUrlRef.current) URL.revokeObjectURL(refAudioUrlRef.current);
         refAudioUrlRef.current = blobUrl;
         setRefAudioUrl(blobUrl);
-        // Get audio duration for word-segment playback
         const audio = new Audio(blobUrl);
         audio.onloadedmetadata = () => {
           refAudioDurationRef.current = audio.duration;
@@ -148,8 +178,8 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
       setState('ready');
     } catch (e) {
       if (e instanceof Error && e.name === 'AbortError') return;
+      if (ac.signal.aborted) return;
       console.error(e);
-      // Clear cache on error so next retry fetches fresh
       clearShadowCache();
       const msg = e instanceof Error ? e.message : 'Unable to load challenge.';
       const isNetworkError =
@@ -176,6 +206,10 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
       }
     };
   }, [loadChallenge]);
+
+  useEffect(() => {
+    getShadowHistory().then(setHistoryEntries);
+  }, []);
 
   const startRecording = async () => {
     try {
@@ -277,6 +311,12 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
       setAnalysis(data);
       setSummaryCardIndex(0);
       setState('results');
+      await addShadowHistoryEntry(
+        { topic: challenge.topic, text: challenge.text, sourceUrl: challenge.sourceUrl },
+        data
+      );
+      const list = await getShadowHistory();
+      setHistoryEntries(list);
     } catch (e) {
       console.error(e);
       setError(e instanceof Error ? e.message : 'Analysis failed.');
@@ -396,6 +436,134 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
 
   if (!challenge) return null;
 
+  const selectedEntry = selectedHistoryId
+    ? historyEntries.find((e) => e.id === selectedHistoryId)
+    : null;
+
+  if (historyView === 'list') {
+    return (
+      <div className="h-full bg-primary-50 flex flex-col overflow-y-auto overflow-x-hidden">
+        <div className="flex-1 px-4 py-6 pb-24 safe-bottom">
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <button
+              type="button"
+              onClick={() => setHistoryView('closed')}
+              className="flex items-center gap-2 text-sm text-gray-500 hover:text-primary-900 font-medium touch-manipulation min-h-[44px]"
+              aria-label="Back to challenge"
+            >
+              <BackIcon size={18} />
+              Back
+            </button>
+            <h2 className="text-lg font-semibold text-primary-900">Past Analyses</h2>
+            <div className="w-14" aria-hidden />
+          </div>
+          {historyEntries.length === 0 ? (
+            <div className="bg-white rounded-2xl p-8 shadow-float border border-black/5 text-center text-gray-500 text-sm">
+              No past analyses yet. Complete an analysis to see it here.
+            </div>
+          ) : (
+            <ul className="space-y-3">
+              {historyEntries.map((entry) => (
+                <li key={entry.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedHistoryId(entry.id);
+                      setHistoryView('detail');
+                    }}
+                    className="w-full text-left bg-white rounded-2xl p-4 shadow-float border border-black/5 hover:border-primary-200 transition-colors touch-manipulation"
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="text-sm font-medium text-primary-900 truncate flex-1">
+                        {entry.challenge.topic}
+                      </span>
+                      <span
+                        className={`text-sm font-bold shrink-0 ${
+                          entry.analysis.score > 80
+                            ? 'text-green-600'
+                            : entry.analysis.score > 60
+                              ? 'text-amber-600'
+                              : 'text-red-600'
+                        }`}
+                      >
+                        {entry.analysis.score}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      {new Date(entry.timestamp).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-1 line-clamp-2">
+                      &quot;{entry.challenge.text}&quot;
+                    </p>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (historyView === 'detail' && selectedEntry) {
+    const entryAnalysis = selectedEntry.analysis;
+    const entryCards = [
+      { id: 'score', title: 'Overall Score', type: 'score' as const },
+      { id: 'feedback', title: "Coach's Feedback", type: 'feedback' as const },
+      { id: 'strengths', title: 'Strengths', type: 'strengths' as const },
+      { id: 'improvements', title: 'Improvements', type: 'improvements' as const },
+    ];
+    return (
+      <div className="h-full bg-primary-50 flex flex-col overflow-y-auto overflow-x-hidden">
+        <div className="flex-1 px-4 py-6 pb-24 safe-bottom">
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedHistoryId(null);
+                setHistoryView('list');
+              }}
+              className="flex items-center gap-2 text-sm text-gray-500 hover:text-primary-900 font-medium touch-manipulation min-h-[44px]"
+              aria-label="Back to list"
+            >
+              <BackIcon size={18} />
+              Back
+            </button>
+            <h2 className="text-lg font-semibold text-primary-900 truncate flex-1 text-center">
+              {selectedEntry.challenge.topic}
+            </h2>
+            <div className="w-14" aria-hidden />
+          </div>
+          <div className="max-w-xl mx-auto space-y-6">
+            <p className="text-xs text-gray-500 text-center">
+              {new Date(selectedEntry.timestamp).toLocaleString()}
+            </p>
+            <WordAnalysisView words={entryAnalysis.words} />
+            <div className="flex overflow-x-auto gap-4 pb-2 snap-x snap-mandatory no-scrollbar">
+              {entryCards.map((_, index) => (
+                <div key={entryCards[index].id} className="flex-shrink-0 w-[85%] max-w-sm snap-center">
+                  <SummaryCard analysis={entryAnalysis} card={entryCards[index]} />
+                </div>
+              ))}
+            </div>
+            {selectedEntry.challenge.sourceUrl && (
+              <div className="flex justify-center pt-2">
+                <a
+                  href={selectedEntry.challenge.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[10px] text-gray-300 hover:text-gray-500 uppercase tracking-widest"
+                >
+                  Content Source
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const summaryCards = analysis
     ? [
         { id: 'score', title: 'Overall Score', type: 'score' as const },
@@ -411,6 +579,22 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
         <div className="max-w-xl mx-auto space-y-6">
           <div className="text-center space-y-4">
             <div className="flex items-center justify-center gap-2">
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setHistoryView('list')}
+                  className="p-1.5 rounded-full text-gray-400 hover:text-primary-900 hover:bg-white/80 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+                  aria-label="View past analyses"
+                  title="Past analyses"
+                >
+                  <History size={18} />
+                </button>
+                {historyEntries.length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full bg-primary-900 text-white text-[10px] font-bold flex items-center justify-center px-1">
+                    {historyEntries.length > 50 ? '50+' : historyEntries.length}
+                  </span>
+                )}
+              </div>
               <div className="inline-block px-3 py-1 bg-white rounded-full text-gray-500 text-[10px] uppercase tracking-widest font-bold shadow-float border border-black/5">
                 Today&apos;s Topic: {challenge.topic}
               </div>
@@ -469,32 +653,15 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
                         ))}
                       </div>
                       <p className="text-sm font-medium text-gray-600">Recording...</p>
-                      <button
-                        type="button"
-                        onClick={stopRecording}
-                        className="flex items-center gap-2 px-5 py-3 bg-apple-blue text-white rounded-xl font-semibold text-sm active:scale-95 transition-transform shadow-sm"
-                      >
-                        <Square size={18} />
-                        Stop
-                      </button>
+                      <p className="text-xs text-gray-400">Tap the button below to stop</p>
                     </>
                   ) : (
-                    <>
-                      <div className="w-full h-20 bg-gray-50 rounded-xl flex items-center justify-center border border-black/5">
-                        <div className="flex items-center gap-2 text-gray-400">
-                          <div className="w-2 h-2 rounded-full bg-gray-300" />
-                          <span className="text-sm font-medium">Ready to record</span>
-                        </div>
+                    <div className="w-full h-20 bg-gray-50 rounded-xl flex items-center justify-center border border-black/5">
+                      <div className="flex items-center gap-2 text-gray-400">
+                        <div className="w-2 h-2 rounded-full bg-gray-300" />
+                        <span className="text-sm font-medium">Ready to record</span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={startRecording}
-                        className="w-full bg-primary-900 text-white py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-transform"
-                      >
-                        <Mic size={20} />
-                        Start Recording
-                      </button>
-                    </>
+                    </div>
                   )}
                 </div>
               </div>
@@ -612,6 +779,33 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
           )}
         </div>
       </div>
+
+      {/* Fixed recording button – same style as Library FAB */}
+      {(state === 'ready' || state === 'recording') && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-30 safe-bottom">
+          {state === 'recording' ? (
+            <button
+              type="button"
+              onClick={stopRecording}
+              className="bg-primary-900 text-white px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 touch-manipulation min-h-[44px]"
+              aria-label="Stop recording"
+            >
+              <Square size={18} />
+              <span>Stop</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={startRecording}
+              className="bg-primary-900 text-white px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 touch-manipulation min-h-[44px]"
+              aria-label="Start recording"
+            >
+              <Mic size={18} />
+              <span>Start Recording</span>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

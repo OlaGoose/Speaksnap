@@ -196,6 +196,10 @@ CRITICAL REQUIREMENTS:
 9. Return VALID JSON only - no markdown, no extra text
 `;
 
+  if (!doubao && !gemini && !openai) {
+    throw new Error('No AI provider configured. Please set at least one of: NEXT_PUBLIC_GEMINI_API_KEY, NEXT_PUBLIC_OPENAI_API_KEY, or Doubao env vars.');
+  }
+
   let lastError: any = null;
 
   // Try Doubao (priority 1)

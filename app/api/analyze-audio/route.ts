@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { analyzeAudio } from '@/lib/ai/service';
+import { analyzeAudio, NO_AI_PROVIDER_MESSAGE } from '@/lib/ai/service';
+
+function isUnavailableError(message: string): boolean {
+  return (
+    message === NO_AI_PROVIDER_MESSAGE ||
+    message.includes('All AI providers failed') ||
+    message.includes('No AI provider')
+  );
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,14 +21,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await analyzeAudio(audio, level, location, mode);
+    const result = await analyzeAudio(audio, level, location, mode ?? 'Daily');
 
     return NextResponse.json(result);
   } catch (error: any) {
+    const message = error?.message || 'Internal server error';
     console.error('Analyze audio API error:', error);
+    const status = isUnavailableError(message) ? 503 : 500;
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
+      { error: status === 503 ? 'AI service unavailable. Please check your API keys and try again.' : message },
+      { status }
     );
   }
 }

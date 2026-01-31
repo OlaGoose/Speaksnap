@@ -178,3 +178,11 @@ export interface ShadowAnalysisResult {
   intonation: string;
   suggestions: string;
 }
+
+/** Stored entry for shadow analysis review (no audio URLs). */
+export interface ShadowHistoryEntry {
+  id: string;
+  timestamp: number;
+  challenge: { topic: string; text: string; sourceUrl?: string };
+  analysis: ShadowAnalysisResult;
+}

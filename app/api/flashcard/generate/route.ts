@@ -168,14 +168,17 @@ Note: Do NOT include video_ids - those will be fetched separately.
     const errorMessage = lastError?.message || 'No AI provider available';
     console.error('❌ [Flashcard] All providers failed. Last error:', errorMessage);
     return NextResponse.json(
-      { error: `All AI providers failed. Last error: ${errorMessage}` },
-      { status: 500 }
+      { error: 'AI service unavailable. Please check your API keys and try again.' },
+      { status: 503 }
     );
   } catch (error: any) {
     console.error('❌ [Flashcard] API error:', error);
+    const message = error?.message || 'Internal server error';
+    const isUnavailable =
+      message.includes('No AI provider') || message.includes('All AI providers failed');
     return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
+      { error: isUnavailable ? 'AI service unavailable. Please check your API keys and try again.' : message },
+      { status: isUnavailable ? 503 : 500 }
     );
   }
 }

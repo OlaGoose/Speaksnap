@@ -316,8 +316,8 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
           })
         );
 
-        const cards = storage.getItem('speakSnapFlashcards') || [];
-        storage.setItem('speakSnapFlashcards', [...flashcardsWithVideos, ...cards]);
+        const cards = await storage.getItem('speakSnapFlashcards') || [];
+        await storage.setItem('speakSnapFlashcards', [...flashcardsWithVideos, ...cards]);
       }
 
       // Save diary entry
@@ -329,8 +329,8 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
         timestamp: Date.now(),
       };
 
-      const entries = storage.getItem('speakSnapDiary') || [];
-      storage.setItem('speakSnapDiary', [entry, ...entries]);
+      const entries = await storage.getItem('speakSnapDiary') || [];
+      await storage.setItem('speakSnapDiary', [entry, ...entries]);
     } catch (error: any) {
       console.error('Analysis error:', error);
       const errorMessage = error.message || 'Failed to analyze diary. Please try again.';
@@ -440,8 +440,8 @@ export default function DiaryEditor({ isOpen, onClose }: DiaryEditorProps) {
         source: 'diary',
       };
 
-      const cards = storage.getItem<any[]>('speakSnapFlashcards') || [];
-      storage.setItem('speakSnapFlashcards', [newCard, ...cards]);
+      const cards = await storage.getItem<any[]>('speakSnapFlashcards') || [];
+      await storage.setItem('speakSnapFlashcards', [newCard, ...cards]);
 
       processingToast.textContent = '✅ Flashcard saved!';
       processingToast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded-full text-sm z-50 animate-in fade-in';

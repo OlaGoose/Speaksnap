@@ -405,22 +405,25 @@ IMPORTANT:
   useEffect(() => {
     if (dialogueId) {
       // Load existing dialogue
-      const scenarios = storage.getItem<Scenario[]>('speakSnapScenarios') || [];
-      const currentScenario = scenarios.find((s: Scenario) => s.id === scenario.id);
-      const existingDialogue = currentScenario?.dialogues?.find((d: any) => d.id === dialogueId);
+      (async () => {
+        const scenarios = await storage.getItem<Scenario[]>('speakSnapScenarios') || [];
+        const currentScenario = scenarios.find((s: Scenario) => s.id === scenario.id);
+        const existingDialogue = currentScenario?.dialogues?.find((d: any) => d.id === dialogueId);
       
-      if (existingDialogue) {
-        setMessages(existingDialogue.messages);
-        // Reset last played message ID when loading existing dialogue
-        // This prevents auto-playing old messages, only new ones will play
-        const lastAiMessage = existingDialogue.messages
-          .filter((msg: DialogueLine) => msg.speaker === 'ai')
-          .slice(-1)[0];
-        if (lastAiMessage) {
-          lastPlayedMessageIdRef.current = lastAiMessage.id;
+        if (existingDialogue) {
+          setMessages(existingDialogue.messages);
+          // Reset last played message ID when loading existing dialogue
+          // This prevents auto-playing old messages, only new ones will play
+          const lastAiMessage = existingDialogue.messages
+            .filter((msg: DialogueLine) => msg.speaker === 'ai')
+            .slice(-1)[0];
+          if (lastAiMessage) {
+            lastPlayedMessageIdRef.current = lastAiMessage.id;
+          }
+          return;
         }
-        return;
-      }
+      })();
+      return;
     }
     
     // New dialogue
@@ -842,9 +845,9 @@ IMPORTANT:
   };
 
   // Real-time save function
-  const saveDialogueProgress = useCallback((currentMessages: DialogueLine[], isCompleted: boolean = false) => {
+  const saveDialogueProgress = useCallback(async (currentMessages: DialogueLine[], isCompleted: boolean = false) => {
     try {
-      const scenarios = storage.getItem<Scenario[]>('speakSnapScenarios') || [];
+      const scenarios = await storage.getItem<Scenario[]>('speakSnapScenarios') || [];
       const scenarioIndex = scenarios.findIndex((s: Scenario) => s.id === scenario.id);
       
       if (scenarioIndex === -1) {
@@ -888,7 +891,7 @@ IMPORTANT:
       );
       scenarios[scenarioIndex].last_practiced = Date.now();
       
-      storage.setItem('speakSnapScenarios', scenarios);
+      await storage.setItem('speakSnapScenarios', scenarios);
       console.log('✅ Real-time save:', isCompleted ? 'Completed' : 'In progress');
     } catch (error) {
       console.error('❌ Failed to save dialogue:', error);
@@ -998,8 +1001,8 @@ IMPORTANT:
         source: 'dialogue',
       };
 
-      const cards = storage.getItem<any[]>('speakSnapFlashcards') || [];
-      storage.setItem('speakSnapFlashcards', [newCard, ...cards]);
+      const cards = await storage.getItem<any[]>('speakSnapFlashcards') || [];
+      await storage.setItem('speakSnapFlashcards', [newCard, ...cards]);
 
       // Log for debugging
       console.log('✅ Flashcard saved:', newCard);
@@ -1028,8 +1031,8 @@ IMPORTANT:
         source: 'dialogue',
       };
 
-      const cards = storage.getItem('speakSnapFlashcards') || [];
-      storage.setItem('speakSnapFlashcards', [basicCard, ...cards]);
+      const cards = await storage.getItem('speakSnapFlashcards') || [];
+      await storage.setItem('speakSnapFlashcards', [basicCard, ...cards]);
 
       processingToast.textContent = '✅ Basic card saved!';
       setTimeout(() => {

@@ -1,16 +1,30 @@
 /**
- * Optimized localStorage utilities with error handling and caching
+ * IndexedDB storage utilities using localforage (industry best practice)
+ * - Large storage capacity (hundreds of MB to GB)
+ * - Async API for better performance
+ * - Automatic fallback to WebSQL/localStorage
  */
 
-// In-memory cache to reduce localStorage access
+import localforage from 'localforage';
+
+// Configure localforage instance
+localforage.config({
+  driver: [localforage.INDEXEDDB, localforage.WEBSQL, localforage.LOCALSTORAGE],
+  name: 'SpeakSnap',
+  version: 1.0,
+  storeName: 'speaksnap_store',
+  description: 'SpeakSnap application data storage',
+});
+
+// In-memory cache to reduce IndexedDB access
 const cache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_DURATION = 5000; // 5 seconds cache
 
 export const storage = {
   /**
-   * Get item from localStorage with caching
+   * Get item from IndexedDB with in-memory caching
    */
-  getItem<T = any>(key: string, useCache = true): T | null {
+  async getItem<T = any>(key: string, useCache = true): Promise<T | null> {
     try {
       // Check cache first
       if (useCache && cache.has(key)) {
@@ -21,68 +35,51 @@ export const storage = {
         cache.delete(key);
       }
 
-      const item = localStorage.getItem(key);
-      if (!item) return null;
-
-      const parsed = JSON.parse(item);
+      const value = await localforage.getItem<T>(key);
       
       // Update cache
-      if (useCache) {
-        cache.set(key, { data: parsed, timestamp: Date.now() });
+      if (value !== null && useCache) {
+        cache.set(key, { data: value, timestamp: Date.now() });
       }
 
-      return parsed as T;
+      return value;
     } catch (error) {
-      console.error(`Error reading from localStorage (${key}):`, error);
+      console.error(`Error reading from storage (${key}):`, error);
       return null;
     }
   },
 
   /**
-   * Set item to localStorage with caching
+   * Set item to IndexedDB with in-memory caching
    */
-  setItem<T = any>(key: string, value: T): boolean {
+  async setItem<T = any>(key: string, value: T): Promise<boolean> {
     try {
-      const serialized = JSON.stringify(value);
-      localStorage.setItem(key, serialized);
+      await localforage.setItem(key, value);
       
       // Update cache
       cache.set(key, { data: value, timestamp: Date.now() });
       
       return true;
     } catch (error) {
-      console.error(`Error writing to localStorage (${key}):`, error);
-      
-      // Try to clear some space if quota exceeded
-      if (error instanceof Error && error.name === 'QuotaExceededError') {
-        this.clearOldItems();
-        // Retry once
-        try {
-          localStorage.setItem(key, JSON.stringify(value));
-          return true;
-        } catch {
-          return false;
-        }
-      }
-      
+      console.error(`Error writing to storage (${key}):`, error);
       return false;
     }
   },
 
   /**
-   * Remove item from localStorage and cache
+   * Remove item from IndexedDB and cache
    */
-  removeItem(key: string): void {
+  async removeItem(key: string): Promise<void> {
     try {
-      localStorage.removeItem(key);
+      await localforage.removeItem(key);
       cache.delete(key);
     } catch (error) {
-      console.error(`Error removing from localStorage (${key}):`, error);
+      console.error(`Error removing from storage (${key}):`, error);
     }
   },
 
   /**
-   * Clear all cache
+   * Clear all cache (memory only, doesn't affect IndexedDB)
    */
   clearCache(): void {
     cache.clear();
@@ -91,58 +88,56 @@ export const storage = {
   /**
    * Clear old items to free up space (removes items older than 30 days)
    */
-  clearOldItems(): void {
+  async clearOldItems(): Promise<void> {
     try {
       const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
       
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (!key) continue;
-
-        try {
-          const item = localStorage.getItem(key);
-          if (!item) continue;
-
-          const parsed = JSON.parse(item);
+      await localforage.iterate((value: any, key: string) => {
+        if (Array.isArray(value)) {
+          // For arrays of items with timestamps
+          const filtered = value.filter((item: any) => {
+            return !item.timestamp || item.timestamp > thirtyDaysAgo;
+          });
           
-          // Check if item has timestamp and is old
-          if (Array.isArray(parsed)) {
-            // For arrays of items with timestamps
-            const filtered = parsed.filter((item: any) => {
-              return !item.timestamp || item.timestamp > thirtyDaysAgo;
-            });
-            
-            if (filtered.length < parsed.length) {
-              localStorage.setItem(key, JSON.stringify(filtered));
+          if (filtered.length < value.length) {
+            if (filtered.length === 0) {
+              localforage.removeItem(key);
+            } else {
+              localforage.setItem(key, filtered);
             }
           }
-        } catch {
-          // Skip items that can't be parsed
         }
-      }
+      });
     } catch (error) {
       console.error('Error clearing old items:', error);
     }
   },
 
   /**
-   * Get storage usage info
+   * Get all keys in storage
    */
-  getStorageInfo(): { used: number; available: number; percentage: number } {
+  async keys(): Promise<string[]> {
     try {
-      let used = 0;
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key) {
-          const item = localStorage.getItem(key);
-          used += (key.length + (item?.length || 0)) * 2; // UTF-16 encoding
-        }
+      return await localforage.keys();
+    } catch (error) {
+      console.error('Error getting keys:', error);
+      return [];
+    }
+  },
+
+  /**
+   * Get storage usage info (estimate)
+   */
+  async getStorageInfo(): Promise<{ used: number; available: number; percentage: number }> {
+    try {
+      if ('storage' in navigator && 'estimate' in navigator.storage) {
+        const estimate = await navigator.storage.estimate();
+        const used = estimate.usage || 0;
+        const available = estimate.quota || 0;
+        const percentage = available > 0 ? (used / available) * 100 : 0;
+        return { used, available, percentage };
       }
-
-      const available = 5 * 1024 * 1024; // 5MB typical limit
-      const percentage = (used / available) * 100;
-
-      return { used, available, percentage };
+      return { used: 0, available: 0, percentage: 0 };
     } catch {
       return { used: 0, available: 0, percentage: 0 };
     }

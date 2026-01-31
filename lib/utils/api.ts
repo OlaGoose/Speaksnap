@@ -2,6 +2,10 @@
  * API request utilities with caching and optimization
  */
 
+const DEFAULT_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+const MAX_CACHE_ENTRIES = 50;
+
 interface CacheEntry<T> {
   data: T;
   timestamp: number;
@@ -10,10 +14,9 @@ interface CacheEntry<T> {
 
 class APICache {
   private cache = new Map<string, CacheEntry<any>>();
-  private maxSize = 50; // Maximum cache entries
+  private maxSize = MAX_CACHE_ENTRIES;
 
-  set<T>(key: string, data: T, expiresIn = 300000): void {
-    // 5 minutes default
+  set<T>(key: string, data: T, expiresIn = DEFAULT_CACHE_TTL_MS): void {
     if (this.cache.size >= this.maxSize) {
       // Remove oldest entry
       const firstKey = this.cache.keys().next().value;
@@ -71,11 +74,15 @@ class APICache {
 
 const apiCache = new APICache();
 
-// Clear expired cache entries every 5 minutes
+// Clear expired cache entries periodically; clean up interval on page unload
 if (typeof window !== 'undefined') {
-  setInterval(() => {
+  const cleanupIntervalId = setInterval(() => {
     apiCache.clearExpired();
-  }, 300000);
+  }, CLEANUP_INTERVAL_MS);
+
+  window.addEventListener('beforeunload', () => {
+    clearInterval(cleanupIntervalId);
+  });
 }
 
 /**

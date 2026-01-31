@@ -73,14 +73,16 @@ export default function FlashcardDeck() {
   }, []);
 
   useEffect(() => {
-    const savedCards = storage.getItem<Flashcard[]>('speakSnapFlashcards');
-    console.log('📚 Loading flashcards:', savedCards?.length || 0, 'cards');
-    if (savedCards && savedCards.length > 0) {
-      console.log('First card:', savedCards[0]);
-      setFlashcards(savedCards);
-    } else {
-      console.log('⚠️ No flashcards found in storage');
-    }
+    (async () => {
+      const savedCards = await storage.getItem<Flashcard[]>('speakSnapFlashcards');
+      console.log('📚 Loading flashcards:', savedCards?.length || 0, 'cards');
+      if (savedCards && savedCards.length > 0) {
+        console.log('First card:', savedCards[0]);
+        setFlashcards(savedCards);
+      } else {
+        console.log('⚠️ No flashcards found in storage');
+      }
+    })();
 
     // Cleanup: stop all videos when component unmounts
     return () => {
@@ -301,14 +303,14 @@ export default function FlashcardDeck() {
     window.speechSynthesis.speak(utterance);
   }, []);
 
-  const deleteCurrentCard = useCallback((e: React.MouseEvent) => {
+  const deleteCurrentCard = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
     const currentCard = flashcards[activeIndex];
     if (!currentCard) return;
 
     const updated = flashcards.filter((f) => f.id !== currentCard.id);
     setFlashcards(updated);
-    storage.setItem('speakSnapFlashcards', updated);
+    await storage.setItem('speakSnapFlashcards', updated);
 
     if (activeIndex >= updated.length) {
       setActiveIndex(Math.max(0, updated.length - 1));

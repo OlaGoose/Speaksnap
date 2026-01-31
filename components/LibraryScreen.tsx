@@ -61,8 +61,8 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel,
     prefetchShadowChallenge(userLevel, practiceMode);
   }, [userLevel, practiceMode]);
 
-  const loadScenarios = useCallback(() => {
-    const scenarios = storage.getItem<Scenario[]>('speakSnapScenarios');
+  const loadScenarios = useCallback(async () => {
+    const scenarios = await storage.getItem<Scenario[]>('speakSnapScenarios');
     if (scenarios) {
       // Sort by last practiced
       scenarios.sort((a: Scenario, b: Scenario) => b.last_practiced - a.last_practiced);
@@ -70,8 +70,8 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel,
     }
   }, []);
 
-  const loadDiaries = useCallback(() => {
-    const entries = storage.getItem<DiaryEntry[]>('speakSnapDiary');
+  const loadDiaries = useCallback(async () => {
+    const entries = await storage.getItem<DiaryEntry[]>('speakSnapDiary');
     if (entries && Array.isArray(entries)) {
       // Filter and validate entries to ensure they have required fields
       const validEntries = entries.filter((entry) => {
@@ -88,31 +88,31 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel,
     }
   }, []);
 
-  const handleDeleteDiary = useCallback((diaryId: string, e: React.MouseEvent) => {
+  const handleDeleteDiary = useCallback(async (diaryId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm('Delete this diary entry?')) return;
     
     const updated = diaryEntries.filter((d) => d.id !== diaryId);
     setDiaryEntries(updated);
-    storage.setItem('speakSnapDiary', updated);
+    await storage.setItem('speakSnapDiary', updated);
     if (expandedDiaryId === diaryId) {
       setExpandedDiaryId(null);
     }
   }, [diaryEntries, expandedDiaryId]);
 
-  const handleDeleteScenario = useCallback((scenarioId: string, e: React.MouseEvent) => {
+  const handleDeleteScenario = useCallback(async (scenarioId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm('Delete this scenario and all its dialogues?')) return;
     
     const updated = savedScenarios.filter((s) => s.id !== scenarioId);
     setSavedScenarios(updated);
-    storage.setItem('speakSnapScenarios', updated);
+    await storage.setItem('speakSnapScenarios', updated);
     if (expandedScenarioId === scenarioId) {
       setExpandedScenarioId(null);
     }
   }, [savedScenarios, expandedScenarioId]);
 
-  const handleDeleteDialogue = (scenario: Scenario, dialogueId: string, e: React.MouseEvent) => {
+  const handleDeleteDialogue = async (scenario: Scenario, dialogueId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm('Delete this dialogue?')) return;
     
@@ -131,7 +131,7 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel,
     });
     
     setSavedScenarios(updatedScenarios);
-    localStorage.setItem('speakSnapScenarios', JSON.stringify(updatedScenarios));
+    await storage.setItem('speakSnapScenarios', updatedScenarios);
   };
 
   const toggleExpand = (scenarioId: string) => {

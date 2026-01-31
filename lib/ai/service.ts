@@ -12,7 +12,7 @@ import type {
   DiaryProcessResult,
   UserLevel,
   PracticeMode,
-} from '../types';
+} from '@/lib/types';
 
 // Initialize providers
 const doubaoConfig = {
@@ -29,7 +29,7 @@ const doubao =
 const openaiKey = process.env.NEXT_PUBLIC_OPENAI_API_KEY || '';
 const openai = openaiKey ? new OpenAI({ 
   apiKey: openaiKey,
-  timeout: 30000, // 30 seconds default timeout
+  timeout: 60000, // 30 seconds default timeout
   maxRetries: 2, // Retry on failure
 }) : null;
 
@@ -37,6 +37,15 @@ const geminiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
 const gemini = geminiKey ? new GoogleGenerativeAI(geminiKey) : null;
 
 const AI_PROVIDER = (process.env.NEXT_PUBLIC_AI_PROVIDER || 'auto').toLowerCase();
+
+/** Error message when no AI provider is configured (map to 503 in API routes). */
+export const NO_AI_PROVIDER_MESSAGE = 'No AI provider configured. Please set at least one of: NEXT_PUBLIC_GEMINI_API_KEY, NEXT_PUBLIC_OPENAI_API_KEY, or Doubao env vars.';
+
+function ensureProviderAvailable(): void {
+  if (!doubao && !gemini && !openai) {
+    throw new Error(NO_AI_PROVIDER_MESSAGE);
+  }
+}
 
 /**
  * Analyze image to create a learning scenario
@@ -47,6 +56,7 @@ export async function analyzeScene(
   location?: { lat: number; lng: number },
   mode: PracticeMode = 'Daily'
 ): Promise<AnalyzeImageResponse> {
+  ensureProviderAvailable();
   const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg);base64,/, '');
 
   const now = new Date();
@@ -127,7 +137,7 @@ Return JSON:
 
       // Add timeout control (30 seconds)
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Gemini request timeout after 30s')), 30000);
+        setTimeout(() => reject(new Error('Gemini request timeout after 30s')), 60000);
       });
 
       const result = await Promise.race([
@@ -170,7 +180,7 @@ Return JSON:
       
       // Add timeout control (30 seconds)
       const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('OpenAI request timeout after 30s')), 30000);
+        setTimeout(() => reject(new Error('OpenAI request timeout after 30s')), 60000);
       });
 
       const response = await Promise.race([
@@ -291,6 +301,7 @@ export async function analyzeAudio(
   location?: { lat: number; lng: number },
   mode: PracticeMode = 'Daily'
 ): Promise<AnalyzeImageResponse> {
+  ensureProviderAvailable();
   const now = new Date();
   const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const dayPart =
@@ -456,6 +467,7 @@ export async function continueDialogue(
   scenarioContext: string,
   level: UserLevel
 ): Promise<DialogueResponse> {
+  ensureProviderAvailable();
   const systemPrompt = `
 You are an English conversation tutor conducting a roleplay dialogue exercise.
 
