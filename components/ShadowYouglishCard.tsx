@@ -119,8 +119,9 @@ function ShadowYouglishCardInner({ words, title = 'Native Examples' }: ShadowYou
     // Reset error state when changing word
     setWidgetError(false);
 
-    // Add delay to avoid bot detection
-    const timeoutId = setTimeout(() => {
+    let retryTimeoutId: NodeJS.Timeout | null = null;
+
+    const initializeWidget = (container: HTMLDivElement, containerWidth: number) => {
       try {
         setWidgetLoading(true);
 
@@ -143,15 +144,9 @@ function ShadowYouglishCardInner({ words, title = 'Native Examples' }: ShadowYou
         }
 
         // Clear container
-        if (containerRef.current) {
-          containerRef.current.innerHTML = '';
-        }
+        container.innerHTML = '';
 
         // Match flashcard: components 72, autoStart 1, width from container
-        const containerWidth =
-          containerRef.current?.getBoundingClientRect().width ??
-          containerRef.current?.offsetWidth ??
-          640;
         const widgetWidth = Math.max(320, Math.min(containerWidth, 1200));
 
         const widget = new (window as any).YG.Widget('youglish-shadow-widget', {
@@ -171,7 +166,7 @@ function ShadowYouglishCardInner({ words, title = 'Native Examples' }: ShadowYou
         });
 
         // Fetch the word (already cleaned in problemWords memo)
-        console.log('[Youglish] Fetching word:', currentWord);
+        console.log('[Youglish] Fetching word:', currentWord, 'width:', widgetWidth);
         widget.fetch(currentWord, 'english');
         widgetRef.current = widget;
       } catch (error) {
@@ -179,10 +174,41 @@ function ShadowYouglishCardInner({ words, title = 'Native Examples' }: ShadowYou
         setWidgetLoading(false);
         setWidgetError(true);
       }
-    }, 300); // 300ms delay to avoid rapid requests
+    };
+
+    // Add delay to avoid bot detection and ensure DOM is ready
+    const timeoutId = setTimeout(() => {
+      const container = containerRef.current;
+      if (!container) return;
+
+      // Check container dimensions (critical fix: match FlashcardDeck behavior)
+      const containerRect = container.getBoundingClientRect();
+      if (containerRect.width === 0 || containerRect.height === 0) {
+        console.warn('[Youglish] Container has no dimensions, retrying...', containerRect);
+        // Retry after container becomes visible
+        retryTimeoutId = setTimeout(() => {
+          const retryContainer = containerRef.current;
+          if (!retryContainer) return;
+
+          const retryRect = retryContainer.getBoundingClientRect();
+          if (retryRect.width === 0 || retryRect.height === 0) {
+            console.warn('[Youglish] Container still has no dimensions after retry, skipping initialization');
+            return;
+          }
+
+          // Retry initialization
+          initializeWidget(retryContainer, retryRect.width || retryContainer.offsetWidth || 640);
+        }, 300);
+        return;
+      }
+
+      // Initialize immediately if container has dimensions
+      initializeWidget(container, containerRect.width || container.offsetWidth || 640);
+    }, 100); // Reduced from 300ms to 100ms (match FlashcardDeck)
 
     return () => {
       clearTimeout(timeoutId);
+      if (retryTimeoutId) clearTimeout(retryTimeoutId);
       if (widgetRef.current) {
         try {
           widgetRef.current.destroy?.();
@@ -274,6 +300,7 @@ function ShadowYouglishCardInner({ words, title = 'Native Examples' }: ShadowYou
                   ref={containerRef}
                   id="youglish-shadow-widget"
                   className="w-full min-h-[300px] rounded-lg overflow-hidden bg-gray-50"
+                  style={{ minHeight: '300px', width: '100%', maxWidth: '100%' }}
                 />
               </div>
 
