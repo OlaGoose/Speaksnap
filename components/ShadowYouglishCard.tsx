@@ -52,27 +52,34 @@ function ShadowYouglishCardInner({ words, title = 'Native Examples' }: ShadowYou
   const widgetRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Filter words that need practice (poor or average status)
+  // Identify words user pronounced poorly: status poor/average, or has issue (same as flashcard logic – one term per Youglish search)
   const problemWords = React.useMemo(() => {
     if (!words || !Array.isArray(words)) return [];
-    
+
     const filtered = words
-      .filter((w) => w && (w.status === 'poor' || w.status === 'average'))
+      .filter(
+        (w) =>
+          w &&
+          (w.status === 'poor' ||
+            w.status === 'average' ||
+            (typeof w.issue === 'string' && w.issue.trim().length > 0))
+      )
       .map((w) => w.word)
       .filter((word) => word && typeof word === 'string' && word.trim().length > 0)
-      .map((word) => 
-        // Clean word: lowercase, remove punctuation
-        word.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim()
+      .map((word) =>
+        word
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/g, '')
+          .trim()
       )
       .filter((word) => word.length > 0);
-    
-    // Remove duplicates
+
     return Array.from(new Set(filtered));
   }, [words]);
 
-  // Load Youglish script
+  // Load Youglish script when we have words (so widget is ready when problemWords exist)
   useEffect(() => {
-    if (typeof window === 'undefined' || problemWords.length === 0) return;
+    if (typeof window === 'undefined' || (words?.length ?? 0) === 0) return;
 
     const existingScript = document.querySelector('script[src*="youglish.com"]');
     if (existingScript) {
@@ -100,7 +107,7 @@ function ShadowYouglishCardInner({ words, title = 'Native Examples' }: ShadowYou
         widgetRef.current = null;
       }
     };
-  }, [problemWords.length]);
+  }, [words?.length]);
 
   // Initialize widget when Youglish is ready
   useEffect(() => {
@@ -140,20 +147,23 @@ function ShadowYouglishCardInner({ words, title = 'Native Examples' }: ShadowYou
           containerRef.current.innerHTML = '';
         }
 
-        // Create widget with simplified config
+        // Match flashcard: components 72, autoStart 1, width from container
+        const containerWidth =
+          containerRef.current?.getBoundingClientRect().width ??
+          containerRef.current?.offsetWidth ??
+          640;
+        const widgetWidth = Math.max(320, Math.min(containerWidth, 1200));
+
         const widget = new (window as any).YG.Widget('youglish-shadow-widget', {
-          width: containerRef.current?.offsetWidth || 320,
-          components: 9, // Show controls
+          width: widgetWidth,
+          components: 72, // Search + title + controls (same as FlashcardDeck)
+          autoStart: 1,
           events: {
             onFetchDone: () => {
-              console.log('[Youglish] Fetch done for:', currentWord);
               setWidgetLoading(false);
             },
-            onVideoChange: () => {
-              console.log('[Youglish] Video changed');
-            },
-            onError: (error: any) => {
-              console.error('[Youglish] Widget error:', error);
+            onVideoChange: () => {},
+            onError: () => {
               setWidgetLoading(false);
               setWidgetError(true);
             },

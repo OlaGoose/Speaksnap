@@ -131,8 +131,8 @@ export function ShadowMultiAudioMode({
           body: JSON.stringify({
             userAudioBase64: userBase64,
             userMimeType: entry.audioBlob!.type,
-            referenceAudioBase64: refAudioBase64,
-            referenceText: challenge.text,
+            refAudioBase64,
+            refText: challenge.text,
           }),
         });
         const data = await res.json();
