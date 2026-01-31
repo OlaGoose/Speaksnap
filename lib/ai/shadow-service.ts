@@ -281,3 +281,95 @@ export async function analyzeShadowReading(
 
   return parseJSON(responseText) as unknown as ShadowAnalysisResult;
 }
+
+export interface RecommendedVideo {
+  url: string;
+  videoId: string;
+  title: string;
+  summary: string;
+  relevanceScore?: number;
+}
+
+/**
+ * Recommend a YouTube video from PDF based on shadow reading context.
+ * Uses Gemini's document understanding to extract and match videos.
+ */
+export async function recommendYouTubeVideo(
+  practiceText: string,
+  weaknesses: string[] = [],
+  pdfFileUri?: string
+): Promise<RecommendedVideo | null> {
+  if (!ai) {
+    console.warn('Gemini API key not configured for video recommendation');
+    return null;
+  }
+
+  const fileUri = pdfFileUri || process.env.SHADOW_YOUTUBE_PDF_URI;
+  if (!fileUri) {
+    console.warn('SHADOW_YOUTUBE_PDF_URI not configured');
+    return null;
+  }
+
+  const weaknessContext = weaknesses.length > 0
+    ? `\nUser's pronunciation weaknesses: ${weaknesses.join(', ')}`
+    : '';
+
+  const prompt = `
+You are given a PDF document containing YouTube video recommendations. Each segment has this format:
+=== Segment XX ===
+URL: [YouTube URL]
+Summary: [Video description]
+
+Your task:
+1. Read the entire PDF and extract all video segments
+2. Analyze the user's shadow reading practice context:
+   - Practice text: "${practiceText}"${weaknessContext}
+3. Find the MOST relevant video that matches:
+   - Topic similarity (e.g., if practice is about coffee, recommend coffee-related video)
+   - Learning needs (e.g., if weakness is intonation, recommend videos with clear speech patterns)
+   - Practical scenarios (prefer real-world conversation videos)
+
+Output STRICTLY valid JSON (no markdown, no explanation):
+{
+  "url": "full YouTube URL",
+  "videoId": "YouTube video ID (e.g., jhEtBuuYNj4)",
+  "title": "descriptive title based on summary (max 50 chars)",
+  "summary": "original summary from PDF",
+  "relevanceScore": number (0-100, how well it matches the context)
+}
+
+If no suitable video found, output: {"url": "", "videoId": "", "title": "", "summary": "", "relevanceScore": 0}
+`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: createUserContent([
+        createPartFromUri(fileUri, 'application/pdf'),
+        prompt,
+      ]),
+      config: { httpOptions: { timeout: 60000 } },
+    });
+
+    const text = response.text;
+    if (!text) {
+      console.warn('Empty response from video recommendation');
+      return null;
+    }
+
+    const data = parseJSON(text) as unknown as RecommendedVideo;
+    
+    // Validate response
+    if (!data.url || !data.videoId || data.relevanceScore === 0) {
+      console.warn('No suitable video found in PDF');
+      return null;
+    }
+
+    console.log('✅ Recommended video:', data.title, '(score:', data.relevanceScore, ')');
+    return data;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn('⚠️ Video recommendation failed:', msg);
+    return null;
+  }
+}

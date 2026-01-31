@@ -4,16 +4,19 @@ import React, { useState } from 'react';
 import type { ShadowWordAnalysis } from '@/lib/types';
 
 /** Fixed pronunciation guide video IDs (in-site embed, no external redirect). */
-const SHADOW_YOUTUBE_VIDEO_IDS = [
-  'QxQUapA-2w4',
-  'q7SAt9h4sd0',
-  'jhEtBuuYNj4', // Starbucks ordering - real-world coffee vocabulary and practical English
-] as const;
+const SHADOW_YOUTUBE_VIDEO_IDS = ['QxQUapA-2w4', 'q7SAt9h4sd0'] as const;
+
+interface RecommendedVideo {
+  videoId: string;
+  title: string;
+  summary: string;
+}
 
 interface ShadowYouTubeCardProps {
   words: ShadowWordAnalysis[];
   weaknesses?: string[];
   title?: string;
+  recommendedVideo?: RecommendedVideo | null;
 }
 
 /**
@@ -48,10 +51,29 @@ class YouTubeCardErrorBoundary extends React.Component<
 
 /**
  * YouTube pronunciation guides card for Shadow Reading.
- * Fixed 2 videos; play inline via embed (same pattern as flashcard).
+ * Fixed 2 videos + optional AI-recommended video based on practice context.
  */
-function ShadowYouTubeCardInner({ words, weaknesses, title = 'Pronunciation Guides' }: ShadowYouTubeCardProps) {
+function ShadowYouTubeCardInner({ 
+  words, 
+  weaknesses, 
+  title = 'Pronunciation Guides',
+  recommendedVideo 
+}: ShadowYouTubeCardProps) {
   const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
+
+  // Combine fixed videos with recommended video (if available)
+  const allVideos = [
+    ...SHADOW_YOUTUBE_VIDEO_IDS.map((id, idx) => ({
+      id,
+      title: `Pronunciation guide ${idx + 1}`,
+      isRecommended: false,
+    })),
+    ...(recommendedVideo?.videoId ? [{
+      id: recommendedVideo.videoId,
+      title: recommendedVideo.title,
+      isRecommended: true,
+    }] : []),
+  ];
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-float border border-black/5 space-y-4">
@@ -75,20 +97,25 @@ function ShadowYouTubeCardInner({ words, weaknesses, title = 'Pronunciation Guid
       )}
 
       <div className="space-y-3">
-        {SHADOW_YOUTUBE_VIDEO_IDS.map((vidId, idx) => (
+        {allVideos.map((video) => (
           <button
-            key={vidId}
+            key={video.id}
             type="button"
-            onClick={() => setPlayingVideoId(vidId)}
-            className="w-full flex gap-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+            onClick={() => setPlayingVideoId(video.id)}
+            className="w-full flex gap-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors text-left relative"
           >
+            {video.isRecommended && (
+              <div className="absolute -top-2 -right-2 z-10 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg">
+                AI Match
+              </div>
+            )}
             <div className="flex-shrink-0 relative rounded-lg overflow-hidden bg-gray-900">
               <img
-                src={`https://img.youtube.com/vi/${vidId}/mqdefault.jpg`}
-                alt={`Video ${idx + 1}`}
+                src={`https://img.youtube.com/vi/${video.id}/mqdefault.jpg`}
+                alt={video.title}
                 className="w-28 h-20 object-cover"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${vidId}/default.jpg`;
+                  (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${video.id}/default.jpg`;
                 }}
               />
               <div className="absolute inset-0 flex items-center justify-center">
@@ -98,7 +125,7 @@ function ShadowYouTubeCardInner({ words, weaknesses, title = 'Pronunciation Guid
               </div>
             </div>
             <div className="flex-1 min-w-0 flex items-center">
-              <span className="text-sm font-medium text-primary-900">Pronunciation guide {idx + 1}</span>
+              <span className="text-sm font-medium text-primary-900 line-clamp-2">{video.title}</span>
             </div>
           </button>
         ))}
