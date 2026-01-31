@@ -181,29 +181,21 @@ function ShadowYouglishCardInner({ words, title = 'Native Examples' }: ShadowYou
       const container = containerRef.current;
       if (!container) return;
 
-      // Check container dimensions (critical fix: match FlashcardDeck behavior)
+      // Check container dimensions (use explicit 320px height if layout not yet computed)
       const containerRect = container.getBoundingClientRect();
-      if (containerRect.width === 0 || containerRect.height === 0) {
-        console.warn('[Youglish] Container has no dimensions, retrying...', containerRect);
-        // Retry after container becomes visible
+      const width = containerRect.width || container.offsetWidth || 640;
+      if (width === 0) {
+        console.warn('[Youglish] Container has no width, retrying...', containerRect);
         retryTimeoutId = setTimeout(() => {
           const retryContainer = containerRef.current;
           if (!retryContainer) return;
-
-          const retryRect = retryContainer.getBoundingClientRect();
-          if (retryRect.width === 0 || retryRect.height === 0) {
-            console.warn('[Youglish] Container still has no dimensions after retry, skipping initialization');
-            return;
-          }
-
-          // Retry initialization
-          initializeWidget(retryContainer, retryRect.width || retryContainer.offsetWidth || 640);
+          const retryWidth = retryContainer.getBoundingClientRect().width || retryContainer.offsetWidth || 640;
+          if (retryWidth > 0) initializeWidget(retryContainer, retryWidth);
         }, 300);
         return;
       }
 
-      // Initialize immediately if container has dimensions
-      initializeWidget(container, containerRect.width || container.offsetWidth || 640);
+      initializeWidget(container, width);
     }, 100); // Reduced from 300ms to 100ms (match FlashcardDeck)
 
     return () => {
@@ -227,7 +219,7 @@ function ShadowYouglishCardInner({ words, title = 'Native Examples' }: ShadowYou
   const currentWord = problemWords[currentWordIndex];
 
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-float border border-black/5 space-y-4">
+    <div className="bg-white rounded-2xl p-6 shadow-float border border-black/5 space-y-4 min-h-[380px] flex flex-col">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-primary-900">{title}</h3>
         <div className="flex items-center gap-1 px-2 py-1 bg-amber-50 rounded-full">
@@ -290,17 +282,19 @@ function ShadowYouglishCardInner({ words, title = 'Native Examples' }: ShadowYou
             </div>
           ) : (
             <>
-              <div className="relative">
+              <div className="relative flex-1 min-h-0 flex flex-col">
                 {widgetLoading && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10 rounded-lg">
-                    <Loader2 className="animate-spin text-primary-900" size={24} />
-                  </div>
+                  <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10 rounded-lg pointer-events-none" aria-hidden />
                 )}
                 <div
                   ref={containerRef}
                   id="youglish-shadow-widget"
-                  className="w-full min-h-[300px] rounded-lg overflow-hidden bg-gray-50"
-                  style={{ minHeight: '300px', width: '100%', maxWidth: '100%' }}
+                  className="shadow-youglish-widget-container w-full flex-1 min-h-[280px] rounded-lg overflow-hidden bg-white border border-gray-200"
+                  style={{ minHeight: '280px', height: '320px', width: '100%', maxWidth: '100%', display: 'block' }}
+                  onClick={(e) => e.stopPropagation()}
+                  onTouchStart={(e) => e.stopPropagation()}
+                  onTouchMove={(e) => e.stopPropagation()}
+                  onTouchEnd={(e) => e.stopPropagation()}
                 />
               </div>
 
