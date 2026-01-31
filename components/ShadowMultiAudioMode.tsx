@@ -343,8 +343,8 @@ export function ShadowMultiAudioMode({
             </div>
           )}
 
-          {/* Add Person Button - compact, centered */}
-          {!recordingId && audioEntries.length < MAX_AUDIOS && (
+          {/* Add Person Button - compact, centered; hidden while analyzing */}
+          {!recordingId && !anyAnalyzing && audioEntries.length < MAX_AUDIOS && (
             <div className="flex justify-center pt-2">
               <button
                 type="button"
@@ -364,61 +364,49 @@ export function ShadowMultiAudioMode({
           {/* Comparison View */}
           {showComparison && (
             <div className="bg-white rounded-2xl p-6 shadow-float border border-black/5 space-y-6">
-              <h3 className="text-lg font-semibold text-primary-900 text-center">
-                Comparison Results
-              </h3>
               <ComparisonView entries={analyzedEntries} />
             </div>
           )}
         </div>
       </div>
 
-      {/* Floating FAB - Stop when recording, Analyze always visible but disabled when needed */}
-      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-30 safe-bottom">
-        {recordingId ? (
-          <button
-            type="button"
-            onClick={stopRecording}
-            className="bg-primary-900 text-white px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 touch-manipulation min-h-[44px]"
-            aria-label="Stop recording"
-          >
-            <Square size={18} />
-            <span>Stop</span>
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={analyzeAll}
-            disabled={!canAnalyze}
-            className={`px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 touch-manipulation min-h-[44px] transition-all ${
-              canAnalyze
-                ? 'bg-primary-900 text-white hover:scale-105 active:scale-95 cursor-pointer'
-                : anyAnalyzing
-                  ? 'bg-primary-900 text-white cursor-wait'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
-            }`}
-            aria-label={
-              anyAnalyzing
-                ? 'Analyzing...'
-                : !hasMinimumAudios
-                  ? 'Need at least 2 recordings'
-                  : 'Analyze all'
-            }
-          >
-            {anyAnalyzing ? (
-              <Loader2 size={18} className="animate-spin" />
-            ) : (
-              <Activity size={18} />
-            )}
-            <span>{anyAnalyzing ? 'Analyzing...' : 'Analyze All'}</span>
-          </button>
-        )}
-        {!recordingId && !anyAnalyzing && !hasMinimumAudios && (
-          <p className="text-xs text-gray-500 text-center mt-2 absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
-            Need at least 2 recordings
-          </p>
-        )}
-      </div>
+      {/* Floating FAB - Stop when recording; Analyze when 2+ audio (hidden after comparison done) */}
+      {!showComparison && (
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-30 safe-bottom">
+          {recordingId ? (
+            <button
+              type="button"
+              onClick={stopRecording}
+              className="bg-primary-900 text-white px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 touch-manipulation min-h-[44px]"
+              aria-label="Stop recording"
+            >
+              <Square size={18} />
+              <span>Stop</span>
+            </button>
+          ) : entriesWithAudio.length > 0 ? (
+            <button
+              type="button"
+              onClick={analyzeAll}
+              disabled={!canAnalyze}
+              className={`px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 touch-manipulation min-h-[44px] transition-all ${
+                canAnalyze
+                  ? 'bg-primary-900 text-white hover:scale-105 active:scale-95 cursor-pointer'
+                  : anyAnalyzing
+                    ? 'bg-primary-900 text-white cursor-wait'
+                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              }`}
+              aria-label={anyAnalyzing ? 'Analyzing...' : 'Analyze all'}
+            >
+              {anyAnalyzing ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Activity size={18} />
+              )}
+              <span>{anyAnalyzing ? 'Analyzing...' : 'Analyze All'}</span>
+            </button>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }
