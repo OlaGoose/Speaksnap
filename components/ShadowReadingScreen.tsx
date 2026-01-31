@@ -626,11 +626,6 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
                 >
                   <History size={20} />
                 </button>
-                {historyEntries.length > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] rounded-full bg-primary-900 text-white text-[10px] font-bold flex items-center justify-center px-1">
-                    {historyEntries.length > 50 ? '50+' : historyEntries.length}
-                  </span>
-                )}
               </div>
               <h2 className="flex-1 text-center text-base font-semibold text-primary-900 truncate px-2">
                 {challenge.topic}

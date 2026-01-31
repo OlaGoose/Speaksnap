@@ -14,12 +14,15 @@ interface ShadowYouTubeCardProps {
  * Shows videos based on detected pronunciation issues
  */
 export function ShadowYouTubeCard({ weaknesses, title = 'Pronunciation Guides' }: ShadowYouTubeCardProps) {
-  // Extract key pronunciation issues to search for
+  // Extract key pronunciation issues to search for (sanitize for URL / API)
   const searchQuery = React.useMemo(() => {
     if (!weaknesses || weaknesses.length === 0) return null;
-    
-    // Take the first issue and create a search query for pronunciation teaching
-    const firstIssue = weaknesses[0];
+    const firstIssue = weaknesses[0]
+      .replace(/[''""`]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 60);
+    if (!firstIssue) return null;
     return `english pronunciation ${firstIssue} tutorial`;
   }, [weaknesses]);
 

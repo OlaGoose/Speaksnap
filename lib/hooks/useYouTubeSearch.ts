@@ -81,15 +81,14 @@ export function useYouTubeSearch(
 
         if (cancelled) return;
 
-        if (data.error) {
+        if (data.error && (!data.videos || data.videos.length === 0)) {
           setError(data.error);
           setVideos([]);
           setSource(null);
         } else {
           setVideos(data.videos || []);
           setSource(data.source || null);
-          
-          // Save to cache
+          setError(null);
           if (data.videos && data.videos.length > 0) {
             setCachedSearch(query, data.videos, data.source || 'api');
           }
