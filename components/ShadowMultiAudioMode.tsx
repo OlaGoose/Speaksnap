@@ -11,6 +11,7 @@ import {
   AlertCircle,
   ChevronLeft,
   Plus,
+  Activity,
 } from 'lucide-react';
 import type { ShadowDailyChallenge, ShadowAnalysisResult } from '@/lib/types';
 
@@ -54,7 +55,16 @@ export function ShadowMultiAudioMode({
   const startRecording = async (entryId: string) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      
+      // Align with single mode: detect best mimeType, set audioBitsPerSecond
+      const options: MediaRecorderOptions = { audioBitsPerSecond: 128000 };
+      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+        options.mimeType = 'audio/webm;codecs=opus';
+      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+        options.mimeType = 'audio/mp4';
+      }
+      
+      const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
 
@@ -63,7 +73,11 @@ export function ShadowMultiAudioMode({
       };
 
       mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
+        stream.getTracks().forEach((track) => track.stop());
+        
+        // Use actual mimeType from recorder or fallback to options
+        const mimeType = mediaRecorder.mimeType || options.mimeType || 'audio/webm';
+        const blob = new Blob(chunksRef.current, { type: mimeType });
         const url = URL.createObjectURL(blob);
         
         setAudioEntries((prev) =>
@@ -74,11 +88,11 @@ export function ShadowMultiAudioMode({
           )
         );
 
-        stream.getTracks().forEach((track) => track.stop());
         setRecordingId(null);
       };
 
-      mediaRecorder.start();
+      // Use 250ms timeslice for more reliable data (same as single mode)
+      mediaRecorder.start(250);
       setRecordingId(entryId);
     } catch (error) {
       console.error('Failed to start recording:', error);
@@ -365,8 +379,12 @@ export function ShadowMultiAudioMode({
             className="bg-primary-900 text-white px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 touch-manipulation min-h-[44px]"
             aria-label="Analyze all"
           >
-            <Loader2 size={18} className={anyAnalyzing ? 'animate-spin' : ''} />
-            <span>{anyAnalyzing ? 'Analyzing...' : 'Analyze'}</span>
+            {anyAnalyzing ? (
+              <Loader2 size={18} className="animate-spin" />
+            ) : (
+              <Activity size={18} />
+            )}
+            <span>{anyAnalyzing ? 'Analyzing...' : 'Analyze All'}</span>
           </button>
         </div>
       )}
