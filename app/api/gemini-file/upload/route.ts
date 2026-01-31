@@ -66,7 +66,7 @@ export async function POST(request: Request) {
   const blob = new Blob([bytes], { type: mimeType });
 
   const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-  let uploaded: { name?: string; state?: string; uri?: string; displayName?: string; mimeType?: string; sizeBytes?: string; createTime?: string; expireTime?: string };
+  let uploaded: { name?: string; state?: string; uri?: string; displayName?: string; mimeType?: string; sizeBytes?: string; createTime?: string; expirationTime?: string };
 
   try {
     uploaded = await ai.files.upload({
@@ -132,6 +132,6 @@ export async function POST(request: Request) {
     state: fileInfo.state,
     sizeBytes: fileInfo.sizeBytes,
     createTime: fileInfo.createTime,
-    expireTime: fileInfo.expireTime,
+    expirationTime: fileInfo.expirationTime,
   });
 }

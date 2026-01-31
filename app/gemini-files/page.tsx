@@ -2,11 +2,12 @@
 
 /**
  * Standalone page: upload files to Google Gemini File API.
- * Decoupled from the main app; uses the same env key (NEXT_PUBLIC_GEMINI_API_KEY / GEMINI_API_KEY).
- * Supports PDF, TXT, MD, HTML, JSON, and other document types (per Gemini docs).
+ * CLIENT-SIDE upload to bypass server network restrictions.
+ * Uses NEXT_PUBLIC_GEMINI_API_KEY directly from browser.
  */
 
 import { useState, useRef } from 'react';
+import { GoogleGenAI } from '@google/genai';
 
 type FileResult = {
   name?: string;
@@ -16,7 +17,7 @@ type FileResult = {
   state?: string;
   sizeBytes?: string;
   createTime?: string;
-  expireTime?: string;
+  expirationTime?: string;
 };
 
 const ACCEPT =
@@ -42,28 +43,64 @@ export default function GeminiFilesPage() {
       setError('Please select a file.');
       return;
     }
+
+    const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+    if (!apiKey) {
+      setError('NEXT_PUBLIC_GEMINI_API_KEY is not set in environment.');
+      return;
+    }
+
     setUploading(true);
     setError(null);
     setResult(null);
+
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch('/api/gemini-file/upload', {
-        method: 'POST',
-        body: formData,
+      // Client-side upload using @google/genai SDK
+      const ai = new GoogleGenAI({ apiKey });
+      
+      // Upload file
+      const uploadedFile = await ai.files.upload({
+        file: file,
+        config: {
+          displayName: file.name,
+          mimeType: file.type || 'application/octet-stream',
+        },
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const parts = [data.error || `Upload failed (${res.status})`];
-        if (data.hint) parts.push(data.hint);
-        if (data.detail) parts.push(data.detail);
-        if (data.stack && process.env.NODE_ENV === 'development') parts.push(data.stack);
-        setError(parts.join('\n'));
+
+      if (!uploadedFile?.name) {
+        setError('Upload succeeded but no file name returned.');
         return;
       }
-      setResult(data);
+
+      // Poll for processing completion
+      let fileInfo = uploadedFile;
+      const start = Date.now();
+      const maxWait = 120000; // 2 min
+      
+      while (fileInfo.state === 'PROCESSING' && Date.now() - start < maxWait) {
+        await new Promise((r) => setTimeout(r, 2000));
+        fileInfo = await ai.files.get({ name: uploadedFile.name });
+      }
+
+      if (fileInfo.state === 'FAILED') {
+        setError('File processing failed on Google servers.');
+        return;
+      }
+
+      setResult({
+        name: fileInfo.name,
+        uri: fileInfo.uri,
+        displayName: fileInfo.displayName,
+        mimeType: fileInfo.mimeType,
+        state: fileInfo.state,
+        sizeBytes: fileInfo.sizeBytes,
+        createTime: fileInfo.createTime,
+        expirationTime: fileInfo.expirationTime,
+      });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed');
+      const msg = err instanceof Error ? err.message : 'Upload failed';
+      const cause = err instanceof Error && 'cause' in err ? String(err.cause) : '';
+      setError(`${msg}${cause ? '\n' + cause : ''}`);
     } finally {
       setUploading(false);
     }
@@ -82,9 +119,11 @@ export default function GeminiFilesPage() {
         <h1 className="text-2xl font-semibold mb-2">
           Upload to Gemini File API
         </h1>
-        <p className="text-sm text-neutral-600 mb-6">
+        <p className="text-sm text-neutral-600 mb-2">
           Upload PDF, text, or other documents. Files are stored for 48 hours.
-          Uses your project&apos;s Gemini API key from env.
+        </p>
+        <p className="text-xs text-amber-600 mb-6">
+          ⚠️ Client-side upload: API key is used in browser. Ensure your network can access generativelanguage.googleapis.com.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -126,7 +165,7 @@ export default function GeminiFilesPage() {
         </form>
 
         {error && (
-          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded text-red-800 text-sm">
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded text-red-800 text-sm whitespace-pre-wrap">
             {error}
           </div>
         )}
@@ -171,10 +210,10 @@ export default function GeminiFilesPage() {
                   <dd>{result.sizeBytes} bytes</dd>
                 </div>
               )}
-              {result.expireTime && (
+              {result.expirationTime && (
                 <div>
                   <dt className="text-neutral-500">Expires</dt>
-                  <dd>{result.expireTime}</dd>
+                  <dd>{result.expirationTime}</dd>
                 </div>
               )}
             </dl>
