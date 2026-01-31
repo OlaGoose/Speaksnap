@@ -277,17 +277,6 @@ body {
   }
 }
 
-/* Shadow YouGlish card - ensure widget container and embed iframe are visible */
-.shadow-youglish-widget-container {
-  display: block !important;
-  position: relative;
-}
-.shadow-youglish-widget-container iframe {
-  display: block !important;
-  width: 100% !important;
-  min-height: 280px !important;
-}
-
 /* Flashcard audio button - mobile padding optimization */
 .flashcard-audio-btn {
   padding: 6px !important; /* 移动端：2px (p-1 的 50%) */

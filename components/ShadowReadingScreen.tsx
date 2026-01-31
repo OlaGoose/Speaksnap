@@ -8,7 +8,6 @@ import {
   Volume2,
   Trash2,
   ChevronLeft,
-  ChevronRight,
   Check,
   AlertCircle,
   RotateCw,
@@ -29,7 +28,6 @@ import { storage } from '@/lib/utils/storage';
 
 const SHADOW_SOURCE_FILE_KEY = 'speakSnapShadowSourceFile';
 import { ShadowYouTubeCard } from './ShadowYouTubeCard';
-import { ShadowYouglishCard } from './ShadowYouglishCard';
 import { ShadowMultiAudioMode } from './ShadowMultiAudioMode';
 
 type ShadowState =
@@ -59,11 +57,9 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
   const [analysis, setAnalysis] = useState<ShadowAnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [summaryCardIndex, setSummaryCardIndex] = useState(0);
   const [historyEntries, setHistoryEntries] = useState<ShadowHistoryEntry[]>([]);
   const [historyView, setHistoryView] = useState<'closed' | 'list' | 'detail'>('closed');
   const [selectedHistoryId, setSelectedHistoryId] = useState<string | null>(null);
-  const cardsScrollRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const refAudioUrlRef = useRef<string | null>(null);
@@ -333,7 +329,6 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
       if (!res.ok) throw new Error(data.error || 'Analysis failed');
 
       setAnalysis(data);
-      setSummaryCardIndex(0);
       setState('results');
       await addShadowHistoryEntry(
         { topic: challenge.topic, text: challenge.text, sourceUrl: challenge.sourceUrl },
@@ -356,16 +351,6 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
     clearShadowCache();
     loadChallenge();
   }, [loadChallenge]);
-
-  const scrollToCard = (index: number) => {
-    const container = cardsScrollRef.current;
-    if (!container) return;
-    const card = container.querySelector(`[data-card-index="${index}"]`) as HTMLElement;
-    if (card) {
-      card.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-      setSummaryCardIndex(index);
-    }
-  };
 
   const playAudioSegment = (audioUrl: string, startTime: number, endTime: number): Promise<void> => {
     return new Promise((resolve) => {
@@ -554,7 +539,6 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
       { id: 'strengths', title: 'Strengths', type: 'strengths' as const },
       { id: 'improvements', title: 'Improvements', type: 'improvements' as const },
       { id: 'youtube', title: 'Pronunciation Guides', type: 'youtube' as const },
-      { id: 'youglish', title: 'Native Examples', type: 'youglish' as const },
     ];
     return (
       <div className="h-full bg-primary-50 flex flex-col overflow-y-auto overflow-x-hidden">
@@ -582,17 +566,15 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
               {new Date(selectedEntry.timestamp).toLocaleString()}
             </p>
             <WordAnalysisView words={entryAnalysis.words} />
-            <div className="flex overflow-x-auto gap-4 pb-2 snap-x snap-mandatory no-scrollbar">
-              {entryCards.map((card, index) => (
-                <div key={card.id} className="flex-shrink-0 w-[85%] max-w-sm snap-center">
+            <div className="flex flex-col gap-4">
+              {entryCards.map((card) => (
+                <div key={card.id} className="w-full">
                   {card.type === 'youtube' ? (
                     <ShadowYouTubeCard
                       words={entryAnalysis.words || []}
                       weaknesses={entryAnalysis.pronunciation?.weaknesses || []}
                       title={card.title}
                     />
-                  ) : card.type === 'youglish' ? (
-                    <ShadowYouglishCard words={entryAnalysis.words || []} title={card.title} />
                   ) : (
                     <SummaryCard analysis={entryAnalysis} card={card} />
                   )}
@@ -624,7 +606,6 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
         { id: 'strengths', title: 'Strengths', type: 'strengths' as const },
         { id: 'improvements', title: 'Improvements', type: 'improvements' as const },
         { id: 'youtube', title: 'Pronunciation Guides', type: 'youtube' as const },
-        { id: 'youglish', title: 'Native Examples', type: 'youglish' as const },
       ]
     : [];
 
@@ -785,61 +766,20 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
                 <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2 px-1">
                   Summary
                 </div>
-                <div
-                  ref={cardsScrollRef}
-                  className="flex overflow-x-auto gap-4 pb-2 snap-x snap-mandatory no-scrollbar scroll-smooth"
-                  style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-                  onScroll={() => {
-                    const el = cardsScrollRef.current;
-                    if (!el) return;
-                    const index = Math.round(el.scrollLeft / (el.offsetWidth * 0.85));
-                    setSummaryCardIndex(Math.min(index, summaryCards.length - 1));
-                  }}
-                >
-                  {summaryCards.map((card, index) => (
-                    <div
-                      key={card.id}
-                      data-card-index={index}
-                      className="flex-shrink-0 w-[85%] max-w-sm snap-center"
-                    >
+                <div className="flex flex-col gap-4">
+                  {summaryCards.map((card) => (
+                    <div key={card.id} className="w-full">
                       {card.type === 'youtube' ? (
                         <ShadowYouTubeCard
                           words={analysis.words || []}
                           weaknesses={analysis.pronunciation?.weaknesses || []}
                           title={card.title}
                         />
-                      ) : card.type === 'youglish' ? (
-                        <ShadowYouglishCard words={analysis.words || []} title={card.title} />
                       ) : (
                         <SummaryCard analysis={analysis} card={card} />
                       )}
                     </div>
                   ))}
-                </div>
-                <div className="flex items-center justify-center gap-2 mt-2">
-                  <button
-                    type="button"
-                    onClick={() => scrollToCard(Math.max(0, summaryCardIndex - 1))}
-                    className="w-10 h-10 rounded-full bg-white shadow-float border border-black/5 flex items-center justify-center text-primary-900 disabled:opacity-40"
-                    disabled={summaryCardIndex === 0}
-                    aria-label="Previous card"
-                  >
-                    <ChevronLeft size={20} />
-                  </button>
-                  <span className="text-xs text-gray-500 font-medium">
-                    {summaryCardIndex + 1} / {summaryCards.length}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      scrollToCard(Math.min(summaryCards.length - 1, summaryCardIndex + 1))
-                    }
-                    className="w-10 h-10 rounded-full bg-white shadow-float border border-black/5 flex items-center justify-center text-primary-900 disabled:opacity-40"
-                    disabled={summaryCardIndex === summaryCards.length - 1}
-                    aria-label="Next card"
-                  >
-                    <ChevronRight size={20} />
-                  </button>
                 </div>
                 <div className="pt-6 text-center">
                   <button
@@ -954,7 +894,7 @@ function SummaryCard({
   card,
 }: {
   analysis: ShadowAnalysisResult;
-  card: { id: string; title: string; type: 'score' | 'feedback' | 'strengths' | 'improvements' | 'youtube' | 'youglish' };
+  card: { id: string; title: string; type: 'score' | 'feedback' | 'strengths' | 'improvements' | 'youtube' };
 }) {
   const { type } = card;
 
