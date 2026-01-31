@@ -4,7 +4,7 @@
  * Doubao is used as fallback for challenge text when Gemini times out or is unavailable.
  */
 
-import { GoogleGenAI, Modality } from '@google/genai';
+import { GoogleGenAI, Modality, createPartFromUri, createUserContent } from '@google/genai';
 import { DoubaoProvider } from './doubao';
 import type {
   UserLevel,
@@ -37,14 +37,56 @@ function parseJSON(text: string): Record<string, unknown> {
   }
 }
 
+export interface ShadowSourceFile {
+  uri: string;
+  mimeType?: string;
+  displayName?: string;
+}
+
 export async function generateDailyChallenge(
   level: UserLevel,
-  mode: PracticeMode = 'Daily'
+  mode: PracticeMode = 'Daily',
+  sourceFile?: ShadowSourceFile | null
 ): Promise<ShadowDailyChallenge> {
   if (!ai && !doubao) {
     throw new Error(
       'No AI provider configured for Shadow. Set NEXT_PUBLIC_GEMINI_API_KEY or Doubao env vars (NEXT_DOUBAO_API_KEY, NEXT_DOUBAO_CHAT_ENDPOINT, NEXT_DOUBAO_CHAT_MODEL).'
     );
+  }
+
+  // IELTS + uploaded file: extract 3 sentences from document (Gemini only)
+  if (mode === 'IELTS' && sourceFile?.uri && ai) {
+    const mimeType = sourceFile.mimeType || 'application/pdf';
+    const extractPrompt = `
+You are given a document (e.g. PDF or text). Extract exactly 3 consecutive or representative sentences from it that are suitable for shadow reading practice (clear, complete sentences; no dialogue).
+
+Rules:
+- Output strictly valid JSON only (no markdown, no explanation): { "topic": "short label describing the excerpt", "text": "Sentence one. Sentence two. Sentence three." }
+- topic: short label (e.g. "Reading excerpt", or the document title/section).
+- text: exactly 3 sentences from the document, unchanged from the original.
+`;
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: createUserContent([
+          createPartFromUri(sourceFile.uri, mimeType),
+          extractPrompt,
+        ]),
+        config: { httpOptions: { timeout: 60000 } },
+      });
+      const text = response.text;
+      if (text) {
+        const data = parseJSON(text) as { topic?: string; text?: string };
+        const topic = data?.topic ?? sourceFile.displayName ?? 'Reading excerpt';
+        const textContent = data?.text ?? '';
+        if (!textContent) throw new Error('No text extracted from document');
+        return { topic, text: textContent, sourceUrl: '' };
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn('Shadow IELTS file extract failed:', msg);
+      throw new Error(`Failed to extract sentences from document: ${msg}`);
+    }
   }
 
   const levelPrompt =

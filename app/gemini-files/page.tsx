@@ -8,6 +8,9 @@
 
 import { useState, useRef } from 'react';
 import { GoogleGenAI } from '@google/genai';
+import { storage } from '@/lib/utils/storage';
+
+const SHADOW_SOURCE_FILE_KEY = 'speakSnapShadowSourceFile';
 
 type FileResult = {
   name?: string;
@@ -111,6 +114,16 @@ export default function GeminiFilesPage() {
     setResult(null);
     setError(null);
     if (inputRef.current) inputRef.current.value = '';
+  };
+
+  const setAsShadowSource = async () => {
+    if (!result?.uri) return;
+    await storage.setItem(SHADOW_SOURCE_FILE_KEY, {
+      uri: result.uri,
+      mimeType: result.mimeType,
+      displayName: result.displayName,
+    });
+    alert('已设为 Shadow（雅思+中级）来源，下次进入跟读将从此文件提取 3 句。');
   };
 
   return (
@@ -217,6 +230,13 @@ export default function GeminiFilesPage() {
                 </div>
               )}
             </dl>
+            <button
+              type="button"
+              onClick={setAsShadowSource}
+              className="mt-3 px-4 py-2 bg-primary-900 text-white rounded text-sm hover:bg-primary-800"
+            >
+              用作 Shadow 来源（雅思+中级）
+            </button>
           </div>
         )}
       </div>

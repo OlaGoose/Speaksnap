@@ -25,6 +25,9 @@ import type {
 } from '@/lib/types';
 import { getCachedChallenge, getInFlightRequest, clearShadowCache } from '@/lib/shadowCache';
 import { getShadowHistory, addShadowHistoryEntry } from '@/lib/utils/shadowHistory';
+import { storage } from '@/lib/utils/storage';
+
+const SHADOW_SOURCE_FILE_KEY = 'speakSnapShadowSourceFile';
 import { ShadowYouTubeCard } from './ShadowYouTubeCard';
 import { ShadowYouglishCard } from './ShadowYouglishCard';
 import { ShadowMultiAudioMode } from './ShadowMultiAudioMode';
@@ -70,8 +73,15 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
   const userAudioDurationRef = useRef<number>(0);
 
   const loadChallenge = useCallback(async () => {
-    // Sync cache check: avoid loading state when we have data (removes duplicate loading)
-    const cached = getCachedChallenge(userLevel, practiceMode);
+    // IELTS + uploaded file: use file as source, skip cache
+    const sourceFile =
+      practiceMode === 'IELTS'
+        ? await storage.getItem<{ uri: string; mimeType?: string; displayName?: string }>(SHADOW_SOURCE_FILE_KEY)
+        : null;
+    const useFileSource = Boolean(sourceFile?.uri);
+
+    // Sync cache check: avoid loading state when we have data (skip cache when using file)
+    const cached = !useFileSource ? getCachedChallenge(userLevel, practiceMode) : null;
     if (cached) {
       setError(null);
       setAnalysis(null);
@@ -128,7 +138,7 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
     loadChallengeAbortRef.current = ac;
     try {
       let data: { topic: string; text: string; sourceUrl?: string; refAudioBase64: string };
-      const inFlight = getInFlightRequest();
+      const inFlight = !useFileSource ? getInFlightRequest() : null;
       if (inFlight) {
         const result = await inFlight;
         if (ac.signal.aborted) return;
@@ -143,10 +153,17 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
           typeof window !== 'undefined'
             ? `${window.location.origin}/api/shadow/challenge`
             : '/api/shadow/challenge';
+        const body: { level: UserLevel; mode: PracticeMode; fileUri?: string; mimeType?: string; displayName?: string } =
+          { level: userLevel, mode: practiceMode };
+        if (useFileSource && sourceFile) {
+          body.fileUri = sourceFile.uri;
+          if (sourceFile.mimeType) body.mimeType = sourceFile.mimeType;
+          if (sourceFile.displayName) body.displayName = sourceFile.displayName;
+        }
         const res = await fetch(url, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ level: userLevel, mode: practiceMode }),
+          body: JSON.stringify(body),
           signal: ac.signal,
         });
         const resData = (await res.json()) as {

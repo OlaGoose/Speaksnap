@@ -28,8 +28,16 @@ export async function POST(request: NextRequest) {
 
     const level = (body.level ?? 'Beginner') as UserLevel;
     const mode = (body.mode ?? 'Daily') as PracticeMode;
+    const sourceFile =
+      body.fileUri && typeof body.fileUri === 'string'
+        ? {
+            uri: body.fileUri,
+            mimeType: typeof body.mimeType === 'string' ? body.mimeType : undefined,
+            displayName: typeof body.displayName === 'string' ? body.displayName : undefined,
+          }
+        : null;
 
-    const challenge = await generateDailyChallenge(level, mode);
+    const challenge = await generateDailyChallenge(level, mode, sourceFile);
     const { base64 } = await generateReferenceAudio(challenge.text);
 
     return NextResponse.json({
