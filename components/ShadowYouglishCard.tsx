@@ -48,16 +48,26 @@ function ShadowYouglishCardInner({ words, title = 'Native Examples' }: ShadowYou
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [youglishReady, setYouglishReady] = useState(false);
   const [widgetLoading, setWidgetLoading] = useState(false);
+  const [widgetError, setWidgetError] = useState(false);
   const widgetRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Filter words that need practice (poor or average status)
   const problemWords = React.useMemo(() => {
     if (!words || !Array.isArray(words)) return [];
-    return words
+    
+    const filtered = words
       .filter((w) => w && (w.status === 'poor' || w.status === 'average'))
       .map((w) => w.word)
-      .filter((word) => word && typeof word === 'string' && word.trim().length > 0);
+      .filter((word) => word && typeof word === 'string' && word.trim().length > 0)
+      .map((word) => 
+        // Clean word: lowercase, remove punctuation
+        word.toLowerCase().replace(/[^a-z0-9\s]/g, '').trim()
+      )
+      .filter((word) => word.length > 0);
+    
+    // Remove duplicates
+    return Array.from(new Set(filtered));
   }, [words]);
 
   // Load Youglish script
@@ -97,64 +107,77 @@ function ShadowYouglishCardInner({ words, title = 'Native Examples' }: ShadowYou
     if (!youglishReady || problemWords.length === 0 || !containerRef.current) return;
 
     const currentWord = problemWords[currentWordIndex];
-    if (!currentWord) return;
+    if (!currentWord || typeof currentWord !== 'string') return;
 
-    setWidgetLoading(true);
+    // Reset error state when changing word
+    setWidgetError(false);
 
-    // Clear previous widget
-    if (widgetRef.current) {
+    // Add delay to avoid bot detection
+    const timeoutId = setTimeout(() => {
       try {
-        widgetRef.current.destroy?.();
-      } catch (e) {
-        console.warn('Failed to destroy previous widget:', e);
-      }
-      widgetRef.current = null;
-    }
+        setWidgetLoading(true);
 
-    // Clear container
-    if (containerRef.current) {
-      containerRef.current.innerHTML = '';
-    }
+        // Validate that Youglish API is available
+        if (!(window as any).YG || !(window as any).YG.Widget) {
+          console.warn('[Youglish] API not available');
+          setWidgetLoading(false);
+          setWidgetError(true);
+          return;
+        }
 
-    try {
-      // Validate that Youglish API is available
-      if (!(window as any).YG || !(window as any).YG.Widget) {
-        console.error('Youglish API not available');
+        // Clear previous widget
+        if (widgetRef.current) {
+          try {
+            widgetRef.current.destroy?.();
+          } catch (e) {
+            console.warn('[Youglish] Failed to destroy previous widget:', e);
+          }
+          widgetRef.current = null;
+        }
+
+        // Clear container
+        if (containerRef.current) {
+          containerRef.current.innerHTML = '';
+        }
+
+        // Create widget with simplified config
+        const widget = new (window as any).YG.Widget('youglish-shadow-widget', {
+          width: containerRef.current?.offsetWidth || 320,
+          components: 9, // Show controls
+          events: {
+            onFetchDone: () => {
+              console.log('[Youglish] Fetch done for:', currentWord);
+              setWidgetLoading(false);
+            },
+            onVideoChange: () => {
+              console.log('[Youglish] Video changed');
+            },
+            onError: (error: any) => {
+              console.error('[Youglish] Widget error:', error);
+              setWidgetLoading(false);
+              setWidgetError(true);
+            },
+          },
+        });
+
+        // Fetch the word (already cleaned in problemWords memo)
+        console.log('[Youglish] Fetching word:', currentWord);
+        widget.fetch(currentWord, 'english');
+        widgetRef.current = widget;
+      } catch (error) {
+        console.error('[Youglish] Failed to create widget:', error);
         setWidgetLoading(false);
-        setYouglishReady(false);
-        return;
+        setWidgetError(true);
       }
-
-      const widget = new (window as any).YG.Widget('youglish-shadow-widget', {
-        width: containerRef.current?.offsetWidth || 300,
-        components: 9,
-        events: {
-          onFetchDone: () => {
-            setWidgetLoading(false);
-          },
-          onVideoChange: () => {
-            // Video changed
-          },
-          onError: (error: any) => {
-            console.error('Youglish widget error:', error);
-            setWidgetLoading(false);
-          },
-        },
-      });
-
-      widget.fetch(currentWord, 'english');
-      widgetRef.current = widget;
-    } catch (error) {
-      console.error('Failed to create Youglish widget:', error);
-      setWidgetLoading(false);
-    }
+    }, 300); // 300ms delay to avoid rapid requests
 
     return () => {
+      clearTimeout(timeoutId);
       if (widgetRef.current) {
         try {
           widgetRef.current.destroy?.();
         } catch (e) {
-          console.warn('Widget cleanup error:', e);
+          console.warn('[Youglish] Cleanup error:', e);
         }
         widgetRef.current = null;
       }
@@ -214,22 +237,41 @@ function ShadowYouglishCardInner({ words, title = 'Native Examples' }: ShadowYou
             )}
           </div>
 
-          <div className="relative">
-            {widgetLoading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10 rounded-lg">
-                <Loader2 className="animate-spin text-primary-900" size={24} />
+          {widgetError ? (
+            <div className="bg-gray-50 rounded-lg p-6 text-center space-y-4">
+              <p className="text-sm text-gray-600">
+                Unable to load interactive widget. View examples directly on Youglish:
+              </p>
+              <a
+                href={`https://youglish.com/pronounce/${encodeURIComponent(currentWord)}/english`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-primary-900 text-white rounded-lg hover:bg-primary-800 transition-colors text-sm font-medium"
+              >
+                <Volume2 size={16} />
+                Open &quot;{currentWord}&quot; on Youglish
+              </a>
+            </div>
+          ) : (
+            <>
+              <div className="relative">
+                {widgetLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-white/80 z-10 rounded-lg">
+                    <Loader2 className="animate-spin text-primary-900" size={24} />
+                  </div>
+                )}
+                <div
+                  ref={containerRef}
+                  id="youglish-shadow-widget"
+                  className="w-full min-h-[300px] rounded-lg overflow-hidden bg-gray-50"
+                />
               </div>
-            )}
-            <div
-              ref={containerRef}
-              id="youglish-shadow-widget"
-              className="w-full min-h-[300px] rounded-lg overflow-hidden bg-gray-50"
-            />
-          </div>
 
-          <p className="text-xs text-gray-500 text-center">
-            Watch native speakers pronounce &quot;{currentWord}&quot; in real contexts
-          </p>
+              <p className="text-xs text-gray-500 text-center">
+                Watch native speakers pronounce &quot;{currentWord}&quot; in real contexts
+              </p>
+            </>
+          )}
         </>
       )}
     </div>
