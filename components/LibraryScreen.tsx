@@ -200,17 +200,6 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel,
             Scenarios
           </button>
           <button
-            onClick={() => setActiveTab('flashcards')}
-            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all touch-manipulation min-h-[44px] ${
-              activeTab === 'flashcards' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-gray-600'
-            }`}
-            role="tab"
-            aria-selected={activeTab === 'flashcards'}
-            aria-label="Flashcards tab"
-          >
-            Flashcards
-          </button>
-          <button
             onClick={() => setActiveTab('diary')}
             className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all touch-manipulation min-h-[44px] ${
               activeTab === 'diary' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-gray-600'
@@ -232,6 +221,17 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel,
           >
             Shadow
           </button>
+          <button
+            onClick={() => setActiveTab('flashcards')}
+            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all touch-manipulation min-h-[44px] ${
+              activeTab === 'flashcards' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-gray-600'
+            }`}
+            role="tab"
+            aria-selected={activeTab === 'flashcards'}
+            aria-label="Flashcards tab"
+          >
+            Flashcards
+          </button>
         </div>
       </div>
 
@@ -252,7 +252,7 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel,
         {activeTab === 'scenarios' && (
           <div className="space-y-3 py-4 animate-in fade-in duration-300">
             {filteredScenarios.length === 0 ? (
-              <div className="bg-white rounded-2xl p-8 text-center shadow-float border border-gray-100/50 mt-4">
+              <div className="bg-white rounded-2xl p-8 text-center shadow-float border border-gray-100/50">
                 <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Camera className="text-gray-300" size={32} />
                 </div>
@@ -260,12 +260,6 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel,
                 <p className="text-gray-500 text-sm mt-1 mb-6">
                   Start by capturing a photo or describing a scene.
                 </p>
-                <button
-                  onClick={() => onNavigate(Screen.CAMERA)}
-                  className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium shadow-lg active:scale-95 transition-transform"
-                >
-                  Create First Scenario
-                </button>
               </div>
             ) : (
               filteredScenarios.map((scenario) => {
@@ -487,13 +481,6 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel,
                 <p className="text-gray-500 text-sm mt-1 mb-6">
                   Write daily reflections and improve your English writing skills.
                 </p>
-                <button
-                  onClick={() => setIsWritingDiary(true)}
-                  className="bg-black text-white px-6 py-2.5 rounded-full text-sm font-medium shadow-lg active:scale-95 transition-transform touch-manipulation min-h-[44px]"
-                  aria-label="Start writing diary"
-                >
-                  Start Writing
-                </button>
               </div>
             ) : (
               diaryEntries.map((entry) => {

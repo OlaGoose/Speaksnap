@@ -441,7 +441,13 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
     );
   }
 
-  if (!challenge) return null;
+  if (!challenge) {
+    return (
+      <div className="h-full bg-primary-50 flex items-center justify-center">
+        <Loader2 size={24} className="animate-spin text-primary-900/40" aria-hidden />
+      </div>
+    );
+  }
 
   // Multi-audio mode
   if (audioMode === 'multi' && refAudioBase64) {
@@ -609,33 +615,33 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
       <div className="flex-1 px-4 py-6 pb-32 safe-bottom">
         <div className="max-w-xl mx-auto space-y-6">
           <div className="text-center space-y-4">
-            <div className="flex items-center justify-center gap-2">
-              <div className="relative">
+            <div className="flex items-center gap-3 w-full max-w-xl mx-auto">
+              <div className="relative shrink-0">
                 <button
                   type="button"
                   onClick={() => setHistoryView('list')}
-                  className="p-1.5 rounded-full text-gray-400 hover:text-primary-900 hover:bg-white/80 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+                  className="p-2 rounded-full text-gray-400 hover:text-primary-900 hover:bg-white/80 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
                   aria-label="View past analyses"
                   title="Past analyses"
                 >
-                  <History size={18} />
+                  <History size={20} />
                 </button>
                 {historyEntries.length > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full bg-primary-900 text-white text-[10px] font-bold flex items-center justify-center px-1">
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-[16px] rounded-full bg-primary-900 text-white text-[10px] font-bold flex items-center justify-center px-1">
                     {historyEntries.length > 50 ? '50+' : historyEntries.length}
                   </span>
                 )}
               </div>
-              <div className="inline-block px-3 py-1 bg-white rounded-full text-gray-500 text-[10px] uppercase tracking-widest font-bold shadow-float border border-black/5">
-                Today&apos;s Topic: {challenge.topic}
-              </div>
+              <h2 className="flex-1 text-center text-base font-semibold text-primary-900 truncate px-2">
+                {challenge.topic}
+              </h2>
               <button
                 type="button"
                 onClick={refreshChallenge}
-                className="p-1.5 rounded-full text-gray-400 hover:text-primary-900 hover:bg-white/80 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+                className="p-2 rounded-full text-gray-400 hover:text-primary-900 hover:bg-white/80 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center shrink-0"
                 aria-label="Refresh challenge"
               >
-                <RotateCw size={18} />
+                <RotateCw size={20} />
               </button>
             </div>
             
