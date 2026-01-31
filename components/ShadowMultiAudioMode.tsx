@@ -49,14 +49,22 @@ export function ShadowMultiAudioMode({
   const [recordingId, setRecordingId] = useState<string | null>(null);
   const [analyzingAll, setAnalyzingAll] = useState(false);
   const nextIdRef = useRef(3);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const activeRecorderRef = useRef<{
+    mediaRecorder: MediaRecorder;
+    chunks: Blob[];
+    entryId: string;
+  } | null>(null);
 
   const startRecording = async (entryId: string) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      });
       
-      // Align with single mode: detect best mimeType, set audioBitsPerSecond
       const options: MediaRecorderOptions = { audioBitsPerSecond: 128000 };
       if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
         options.mimeType = 'audio/webm;codecs=opus';
@@ -65,19 +73,29 @@ export function ShadowMultiAudioMode({
       }
       
       const mediaRecorder = new MediaRecorder(stream, options);
-      mediaRecorderRef.current = mediaRecorder;
-      chunksRef.current = [];
+      const chunks: Blob[] = [];
+      
+      activeRecorderRef.current = {
+        mediaRecorder,
+        chunks,
+        entryId,
+      };
 
       mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
+        if (e.data.size > 0 && activeRecorderRef.current?.entryId === entryId) {
+          activeRecorderRef.current.chunks.push(e.data);
+        }
       };
 
       mediaRecorder.onstop = () => {
         stream.getTracks().forEach((track) => track.stop());
         
-        // Use actual mimeType from recorder or fallback to options
+        if (!activeRecorderRef.current || activeRecorderRef.current.entryId !== entryId) {
+          return;
+        }
+        
         const mimeType = mediaRecorder.mimeType || options.mimeType || 'audio/webm';
-        const blob = new Blob(chunksRef.current, { type: mimeType });
+        const blob = new Blob(activeRecorderRef.current.chunks, { type: mimeType });
         const url = URL.createObjectURL(blob);
         
         setAudioEntries((prev) =>
@@ -88,14 +106,15 @@ export function ShadowMultiAudioMode({
           )
         );
 
+        activeRecorderRef.current = null;
         setRecordingId(null);
       };
 
-      // Use 250ms timeslice for more reliable data (same as single mode)
       mediaRecorder.start(250);
       setRecordingId(entryId);
     } catch (error) {
       console.error('Failed to start recording:', error);
+      activeRecorderRef.current = null;
       setAudioEntries((prev) =>
         prev.map((entry) =>
           entry.id === entryId
@@ -107,8 +126,9 @@ export function ShadowMultiAudioMode({
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
+    if (activeRecorderRef.current?.mediaRecorder && 
+        activeRecorderRef.current.mediaRecorder.state !== 'inactive') {
+      activeRecorderRef.current.mediaRecorder.stop();
     }
   };
 
@@ -189,8 +209,9 @@ export function ShadowMultiAudioMode({
   const showComparison = analyzedEntries.length >= 2;
 
   const entriesWithAudio = audioEntries.filter((e) => e.audioUrl);
-  const canAnalyzeAll = entriesWithAudio.length >= 2 && !analyzingAll && entriesWithAudio.every((e) => !e.analyzing);
+  const hasMinimumAudios = entriesWithAudio.length >= 2;
   const anyAnalyzing = analyzingAll || audioEntries.some((e) => e.analyzing);
+  const canAnalyze = hasMinimumAudios && !anyAnalyzing && entriesWithAudio.some((e) => !e.analysis);
 
   return (
     <div className="h-full bg-primary-50 flex flex-col overflow-y-auto">
@@ -325,20 +346,21 @@ export function ShadowMultiAudioMode({
                 </div>
               ))}
 
-              {/* Add 3rd person - full-width row at bottom */}
-              {audioEntries.length < MAX_AUDIOS && (
-                <div className="md:col-span-2">
-                  <button
-                    type="button"
-                    onClick={addEntry}
-                    className="w-full min-h-[120px] rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50/50 hover:bg-gray-100/80 hover:border-primary-300 transition-colors flex flex-col items-center justify-center gap-2 text-gray-500 hover:text-primary-700 touch-manipulation"
-                    aria-label="Add person"
-                  >
-                    <Plus size={28} />
-                    <span className="text-sm font-medium">Add Person</span>
-                  </button>
-                </div>
-              )}
+            </div>
+          )}
+
+          {/* Add Person Button - compact, centered */}
+          {!recordingId && audioEntries.length < MAX_AUDIOS && (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={addEntry}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-gray-300 bg-white hover:bg-gray-50 hover:border-primary-400 transition-colors text-gray-700 hover:text-primary-900 font-medium text-sm touch-manipulation shadow-sm"
+                aria-label="Add person"
+              >
+                <Plus size={18} />
+                <span>Add Person {audioEntries.length + 1}</span>
+              </button>
             </div>
           )}
 
@@ -358,7 +380,7 @@ export function ShadowMultiAudioMode({
       </div>
 
       {/* Floating FAB - Stop when recording, Analyze when 2+ have audio */}
-      {recordingId && (
+      {recordingId ? (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-30 safe-bottom">
           <button
             type="button"
@@ -370,14 +392,24 @@ export function ShadowMultiAudioMode({
             <span>Stop</span>
           </button>
         </div>
-      )}
-      {!recordingId && canAnalyzeAll && (
+      ) : entriesWithAudio.length > 0 ? (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-30 safe-bottom">
           <button
             type="button"
             onClick={analyzeAll}
-            className="bg-primary-900 text-white px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 touch-manipulation min-h-[44px]"
-            aria-label="Analyze all"
+            disabled={!canAnalyze}
+            className={`px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 transition-all touch-manipulation min-h-[44px] ${
+              canAnalyze
+                ? 'bg-primary-900 text-white hover:scale-105 active:scale-95 cursor-pointer'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
+            }`}
+            aria-label={
+              !hasMinimumAudios
+                ? 'Need at least 2 recordings'
+                : anyAnalyzing
+                  ? 'Analyzing...'
+                  : 'Analyze all'
+            }
           >
             {anyAnalyzing ? (
               <Loader2 size={18} className="animate-spin" />
@@ -386,8 +418,13 @@ export function ShadowMultiAudioMode({
             )}
             <span>{anyAnalyzing ? 'Analyzing...' : 'Analyze All'}</span>
           </button>
+          {!hasMinimumAudios && (
+            <p className="text-xs text-gray-500 text-center mt-2 absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
+              Need at least 2 recordings
+            </p>
+          )}
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
