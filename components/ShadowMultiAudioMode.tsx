@@ -329,12 +329,6 @@ export function ShadowMultiAudioMode({
                         <Trash2 size={16} />
                         Delete
                       </button>
-                      {entry.analyzing && (
-                        <div className="flex items-center justify-center gap-2 py-2">
-                          <Loader2 className="animate-spin" size={16} />
-                          <span className="text-sm text-gray-600">Analyzing...</span>
-                        </div>
-                      )}
                       {entry.error && (
                         <div className="flex items-center gap-2 text-red-600 text-sm">
                           <AlertCircle size={16} />
@@ -379,9 +373,9 @@ export function ShadowMultiAudioMode({
         </div>
       </div>
 
-      {/* Floating FAB - Stop when recording, Analyze when 2+ have audio */}
-      {recordingId ? (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-30 safe-bottom">
+      {/* Floating FAB - Stop when recording, Analyze always visible but disabled when needed */}
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-30 safe-bottom">
+        {recordingId ? (
           <button
             type="button"
             onClick={stopRecording}
@@ -391,23 +385,23 @@ export function ShadowMultiAudioMode({
             <Square size={18} />
             <span>Stop</span>
           </button>
-        </div>
-      ) : entriesWithAudio.length > 0 ? (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-30 safe-bottom">
+        ) : (
           <button
             type="button"
             onClick={analyzeAll}
             disabled={!canAnalyze}
-            className={`px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 transition-all touch-manipulation min-h-[44px] ${
+            className={`px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 touch-manipulation min-h-[44px] transition-all ${
               canAnalyze
                 ? 'bg-primary-900 text-white hover:scale-105 active:scale-95 cursor-pointer'
-                : 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
+                : anyAnalyzing
+                  ? 'bg-primary-900 text-white cursor-wait'
+                  : 'bg-gray-300 text-gray-500 cursor-not-allowed opacity-60'
             }`}
             aria-label={
-              !hasMinimumAudios
-                ? 'Need at least 2 recordings'
-                : anyAnalyzing
-                  ? 'Analyzing...'
+              anyAnalyzing
+                ? 'Analyzing...'
+                : !hasMinimumAudios
+                  ? 'Need at least 2 recordings'
                   : 'Analyze all'
             }
           >
@@ -418,13 +412,13 @@ export function ShadowMultiAudioMode({
             )}
             <span>{anyAnalyzing ? 'Analyzing...' : 'Analyze All'}</span>
           </button>
-          {!hasMinimumAudios && (
-            <p className="text-xs text-gray-500 text-center mt-2 absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
-              Need at least 2 recordings
-            </p>
-          )}
-        </div>
-      ) : null}
+        )}
+        {!recordingId && !anyAnalyzing && !hasMinimumAudios && (
+          <p className="text-xs text-gray-500 text-center mt-2 absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
+            Need at least 2 recordings
+          </p>
+        )}
+      </div>
     </div>
   );
 }
@@ -432,83 +426,158 @@ export function ShadowMultiAudioMode({
 function ComparisonView({ entries }: { entries: AudioEntry[] }) {
   const bestScore = Math.max(...entries.map((e) => e.analysis?.score || 0));
   
+  // Extract numeric scores from text evaluations (fallback to reasonable estimates)
+  const getNumericScore = (text: string | undefined): number => {
+    if (!text) return 50;
+    const lower = text.toLowerCase();
+    if (lower.includes('excellent') || lower.includes('great') || lower.includes('perfect')) return 90;
+    if (lower.includes('good') || lower.includes('clear') || lower.includes('natural')) return 75;
+    if (lower.includes('adequate') || lower.includes('fair') || lower.includes('okay')) return 60;
+    if (lower.includes('needs') || lower.includes('improve') || lower.includes('weak')) return 40;
+    return 50;
+  };
+
+  const colors = [
+    { primary: 'bg-blue-500', light: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-300' },
+    { primary: 'bg-purple-500', light: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-300' },
+    { primary: 'bg-amber-500', light: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-300' },
+  ];
+
+  const dimensions = [
+    { key: 'overall', label: 'Overall', getValue: (e: AudioEntry) => e.analysis?.score || 0 },
+    { key: 'fluency', label: 'Fluency', getValue: (e: AudioEntry) => getNumericScore(e.analysis?.fluency) },
+    { key: 'intonation', label: 'Intonation', getValue: (e: AudioEntry) => getNumericScore(e.analysis?.intonation) },
+    { key: 'pronunciation', label: 'Pronunciation', getValue: (e: AudioEntry) => {
+      const strengths = e.analysis?.pronunciation?.strengths?.length || 0;
+      const weaknesses = e.analysis?.pronunciation?.weaknesses?.length || 0;
+      return Math.max(20, Math.min(100, 70 + (strengths * 10) - (weaknesses * 8)));
+    }},
+  ];
+
   return (
-    <div className="space-y-6">
-      {/* Score Comparison */}
-      <div className="space-y-3">
-        <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-          Overall Scores
-        </h4>
-        <div className="space-y-2">
-          {entries.map((entry) => (
-            <div key={entry.id} className="flex items-center gap-3">
-              <span className="w-24 text-sm font-medium text-gray-700 truncate">
-                {entry.label}
-              </span>
-              <div className="flex-1 h-10 bg-gray-100 rounded-lg overflow-hidden relative">
-                <div
-                  className={`h-full flex items-center px-3 transition-all ${
-                    entry.analysis?.score === bestScore
-                      ? 'bg-gradient-to-r from-emerald-500 to-emerald-600'
-                      : 'bg-gradient-to-r from-primary-700 to-primary-800'
-                  }`}
-                  style={{ width: `${entry.analysis?.score || 0}%` }}
-                >
-                  <span className="text-sm font-bold text-white">
-                    {entry.analysis?.score}
-                  </span>
-                </div>
-              </div>
-              {entry.analysis?.score === bestScore && (
-                <div className="flex items-center gap-1 px-2 py-1 bg-emerald-50 rounded-full">
-                  <Check size={14} className="text-emerald-700" />
-                  <span className="text-xs text-emerald-700 font-medium">Best</span>
-                </div>
-              )}
-            </div>
-          ))}
+    <div className="space-y-8">
+      {/* Champion Card - Highlight the winner */}
+      <div className="text-center space-y-3">
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 rounded-full shadow-lg">
+          <span className="text-2xl">🏆</span>
+          <span className="text-white font-bold text-lg">{entries.find(e => e.analysis?.score === bestScore)?.label}</span>
         </div>
+        <p className="text-sm text-gray-600">Best Overall Performance</p>
       </div>
 
-      {/* Detailed Comparison */}
-      <div className="grid gap-4 md:grid-cols-3">
-        {entries.map((entry) => (
-          <div
-            key={entry.id}
-            className={`p-4 rounded-xl space-y-3 ${
-              entry.analysis?.score === bestScore
-                ? 'bg-emerald-50 border-2 border-emerald-300'
-                : 'bg-gray-50 border border-gray-200'
-            }`}
-          >
+      {/* Multi-Dimensional Comparison */}
+      <div className="space-y-4">
+        <h4 className="text-sm font-bold text-gray-700 uppercase tracking-wider text-center">
+          Performance Breakdown
+        </h4>
+        
+        {dimensions.map((dim) => (
+          <div key={dim.key} className="space-y-2">
             <div className="flex items-center justify-between">
-              <h5 className="font-semibold text-primary-900">{entry.label}</h5>
-              <span className="text-2xl font-bold text-primary-900">
-                {entry.analysis?.score}
-              </span>
+              <span className="text-sm font-medium text-gray-700">{dim.label}</span>
+              <div className="flex items-center gap-2">
+                {entries.map((entry, idx) => {
+                  const value = dim.getValue(entry);
+                  const isMax = value === Math.max(...entries.map(e => dim.getValue(e)));
+                  return (
+                    <div key={entry.id} className="flex items-center gap-1">
+                      <div className={`w-2 h-2 rounded-full ${colors[idx % colors.length].primary}`} />
+                      <span className={`text-xs font-bold ${isMax ? 'text-primary-900' : 'text-gray-500'}`}>
+                        {value}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-            <div className="space-y-2 text-sm">
-              <div>
-                <span className="text-gray-600">Fluency:</span>
-                <p className="text-gray-900">{entry.analysis?.fluency}</p>
+            <div className="relative h-8 bg-gray-100 rounded-full overflow-hidden">
+              {entries.map((entry, idx) => {
+                const value = dim.getValue(entry);
+                const maxValue = Math.max(...entries.map(e => dim.getValue(e)));
+                const width = (value / 100) * 100;
+                return (
+                  <div
+                    key={entry.id}
+                    className={`absolute top-0 h-full ${colors[idx % colors.length].primary} transition-all ${
+                      value === maxValue ? 'opacity-100' : 'opacity-70'
+                    }`}
+                    style={{ 
+                      left: `${idx * 33.33}%`,
+                      width: `${width / entries.length}%`,
+                    }}
+                  />
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Legend with Names */}
+      <div className="flex items-center justify-center gap-4 flex-wrap pt-2 border-t border-gray-200">
+        {entries.map((entry, idx) => (
+          <div key={entry.id} className="flex items-center gap-2">
+            <div className={`w-3 h-3 rounded-full ${colors[idx % colors.length].primary}`} />
+            <span className="text-sm font-medium text-gray-700">{entry.label}</span>
+            <span className="text-xs text-gray-500">({entry.analysis?.score})</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Individual Cards with Details */}
+      <div className="grid gap-4 md:grid-cols-3 pt-4">
+        {entries.map((entry, idx) => {
+          const color = colors[idx % colors.length];
+          const isWinner = entry.analysis?.score === bestScore;
+          return (
+            <div
+              key={entry.id}
+              className={`relative p-5 rounded-2xl space-y-3 transition-all ${
+                isWinner
+                  ? 'bg-gradient-to-br from-amber-50 to-amber-100 border-2 border-amber-300 shadow-lg scale-105'
+                  : `${color.light} border ${color.border}`
+              }`}
+            >
+              {isWinner && (
+                <div className="absolute -top-3 -right-3 w-8 h-8 bg-gradient-to-br from-amber-400 to-amber-500 rounded-full flex items-center justify-center shadow-lg">
+                  <span className="text-lg">👑</span>
+                </div>
+              )}
+              
+              <div className="text-center space-y-2">
+                <h5 className="font-bold text-lg text-primary-900">{entry.label}</h5>
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white shadow-md">
+                  <span className="text-2xl font-bold text-primary-900">{entry.analysis?.score}</span>
+                </div>
               </div>
-              <div>
-                <span className="text-gray-600">Intonation:</span>
-                <p className="text-gray-900">{entry.analysis?.intonation}</p>
+
+              <div className="space-y-2 text-xs">
+                <div className={`p-2 rounded-lg bg-white/70`}>
+                  <span className="font-semibold text-gray-700">Fluency:</span>
+                  <p className="text-gray-600 mt-0.5">{entry.analysis?.fluency}</p>
+                </div>
+                <div className={`p-2 rounded-lg bg-white/70`}>
+                  <span className="font-semibold text-gray-700">Intonation:</span>
+                  <p className="text-gray-600 mt-0.5">{entry.analysis?.intonation}</p>
+                </div>
               </div>
+
               {(entry.analysis?.pronunciation?.strengths?.length ?? 0) > 0 && (
-                <div>
-                  <span className="text-emerald-700 font-medium">Strengths:</span>
-                  <ul className="text-gray-700 text-xs space-y-1 mt-1">
+                <div className="pt-2 border-t border-gray-300/50">
+                  <span className="text-xs font-bold text-emerald-700">✨ Top Strengths</span>
+                  <ul className="text-xs text-gray-700 space-y-1 mt-1">
                     {(entry.analysis?.pronunciation?.strengths ?? []).slice(0, 2).map((s, i) => (
-                      <li key={i}>• {s}</li>
+                      <li key={i} className="flex items-start gap-1">
+                        <span className="text-emerald-500 shrink-0">•</span>
+                        <span>{s}</span>
+                      </li>
                     ))}
                   </ul>
                 </div>
               )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
