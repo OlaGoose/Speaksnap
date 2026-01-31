@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, lazy, Suspense } from 'react';
-import { Screen, Scenario, UserLevel } from '@/lib/types';
+import { Screen, Scenario, UserLevel, PracticeMode } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 import { storage } from '@/lib/utils/storage';
 
@@ -15,6 +15,7 @@ export default function Home() {
   const [currentScenario, setCurrentScenario] = useState<Scenario | null>(null);
   const [currentDialogueId, setCurrentDialogueId] = useState<string | undefined>(undefined);
   const [userLevel, setUserLevel] = useState<UserLevel>('Beginner');
+  const [practiceMode, setPracticeMode] = useState<PracticeMode>('Daily');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // Initial setup
@@ -24,12 +25,21 @@ export default function Home() {
     if (savedLevel) {
       setUserLevel(savedLevel);
     }
+    const savedMode = storage.getItem<PracticeMode>('speakSnapPracticeMode');
+    if (savedMode) {
+      setPracticeMode(savedMode);
+    }
   }, []);
 
   useEffect(() => {
     // Save user level
     storage.setItem('speakSnapLevel', userLevel);
   }, [userLevel]);
+
+  useEffect(() => {
+    // Save practice mode
+    storage.setItem('speakSnapPracticeMode', practiceMode);
+  }, [practiceMode]);
 
   const handleCapture = async (imageSrc: string, location?: { lat: number; lng: number }) => {
     setIsAnalyzing(true);
@@ -43,6 +53,7 @@ export default function Home() {
         body: JSON.stringify({
           image: imageSrc,
           level: userLevel,
+          mode: practiceMode,
           location,
         }),
       });
@@ -106,6 +117,7 @@ export default function Home() {
         body: JSON.stringify({
           audio: audioBase64,
           level: userLevel,
+          mode: practiceMode,
           location,
         }),
       });
@@ -179,6 +191,8 @@ export default function Home() {
               onNavigate={setCurrentScreen}
               userLevel={userLevel}
               setUserLevel={setUserLevel}
+              practiceMode={practiceMode}
+              setPracticeMode={setPracticeMode}
             />
           </Suspense>
         );
@@ -202,6 +216,7 @@ export default function Home() {
             <DialogueScreen
               scenario={currentScenario}
               userLevel={userLevel}
+              practiceMode={practiceMode}
               dialogueId={currentDialogueId}
               onBack={() => setCurrentScreen(Screen.LIBRARY)}
               onFinish={() => setCurrentScreen(Screen.LIBRARY)}
@@ -220,6 +235,7 @@ export default function Home() {
                 setCurrentScreen(Screen.DIALOGUE);
               }}
               userLevel={userLevel}
+              practiceMode={practiceMode}
             />
           </Suspense>
         );

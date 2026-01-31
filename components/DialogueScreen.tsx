@@ -15,7 +15,7 @@ import {
   PhoneOff,
   ChevronRight,
 } from 'lucide-react';
-import { Scenario, DialogueLine, UserLevel } from '@/lib/types';
+import { Scenario, DialogueLine, UserLevel, PracticeMode } from '@/lib/types';
 import { storage } from '@/lib/utils/storage';
 import { useVoiceRecorder } from '@/lib/hooks/useVoiceRecorder';
 import { useGeminiLive } from '@/lib/hooks/useGeminiLive';
@@ -23,6 +23,7 @@ import { useGeminiLive } from '@/lib/hooks/useGeminiLive';
 interface DialogueScreenProps {
   scenario: Scenario;
   userLevel: UserLevel;
+  practiceMode: PracticeMode;
   onBack: () => void;
   onFinish: () => void;
   dialogueId?: string; // For resuming existing dialogue
@@ -31,6 +32,7 @@ interface DialogueScreenProps {
 export default function DialogueScreen({
   scenario,
   userLevel,
+  practiceMode,
   onBack,
   onFinish,
   dialogueId,

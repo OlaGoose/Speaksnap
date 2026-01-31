@@ -4,7 +4,7 @@
  */
 
 import { GoogleGenAI, Modality } from '@google/genai';
-import type { UserLevel } from '../types';
+import type { UserLevel, PracticeMode } from '../types';
 import type {
   ShadowDailyChallenge,
   ShadowAnalysisResult,
@@ -25,7 +25,8 @@ function parseJSON(text: string): Record<string, unknown> {
 }
 
 export async function generateDailyChallenge(
-  level: UserLevel
+  level: UserLevel,
+  mode: PracticeMode = 'Daily'
 ): Promise<ShadowDailyChallenge> {
   if (!ai) throw new Error('Gemini API key not configured');
 
@@ -36,20 +37,44 @@ export async function generateDailyChallenge(
         ? 'Use moderate vocabulary (B2). Natural, everyday sentences.'
         : 'Use advanced vocabulary (C1). Nuanced, idiomatic expressions.';
 
-  const prompt = `
-You are creating a short reading passage for an English learner. Do NOT use web search. Do NOT write dialogue (no back-and-forth conversation, no "A said / B said").
+  const modeInstructions = mode === 'IELTS'
+    ? `
+IELTS Mode Content:
+Generate passages that reflect IELTS Speaking test topics and styles:
+- Academic topics: Education, Technology, Environment, Globalization
+- Social topics: Family, Culture, Work-life balance, Media
+- Personal development: Hobbies, Travel, Health, Future plans
+- Opinion pieces: Should require analytical thinking and detailed responses
+- Use formal-to-neutral register, appropriate for IELTS Band 6-8
 
-Generate exactly one of these types at random (vary each time):
-- Personal monologue: one person describing a moment, a thought, or a routine (e.g. morning ritual, a decision, a memory).
-- Famous movie or speech quote: a short iconic 2–3 sentence passage that sounds like a film line or famous speech (you may invent something in that style; no need to cite).
-- Article or blog snippet: 3 sentences that read like the opening of a short article (lifestyle, culture, or how-to).
-- Popular science or news summary: 3 sentences that summarize a concept or a news-style fact in plain language.
-- Scene description: 3 sentences describing a place or situation in Western daily life (e.g. a street, a room, a commute) as if from a book or narration.
+Content types for IELTS:
+- Expert opinion excerpt: 3 sentences from an academic or professional discussing a topic
+- IELTS cue card response sample: 3 sentences describing an experience/person/place
+- News analysis: 3 sentences analyzing a current trend or issue
+- Cultural comparison: 3 sentences comparing aspects of different cultures
+- Future prediction: 3 sentences discussing likely future developments
+`
+    : `
+Daily Life Content:
+Generate passages reflecting everyday Western life:
+- Personal monologue: describing a moment, thought, or routine
+- Movie/speech quote: iconic 2-3 sentence passage
+- Article/blog snippet: lifestyle, culture, or how-to
+- Popular science/news: plain language explanation
+- Scene description: Western daily life (street, room, commute)
+`;
+
+  const prompt = `
+You are creating a short reading passage for an English learner. Do NOT use web search. Do NOT write dialogue.
+
+Practice Mode: ${mode}
+
+${modeInstructions}
 
 Rules:
 - Write exactly 3 sentences. No dialogue. Single voice or narrative only.
 - Sound natural in American or British English. Target: ${level} learner. ${levelPrompt}
-- Topic field: short label (e.g. "Morning routine", "Movie-style line", "News summary", "Street scene").
+- Topic field: short label describing the content
 
 Output strictly valid JSON only (no markdown, no explanation):
 { "topic": "short label", "text": "Your three sentences here." }

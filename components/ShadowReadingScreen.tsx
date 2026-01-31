@@ -13,7 +13,7 @@ import {
   AlertCircle,
   RotateCw,
 } from 'lucide-react';
-import type { UserLevel } from '@/lib/types';
+import type { UserLevel, PracticeMode } from '@/lib/types';
 import type {
   ShadowDailyChallenge,
   ShadowAnalysisResult,
@@ -32,9 +32,10 @@ type ShadowState =
 
 interface ShadowReadingScreenProps {
   userLevel: UserLevel;
+  practiceMode: PracticeMode;
 }
 
-export default function ShadowReadingScreen({ userLevel }: ShadowReadingScreenProps) {
+export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowReadingScreenProps) {
   const [state, setState] = useState<ShadowState>('loading');
   const [challenge, setChallenge] = useState<ShadowDailyChallenge | null>(null);
   const [refAudioBase64, setRefAudioBase64] = useState<string | null>(null);
@@ -76,7 +77,7 @@ export default function ShadowReadingScreen({ userLevel }: ShadowReadingScreenPr
     loadChallengeAbortRef.current = ac;
     try {
       // Check cache first
-      const cached = getCachedChallenge(userLevel);
+      const cached = getCachedChallenge(userLevel, practiceMode);
       let data: { topic: string; text: string; sourceUrl?: string; refAudioBase64: string };
       
       if (cached) {
@@ -107,7 +108,7 @@ export default function ShadowReadingScreen({ userLevel }: ShadowReadingScreenPr
           const res = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ level: userLevel }),
+            body: JSON.stringify({ level: userLevel, mode: practiceMode }),
             signal: ac.signal,
           });
           const resData = (await res.json()) as {
@@ -158,7 +159,7 @@ export default function ShadowReadingScreen({ userLevel }: ShadowReadingScreenPr
       setError(isNetworkError ? 'Network error. Check your connection and try again.' : msg);
       setState('error');
     }
-  }, [userLevel]);
+  }, [userLevel, practiceMode]);
 
   useEffect(() => {
     loadChallenge();

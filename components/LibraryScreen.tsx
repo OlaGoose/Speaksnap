@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import { Screen, Scenario, DialogueRecord, UserLevel } from '@/lib/types';
+import { Screen, Scenario, DialogueRecord, UserLevel, PracticeMode } from '@/lib/types';
 import {
   Camera,
   MapPin,
@@ -29,6 +29,7 @@ interface LibraryScreenProps {
   onNavigate: (screen: Screen) => void;
   onSelectScenario: (scenario: Scenario, dialogueId?: string) => void;
   userLevel: UserLevel;
+  practiceMode: PracticeMode;
 }
 
 interface DiaryEntry {
@@ -39,7 +40,7 @@ interface DiaryEntry {
   timestamp: number;
 }
 
-export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel }: LibraryScreenProps) {
+export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel, practiceMode }: LibraryScreenProps) {
   const [activeTab, setActiveTab] = useState<'scenarios' | 'flashcards' | 'diary' | 'shadow'>('scenarios');
   const [savedScenarios, setSavedScenarios] = useState<Scenario[]>([]);
   const [expandedScenarioId, setExpandedScenarioId] = useState<string | null>(null);
@@ -57,8 +58,8 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel 
 
   // Preload shadow challenge as soon as Library mounts (do not wait for Shadow tab click)
   useEffect(() => {
-    prefetchShadowChallenge(userLevel);
-  }, [userLevel]);
+    prefetchShadowChallenge(userLevel, practiceMode);
+  }, [userLevel, practiceMode]);
 
   const loadScenarios = useCallback(() => {
     const scenarios = storage.getItem<Scenario[]>('speakSnapScenarios');
@@ -245,7 +246,7 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel 
               </div>
             }
           >
-            <ShadowReadingScreen userLevel={userLevel} />
+            <ShadowReadingScreen userLevel={userLevel} practiceMode={practiceMode} />
           </Suspense>
         )}
         {activeTab === 'scenarios' && (

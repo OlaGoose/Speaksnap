@@ -4,7 +4,7 @@ import { analyzeScene } from '@/lib/ai/service';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { image, level, location } = body;
+    const { image, level, mode, location } = body;
 
     if (!image || !level) {
       return NextResponse.json(
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await analyzeScene(image, level, location);
+    const result = await analyzeScene(image, level, location, mode);
 
     return NextResponse.json(result);
   } catch (error: any) {

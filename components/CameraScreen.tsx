@@ -12,7 +12,7 @@ import {
   MapPinOff,
   Loader2,
 } from 'lucide-react';
-import { Screen, UserLevel } from '@/lib/types';
+import { Screen, UserLevel, PracticeMode } from '@/lib/types';
 
 interface CameraScreenProps {
   onCapture: (imageSrc: string, location?: { lat: number; lng: number }) => void;
@@ -20,6 +20,8 @@ interface CameraScreenProps {
   onNavigate: (screen: Screen) => void;
   userLevel: UserLevel;
   setUserLevel: (level: UserLevel) => void;
+  practiceMode: PracticeMode;
+  setPracticeMode: (mode: PracticeMode) => void;
 }
 
 type Mode = 'voice' | 'camera' | 'upload';
@@ -30,6 +32,8 @@ export default function CameraScreen({
   onNavigate,
   userLevel,
   setUserLevel,
+  practiceMode,
+  setPracticeMode,
 }: CameraScreenProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -38,6 +42,7 @@ export default function CameraScreen({
 
   const [error, setError] = useState<string | null>(null);
   const [showLevelMenu, setShowLevelMenu] = useState(false);
+  const [showModeMenu, setShowModeMenu] = useState(false);
   const [activeMode, setActiveMode] = useState<Mode>('camera');
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -601,6 +606,44 @@ export default function CameraScreen({
           >
             {isLocationEnabled ? <MapPin size={23} /> : <MapPinOff size={23} />}
           </button>
+
+          {/* Practice Mode Selector */}
+          <div className="relative">
+            <button
+              onClick={() => setShowModeMenu(!showModeMenu)}
+              className="h-10 px-4 rounded-full bg-black/20 backdrop-blur-md border border-white/10 flex items-center gap-2 text-white hover:bg-black/40 transition-all active:scale-95"
+            >
+              <span className="text-sm font-semibold">{practiceMode}</span>
+              <ChevronDown
+                size={18}
+                className={`transition-transform duration-300 ${
+                  showModeMenu ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+
+            {showModeMenu && (
+              <div className="absolute top-full right-0 mt-2 bg-white/90 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-1.5 flex flex-col gap-1 min-w-[120px] animate-in slide-in-from-top-2 fade-in duration-200 origin-top-right z-50">
+                {(['Daily', 'IELTS'] as PracticeMode[]).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => {
+                      setPracticeMode(m);
+                      setShowModeMenu(false);
+                    }}
+                    className={`text-left px-3 py-2.5 rounded-xl text-sm font-medium transition-colors flex items-center justify-between ${
+                      practiceMode === m
+                        ? 'bg-black/10 text-black'
+                        : 'text-gray-800 hover:bg-black/5'
+                    }`}
+                  >
+                    {m}
+                    {practiceMode === m && <Check size={18} className="text-black" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Level Selector */}
           <div className="relative">

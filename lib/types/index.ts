@@ -3,6 +3,7 @@
  */
 
 export type UserLevel = 'Beginner' | 'Intermediate' | 'Advanced';
+export type PracticeMode = 'Daily' | 'IELTS';
 
 export enum Screen {
   CAMERA = 'CAMERA',

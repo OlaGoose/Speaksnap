@@ -4,7 +4,7 @@ import { analyzeAudio } from '@/lib/ai/service';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { audio, level, location } = body;
+    const { audio, level, mode, location } = body;
 
     if (!audio || !level) {
       return NextResponse.json(
@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await analyzeAudio(audio, level, location);
+    const result = await analyzeAudio(audio, level, location, mode);
 
     return NextResponse.json(result);
   } catch (error: any) {

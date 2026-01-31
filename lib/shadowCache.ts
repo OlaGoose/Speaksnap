@@ -3,7 +3,7 @@
  * Prefetch when user enters Library, reuse when ShadowReadingScreen mounts.
  */
 
-import type { UserLevel } from './types';
+import type { UserLevel, PracticeMode } from './types';
 
 interface CachedChallenge {
   topic: string;
@@ -12,6 +12,7 @@ interface CachedChallenge {
   refAudioBase64: string;
   timestamp: number;
   level: UserLevel;
+  mode: PracticeMode;
 }
 
 let cache: CachedChallenge | null = null;
@@ -20,22 +21,22 @@ let inFlightRequest: Promise<CachedChallenge> | null = null;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 /**
- * Check if cached challenge is valid for the given level
+ * Check if cached challenge is valid for the given level and mode
  */
-function isCacheValid(level: UserLevel): boolean {
+function isCacheValid(level: UserLevel, mode: PracticeMode): boolean {
   if (!cache) return false;
-  if (cache.level !== level) return false;
+  if (cache.level !== level || cache.mode !== mode) return false;
   if (Date.now() - cache.timestamp > CACHE_TTL) return false;
   return true;
 }
 
 /**
- * Prefetch challenge for the given level (fire and forget).
+ * Prefetch challenge for the given level and mode (fire and forget).
  * Called when user clicks Shadow tab in Library.
  */
-export async function prefetchShadowChallenge(level: UserLevel): Promise<void> {
+export async function prefetchShadowChallenge(level: UserLevel, mode: PracticeMode = 'Daily'): Promise<void> {
   // If already valid in cache or request in flight, skip
-  if (isCacheValid(level) || inFlightRequest) return;
+  if (isCacheValid(level, mode) || inFlightRequest) return;
 
   try {
     const url =
@@ -46,7 +47,7 @@ export async function prefetchShadowChallenge(level: UserLevel): Promise<void> {
     const requestPromise = fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ level }),
+      body: JSON.stringify({ level, mode }),
     })
       .then(async (res) => {
         const data = await res.json();
@@ -58,6 +59,7 @@ export async function prefetchShadowChallenge(level: UserLevel): Promise<void> {
           refAudioBase64: data.refAudioBase64,
           timestamp: Date.now(),
           level,
+          mode,
         } as CachedChallenge;
       })
       .then((result) => {
@@ -82,8 +84,8 @@ export async function prefetchShadowChallenge(level: UserLevel): Promise<void> {
  * Get cached challenge if valid, or wait for in-flight request.
  * Returns null if no cache and no request.
  */
-export function getCachedChallenge(level: UserLevel): CachedChallenge | null {
-  if (isCacheValid(level)) return cache;
+export function getCachedChallenge(level: UserLevel, mode: PracticeMode = 'Daily'): CachedChallenge | null {
+  if (isCacheValid(level, mode)) return cache;
   return null;
 }
 

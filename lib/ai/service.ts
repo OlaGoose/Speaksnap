@@ -11,6 +11,7 @@ import type {
   DialogueResponse,
   DiaryProcessResult,
   UserLevel,
+  PracticeMode,
 } from '../types';
 
 // Initialize providers
@@ -43,7 +44,8 @@ const AI_PROVIDER = (process.env.NEXT_PUBLIC_AI_PROVIDER || 'auto').toLowerCase(
 export async function analyzeScene(
   base64Image: string,
   level: UserLevel,
-  location?: { lat: number; lng: number }
+  location?: { lat: number; lng: number },
+  mode: PracticeMode = 'Daily'
 ): Promise<AnalyzeImageResponse> {
   const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg);base64,/, '');
 
@@ -56,24 +58,40 @@ export async function analyzeScene(
     ? `User location: (Lat: ${location.lat}, Lng: ${location.lng}). Use this to identify landmarks or local context.`
     : 'No GPS data available.';
 
+  const modeInstructions = mode === 'IELTS'
+    ? `
+IELTS Speaking Test Mode:
+- Create scenarios that simulate IELTS Speaking Part 2 (Cue Card) or Part 3 (Discussion) topics
+- Topics should include: Work/Study, Hobbies, Travel, Technology, Environment, Culture, Family, etc.
+- AI role should be "IELTS Examiner" - ask follow-up questions, probe deeper on answers
+- Goals should focus on: describing experiences, expressing opinions, comparing situations, hypothesizing
+- Questions should encourage 2-3 minute responses with detailed explanations
+- Evaluate fluency, vocabulary range, grammatical accuracy, and pronunciation
+`
+    : `
+Daily Conversation Mode:
+- Create realistic everyday scenarios based on the image
+- Topics: shopping, dining, asking for directions, social interactions, etc.
+- AI role adapts to the context (staff, friend, stranger, etc.)
+- Goals focus on practical communication tasks
+`;
+
   const prompt = `
 You are an English learning scenario generator. Analyze this image and create a realistic, goal-oriented scenario.
 
 Context:
 - Student Level: ${level}
+- Practice Mode: ${mode}
 - Current Time: ${timeStr} (${dayPart})
 - ${locationContext}
+
+${modeInstructions}
 
 Requirements:
 1. Be EXTREMELY realistic - if it's nighttime, suggest nighttime activities
 2. Identify specific elements in the image (signs, objects, lighting)
-3. Create a clear conversation GOAL based on the scene type:
-   - Service scenes (café, restaurant, shop): Student practices ASKING/ORDERING
-   - Social/Home scenes (objects, toys, desk): Student practices ASKING ABOUT items
-   - Information scenes (signs, places): Student practices SEEKING information
-4. Determine WHO initiates based on scene:
-   - In service scenes: AI (shopkeeper/staff) greets FIRST
-   - In social scenes: Student can ask FIRST, AI responds
+3. Create a clear conversation GOAL based on the scene type and practice mode
+4. Determine WHO initiates based on scene and mode
 5. Match difficulty to ${level} level
 
 Return JSON:
@@ -81,11 +99,11 @@ Return JSON:
   "location": "Specific place name from image",
   "situation": "Clear scenario goal - what needs to be accomplished",
   "difficulty": "A1/A2/B1/B2/C1/C2 based on ${level}",
-  "role_name": "AI's character role (e.g., for service: Barista, Staff; for social: Friend, Roommate)",
-  "context": "AI's role and behavior. CRITICAL: If goals involve student ASKING (e.g., 'Ask about...'), AI should WAIT for student's question and RESPOND helpfully. If goals involve student ORDERING, AI can GREET first.",
-  "goals": ["Clear goal steps starting with action word: Ask/Order/Request/Find out...", "Goal 2", "Goal 3"],
+  "role_name": "AI's character role",
+  "context": "AI's role and behavior",
+  "goals": ["Clear goal steps", "Goal 2", "Goal 3"],
   "completion_phrase": "Natural completion phrase when all goals are achieved",
-  "first_line": "AI's opening line: SHORT greeting in service scenes, or wait for student in social scenes (use empty string '' if student should speak first)",
+  "first_line": "AI's opening line",
   "user_hints": ["3 realistic options that help achieve the first goal"]
 }
   `;
@@ -270,7 +288,8 @@ async function transcribeAudio(
 export async function analyzeAudio(
   base64Audio: string,
   level: UserLevel,
-  location?: { lat: number; lng: number }
+  location?: { lat: number; lng: number },
+  mode: PracticeMode = 'Daily'
 ): Promise<AnalyzeImageResponse> {
   const now = new Date();
   const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -290,6 +309,21 @@ export async function analyzeAudio(
     console.warn('Transcription failed, proceeding with generic scenario:', error.message);
   }
 
+  const modeInstructions = mode === 'IELTS'
+    ? `
+IELTS Speaking Test Mode:
+- Create IELTS Speaking Part 2/3 scenarios
+- AI role: "IELTS Examiner" - professional, encouraging, asks follow-up questions
+- Topics: Work, Study, Hobbies, Travel, Technology, Environment, Culture, etc.
+- Encourage detailed responses (2-3 minutes), opinions, comparisons, hypotheticals
+`
+    : `
+Daily Conversation Mode:
+- Create realistic everyday scenarios
+- AI role adapts to context
+- Focus on practical communication
+`;
+
   const prompt = `
 You are an English learning scenario generator. ${transcribedText 
   ? `The user said: "${transcribedText}". Create a realistic scenario based on their request.`
@@ -297,28 +331,31 @@ You are an English learning scenario generator. ${transcribedText
 
 Context:
 - Student Level: ${level}
+- Practice Mode: ${mode}
 - Current Time: ${timeStr} (${dayPart})
 - ${locationContext}
 ${transcribedText ? `- User Request: "${transcribedText}"` : ''}
 
+${modeInstructions}
+
 Requirements:
 1. Be EXTREMELY realistic - if it's nighttime, suggest nighttime activities
 2. ${transcribedText ? 'Incorporate the user\'s request into the scenario naturally' : 'Create natural conversation starters appropriate for the time and place'}
-3. Create a clear conversation GOAL (e.g., order coffee, buy tickets, ask for directions)
+3. Create a clear conversation GOAL based on practice mode
 4. Make the scenario have a natural beginning, middle, and end
 5. Match difficulty to ${level} level
 
 Return JSON:
 {
   "location": "Specific place name",
-  "situation": "Clear scenario goal - what needs to be accomplished in this conversation",
+  "situation": "Clear scenario goal",
   "difficulty": "A1/A2/B1/B2/C1/C2 based on ${level}",
-  "role_name": "Character role (e.g., Barista, Local, Clerk)",
-  "context": "Character personality, scene instructions, and GOAL: what needs to be accomplished (e.g., GOAL: Help customer complete their order and payment)",
+  "role_name": "Character role",
+  "context": "Character personality and behavior",
   "goals": ["Specific goal step 1", "Specific goal step 2", "Specific goal step 3"],
-  "completion_phrase": "Natural completion phrase when all goals are achieved",
-  "first_line": "AI's natural opening line that sets up the goal",
-  "user_hints": ["3 realistic response options that move towards the goal"]
+  "completion_phrase": "Natural completion phrase",
+  "first_line": "AI's natural opening line",
+  "user_hints": ["3 realistic response options"]
 }
   `;
 

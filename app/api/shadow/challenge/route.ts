@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export const maxDuration = 60;
 import { generateDailyChallenge, generateReferenceAudio } from '@/lib/ai/shadow-service';
-import type { UserLevel } from '@/lib/types';
+import type { UserLevel, PracticeMode } from '@/lib/types';
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,8 +16,9 @@ export async function POST(request: NextRequest) {
     }
 
     const level = (body.level ?? 'Beginner') as UserLevel;
+    const mode = (body.mode ?? 'Daily') as PracticeMode;
 
-    const challenge = await generateDailyChallenge(level);
+    const challenge = await generateDailyChallenge(level, mode);
     const { base64 } = await generateReferenceAudio(challenge.text);
 
     return NextResponse.json({
