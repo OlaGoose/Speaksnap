@@ -10,10 +10,41 @@ interface ShadowYouglishCardProps {
 }
 
 /**
+ * Error Boundary for Youglish Card
+ * Prevents Youglish errors from breaking the entire Shadow flow
+ */
+class YouglishCardErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('[ShadowYouglishCard] Error boundary caught:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      // Fail silently - don't render anything if there's an error
+      return null;
+    }
+
+    return this.props.children;
+  }
+}
+
+/**
  * Youglish pronunciation examples card for Shadow Reading
  * Shows native speaker examples for words the user struggled with
  */
-export function ShadowYouglishCard({ words, title = 'Native Examples' }: ShadowYouglishCardProps) {
+function ShadowYouglishCardInner({ words, title = 'Native Examples' }: ShadowYouglishCardProps) {
   const [currentWordIndex, setCurrentWordIndex] = useState(0);
   const [youglishReady, setYouglishReady] = useState(false);
   const [widgetLoading, setWidgetLoading] = useState(false);
@@ -202,5 +233,16 @@ export function ShadowYouglishCard({ words, title = 'Native Examples' }: ShadowY
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Exported component with error boundary
+ */
+export function ShadowYouglishCard(props: ShadowYouglishCardProps) {
+  return (
+    <YouglishCardErrorBoundary>
+      <ShadowYouglishCardInner {...props} />
+    </YouglishCardErrorBoundary>
   );
 }

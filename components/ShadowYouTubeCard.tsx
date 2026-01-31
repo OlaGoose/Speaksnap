@@ -3,32 +3,92 @@
 import React from 'react';
 import { useYouTubeSearch } from '@/lib/hooks/useYouTubeSearch';
 import { ExternalLink, Loader2 } from 'lucide-react';
+import type { ShadowWordAnalysis } from '@/lib/types';
 
 interface ShadowYouTubeCardProps {
-  weaknesses: string[];
+  words: ShadowWordAnalysis[];
+  weaknesses?: string[]; // Keep for backward compatibility and display
   title?: string;
 }
 
 /**
- * YouTube pronunciation teaching videos card for Shadow Reading
- * Shows videos based on detected pronunciation issues
+ * Error Boundary for YouTube Card
+ * Prevents YouTube errors from breaking the entire Shadow flow
  */
-export function ShadowYouTubeCard({ weaknesses, title = 'Pronunciation Guides' }: ShadowYouTubeCardProps) {
-  // Extract key pronunciation issues to search for (sanitize for URL / API)
+class YouTubeCardErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('[ShadowYouTubeCard] Error boundary caught:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      // Fail silently - don't render anything if there's an error
+      return null;
+    }
+
+    return this.props.children;
+  }
+}
+
+/**
+ * YouTube pronunciation teaching videos card for Shadow Reading
+ * Shows videos based on detected pronunciation issues from word analysis
+ */
+function ShadowYouTubeCardInner({ words, weaknesses, title = 'Pronunciation Guides' }: ShadowYouTubeCardProps) {
+  const [hasError, setHasError] = React.useState(false);
+
+  // Extract problem words and their phonetics for search
   const searchQuery = React.useMemo(() => {
-    if (!weaknesses || !Array.isArray(weaknesses) || weaknesses.length === 0) return null;
-    const firstIssue = weaknesses[0]
-      ?.replace(/[''""`]/g, ' ')
-      ?.replace(/\s+/g, ' ')
-      ?.trim()
-      ?.slice(0, 60);
-    if (!firstIssue) return null;
-    return `english pronunciation ${firstIssue} tutorial`;
-  }, [weaknesses]);
+    try {
+      if (!words || !Array.isArray(words) || words.length === 0) return null;
+      
+      // Find words with pronunciation issues (poor or average status)
+      const problemWords = words.filter(w => w && (w.status === 'poor' || w.status === 'average'));
+      
+      if (problemWords.length === 0) return null;
+      
+      // Use the first problem word for search
+      const firstProblem = problemWords[0];
+      
+      // Prefer phonetic if available, otherwise use the word itself
+      const searchTerm = firstProblem.phonetic || firstProblem.word;
+      
+      if (!searchTerm || typeof searchTerm !== 'string') return null;
+      
+      // Build search query: use phonetic symbol for more targeted results
+      // Example: "/θ/" or "the" -> "english pronunciation /θ/ th sound tutorial"
+      const cleanTerm = searchTerm.trim();
+      
+      // If it's a phonetic symbol (contains /), search for that sound
+      if (cleanTerm.includes('/')) {
+        return `english pronunciation ${cleanTerm} sound tutorial`;
+      }
+      
+      // Otherwise search for the word pronunciation
+      return `how to pronounce ${cleanTerm} english`;
+    } catch (err) {
+      console.error('[ShadowYouTubeCard] Error building search query:', err);
+      setHasError(true);
+      return null;
+    }
+  }, [words]);
 
   const { videos, loading, error } = useYouTubeSearch(searchQuery, !!searchQuery);
 
-  if (!searchQuery || !weaknesses || weaknesses.length === 0) {
+  // Graceful degradation: if error or no search query, don't render (don't block main flow)
+  if (hasError || !searchQuery) {
     return null;
   }
 
@@ -62,14 +122,16 @@ export function ShadowYouTubeCard({ weaknesses, title = 'Pronunciation Guides' }
 
       {!loading && !error && videos.length > 0 && (
         <>
-          <div className="text-sm text-gray-600 space-y-2">
-            <p className="font-medium">Focus areas to improve:</p>
-            <ul className="list-disc list-inside space-y-1 text-gray-500">
-              {weaknesses?.slice(0, 3).map((weakness, idx) => (
-                <li key={idx} className="text-sm">{weakness}</li>
-              ))}
-            </ul>
-          </div>
+          {weaknesses && weaknesses.length > 0 && (
+            <div className="text-sm text-gray-600 space-y-2">
+              <p className="font-medium">Focus areas to improve:</p>
+              <ul className="list-disc list-inside space-y-1 text-gray-500">
+                {weaknesses.slice(0, 3).map((weakness, idx) => (
+                  <li key={idx} className="text-sm">{weakness}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div className="space-y-3 max-h-[400px] overflow-y-auto">
             {videos.slice(0, 5).map((video) => (
@@ -108,5 +170,16 @@ export function ShadowYouTubeCard({ weaknesses, title = 'Pronunciation Guides' }
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Exported component with error boundary
+ */
+export function ShadowYouTubeCard(props: ShadowYouTubeCardProps) {
+  return (
+    <YouTubeCardErrorBoundary>
+      <ShadowYouTubeCardInner {...props} />
+    </YouTubeCardErrorBoundary>
   );
 }

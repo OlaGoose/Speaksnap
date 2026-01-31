@@ -570,6 +570,7 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
                 <div key={card.id} className="flex-shrink-0 w-[85%] max-w-sm snap-center">
                   {card.type === 'youtube' ? (
                     <ShadowYouTubeCard
+                      words={entryAnalysis.words || []}
                       weaknesses={entryAnalysis.pronunciation?.weaknesses || []}
                       title={card.title}
                     />
@@ -786,6 +787,7 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
                     >
                       {card.type === 'youtube' ? (
                         <ShadowYouTubeCard
+                          words={analysis.words || []}
                           weaknesses={analysis.pronunciation?.weaknesses || []}
                           title={card.title}
                         />
