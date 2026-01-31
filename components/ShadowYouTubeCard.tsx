@@ -4,7 +4,11 @@ import React, { useState } from 'react';
 import type { ShadowWordAnalysis } from '@/lib/types';
 
 /** Fixed pronunciation guide video IDs (in-site embed, no external redirect). */
-const SHADOW_YOUTUBE_VIDEO_IDS = ['QxQUapA-2w4', 'q7SAt9h4sd0'] as const;
+const SHADOW_YOUTUBE_VIDEO_IDS = [
+  'QxQUapA-2w4',
+  'q7SAt9h4sd0',
+  'jhEtBuuYNj4', // Starbucks ordering - real-world coffee vocabulary and practical English
+] as const;
 
 interface ShadowYouTubeCardProps {
   words: ShadowWordAnalysis[];
