@@ -416,11 +416,11 @@ function ComparisonView({ entries }: { entries: AudioEntry[] }) {
                 <span className="text-gray-600">Intonation:</span>
                 <p className="text-gray-900">{entry.analysis?.intonation}</p>
               </div>
-              {entry.analysis?.pronunciation.strengths.length > 0 && (
+              {(entry.analysis?.pronunciation?.strengths?.length ?? 0) > 0 && (
                 <div>
                   <span className="text-emerald-700 font-medium">Strengths:</span>
                   <ul className="text-gray-700 text-xs space-y-1 mt-1">
-                    {entry.analysis.pronunciation.strengths.slice(0, 2).map((s, i) => (
+                    {(entry.analysis?.pronunciation?.strengths ?? []).slice(0, 2).map((s, i) => (
                       <li key={i}>• {s}</li>
                     ))}
                   </ul>
