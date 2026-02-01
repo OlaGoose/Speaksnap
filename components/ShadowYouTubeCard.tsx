@@ -15,7 +15,22 @@ interface ShadowYouTubeCardProps {
   weaknesses?: string[];
   title?: string;
   recommendedVideos?: RecommendedVideo[];
+  showFixedVideos?: boolean;
 }
+
+// Fixed YouTube videos for pronunciation guides
+const FIXED_PRONUNCIATION_VIDEOS: RecommendedVideo[] = [
+  {
+    videoId: 'QxQUapA-2w4',
+    title: 'English Pronunciation Training',
+    summary: 'Master the fundamentals of English pronunciation with clear examples',
+  },
+  {
+    videoId: 'q7SAt9h4sd0',
+    title: 'Advanced Pronunciation Techniques',
+    summary: 'Take your pronunciation to the next level with advanced tips',
+  },
+];
 
 /**
  * Error Boundary for YouTube Card
@@ -49,18 +64,23 @@ class YouTubeCardErrorBoundary extends React.Component<
 
 /**
  * YouTube pronunciation guides card for Shadow Reading.
- * Displays TOP 3 AI-recommended videos based on practice context from PDF library.
+ * Can display either fixed pronunciation guides or AI-recommended scene videos.
  */
 function ShadowYouTubeCardInner({ 
   words, 
   weaknesses, 
   title = 'Recommended Videos',
-  recommendedVideos = []
+  recommendedVideos = [],
+  showFixedVideos = false
 }: ShadowYouTubeCardProps) {
   const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
 
-  // Show loading state if no videos yet
-  if (recommendedVideos.length === 0) {
+  // Use fixed videos if requested, otherwise use recommended videos
+  const videosToShow = showFixedVideos ? FIXED_PRONUNCIATION_VIDEOS : recommendedVideos;
+  const isAIRecommended = !showFixedVideos && recommendedVideos.length > 0;
+
+  // Show loading state only for AI-recommended videos (not fixed videos)
+  if (!showFixedVideos && recommendedVideos.length === 0) {
     return (
       <div className="bg-white rounded-2xl p-6 shadow-float border border-black/5 space-y-4">
         <div className="flex items-center justify-between">
@@ -71,7 +91,7 @@ function ShadowYouTubeCardInner({
           </div>
         </div>
         <div className="text-sm text-gray-500 text-center py-4">
-          Finding the best videos for your practice...
+          Finding the best scene video for your practice...
         </div>
       </div>
     );
@@ -81,15 +101,17 @@ function ShadowYouTubeCardInner({
     <div className="bg-white rounded-2xl p-6 shadow-float border border-black/5 space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-primary-900">{title}</h3>
-        <div className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-purple-50 to-pink-50 rounded-full">
-          <div className="w-2 h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full" />
-          <span className="text-xs bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent font-bold">
-            AI Matched
-          </span>
-        </div>
+        {isAIRecommended && (
+          <div className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-purple-50 to-pink-50 rounded-full">
+            <div className="w-2 h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full" />
+            <span className="text-xs bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent font-bold">
+              AI Matched
+            </span>
+          </div>
+        )}
       </div>
 
-      {weaknesses && weaknesses.length > 0 && (
+      {!showFixedVideos && weaknesses && weaknesses.length > 0 && (
         <div className="text-sm text-gray-600 space-y-2">
           <p className="font-medium">Focus areas to improve:</p>
           <ul className="list-disc list-inside space-y-1 text-gray-500">
@@ -101,15 +123,15 @@ function ShadowYouTubeCardInner({
       )}
 
       <div className="space-y-3">
-        {recommendedVideos.map((video, idx) => (
+        {videosToShow.map((video, idx) => (
           <button
             key={video.videoId}
             type="button"
             onClick={() => setPlayingVideoId(video.videoId)}
             className="w-full flex gap-3 p-3 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 transition-all text-left relative group"
           >
-            {/* Relevance badge */}
-            {idx === 0 && (
+            {/* Relevance badge for AI-recommended videos */}
+            {isAIRecommended && idx === 0 && (
               <div className="absolute -top-2 -right-2 z-10 bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg">
                 Best Match
               </div>
@@ -138,7 +160,7 @@ function ShadowYouTubeCardInner({
                   {video.summary}
                 </span>
               )}
-              {video.relevanceScore && (
+              {isAIRecommended && video.relevanceScore && (
                 <div className="flex items-center gap-1 mt-0.5">
                   <div className="h-1 bg-gray-200 rounded-full overflow-hidden flex-1 max-w-[80px]">
                     <div 

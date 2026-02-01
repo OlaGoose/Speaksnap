@@ -575,6 +575,7 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
       { id: 'strengths', title: 'Strengths', type: 'strengths' as const },
       { id: 'improvements', title: 'Improvements', type: 'improvements' as const },
       { id: 'youtube', title: 'Pronunciation Guides', type: 'youtube' as const },
+      { id: 'scene', title: 'Scene Practice', type: 'scene' as const },
     ];
     return (
       <div className="h-full bg-primary-50 flex flex-col overflow-y-auto overflow-x-hidden">
@@ -606,6 +607,13 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
               {entryCards.map((card) => (
                 <div key={card.id} className="w-full">
                   {card.type === 'youtube' ? (
+                    <ShadowYouTubeCard
+                      words={entryAnalysis.words || []}
+                      weaknesses={entryAnalysis.pronunciation?.weaknesses || []}
+                      title={card.title}
+                      showFixedVideos={true}
+                    />
+                  ) : card.type === 'scene' ? (
                     <ShadowYouTubeCard
                       words={entryAnalysis.words || []}
                       weaknesses={entryAnalysis.pronunciation?.weaknesses || []}
@@ -643,6 +651,7 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
         { id: 'strengths', title: 'Strengths', type: 'strengths' as const },
         { id: 'improvements', title: 'Improvements', type: 'improvements' as const },
         { id: 'youtube', title: 'Pronunciation Guides', type: 'youtube' as const },
+        { id: 'scene', title: 'Scene Practice', type: 'scene' as const },
       ]
     : [];
 
@@ -713,9 +722,25 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
                 </p>
               </>
             ) : (
-              <h1 className="text-2xl md:text-3xl font-medium tracking-tight leading-tight text-primary-900 px-2">
-                &quot;{challenge.text}&quot;
-              </h1>
+              <>
+                <h1 className="text-2xl md:text-3xl font-medium tracking-tight leading-tight text-primary-900 px-2">
+                  &quot;{challenge.text}&quot;
+                </h1>
+                {/* Play reference audio button */}
+                {refAudioUrl && state === 'ready' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const audio = new Audio(refAudioUrl);
+                      audio.play();
+                    }}
+                    className="mt-4 bg-gradient-to-br from-emerald-500 to-teal-500 text-white px-6 py-3 rounded-full font-semibold shadow-lg flex items-center gap-2 mx-auto hover:scale-105 transition-transform active:scale-95"
+                  >
+                    <Volume2 size={18} />
+                    <span>Listen to AI</span>
+                  </button>
+                )}
+              </>
             )}
 
             {/* Audio Comparison Cards */}
@@ -764,44 +789,37 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
           <div className="w-full h-px bg-black/5" />
 
           <div className="w-full max-w-xl mx-auto space-y-6">
-            {!userAudioUrl ? (
+            {state === 'recording' && (
               <div className="bg-white rounded-2xl p-6 shadow-float border border-black/5">
                 <div className="flex flex-col items-center gap-4">
-                  {state === 'recording' ? (
-                    <>
-                      <div className="flex items-end justify-center gap-1 h-8" aria-hidden>
-                        {[0, 0.12, 0.08, 0.16, 0.06, 0.14, 0.1, 0.18, 0.04].map((d, i) => (
-                          <div
-                            key={i}
-                            className="w-1 h-5 rounded-full bg-apple-blue recording-wave shadow-sm"
-                            style={{ animationDelay: `${d}s` }}
-                          />
-                        ))}
-                      </div>
-                      <p className="text-sm font-medium text-gray-600">Recording...</p>
-                      <p className="text-xs text-gray-400">Tap the button below to stop</p>
-                    </>
-                  ) : (
-                    <div className="w-full h-20 bg-gray-50 rounded-xl flex items-center justify-center border border-black/5">
-                      <div className="flex items-center gap-2 text-gray-400">
-                        <div className="w-2 h-2 rounded-full bg-gray-300" />
-                        <span className="text-sm font-medium">Ready to record</span>
-                      </div>
-                    </div>
-                  )}
+                  <div className="flex items-end justify-center gap-1 h-8" aria-hidden>
+                    {[0, 0.12, 0.08, 0.16, 0.06, 0.14, 0.1, 0.18, 0.04].map((d, i) => (
+                      <div
+                        key={i}
+                        className="w-1 h-5 rounded-full bg-apple-blue recording-wave shadow-sm"
+                        style={{ animationDelay: `${d}s` }}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-sm font-medium text-gray-600">Recording...</p>
+                  <p className="text-xs text-gray-400">Tap the button below to stop</p>
                 </div>
               </div>
-            ) : (
+            )}
+            
+            {userAudioUrl && (state === 'has_recording' || state === 'analyzing') && (
               <div className="bg-white rounded-2xl p-6 shadow-float border border-black/5 space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-gray-500">Your Recording</span>
-                  <button
-                    type="button"
-                    onClick={resetRecording}
-                    className="text-xs text-gray-400 hover:text-red-500 touch-manipulation min-h-[44px] min-w-[44px] flex items-center"
-                  >
-                    Delete
-                  </button>
+                  {state === 'has_recording' && (
+                    <button
+                      type="button"
+                      onClick={resetRecording}
+                      className="text-xs text-gray-400 hover:text-red-500 touch-manipulation min-h-[44px] min-w-[44px] flex items-center"
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
                 <audio controls src={userAudioUrl} className="w-full h-10" />
                 {state === 'has_recording' && (
@@ -840,7 +858,14 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
                           words={analysis.words || []}
                           weaknesses={analysis.pronunciation?.weaknesses || []}
                           title={card.title}
-                          recommendedVideos={recommendedVideos}
+                          showFixedVideos={true}
+                        />
+                      ) : card.type === 'scene' ? (
+                        <ShadowYouTubeCard
+                          words={analysis.words || []}
+                          weaknesses={analysis.pronunciation?.weaknesses || []}
+                          title={card.title}
+                          recommendedVideos={recommendedVideos.slice(0, 1)}
                         />
                       ) : (
                         <SummaryCard analysis={analysis} card={card} />
@@ -961,7 +986,7 @@ function SummaryCard({
   card,
 }: {
   analysis: ShadowAnalysisResult;
-  card: { id: string; title: string; type: 'score' | 'feedback' | 'strengths' | 'improvements' | 'youtube' };
+  card: { id: string; title: string; type: 'score' | 'feedback' | 'strengths' | 'improvements' | 'youtube' | 'scene' };
 }) {
   const { type } = card;
 
