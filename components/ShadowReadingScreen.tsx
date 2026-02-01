@@ -726,7 +726,7 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
                 <h1 className="text-2xl md:text-3xl font-medium tracking-tight leading-tight text-primary-900 px-2">
                   &quot;{challenge.text}&quot;
                 </h1>
-                {/* Play reference audio button */}
+                {/* Play reference audio - light icon button (matches header style) */}
                 {refAudioUrl && state === 'ready' && (
                   <button
                     type="button"
@@ -734,10 +734,10 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
                       const audio = new Audio(refAudioUrl);
                       audio.play();
                     }}
-                    className="mt-4 bg-gradient-to-br from-emerald-500 to-teal-500 text-white px-6 py-3 rounded-full font-semibold shadow-lg flex items-center gap-2 mx-auto hover:scale-105 transition-transform active:scale-95"
+                    className="mt-3 p-2 rounded-full text-gray-400 hover:text-primary-900 hover:bg-white/80 transition-colors touch-manipulation min-h-[44px] min-w-[44px] inline-flex items-center justify-center"
+                    aria-label="Play reference audio"
                   >
-                    <Volume2 size={18} />
-                    <span>Listen to AI</span>
+                    <Volume2 size={20} />
                   </button>
                 )}
               </>
