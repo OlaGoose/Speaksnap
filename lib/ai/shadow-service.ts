@@ -96,6 +96,35 @@ Rules:
         ? 'Use moderate vocabulary (B2). Natural, everyday sentences.'
         : 'Use advanced vocabulary (C1). Nuanced, idiomatic expressions.';
 
+  // Rich, diverse Western daily life scenarios to prevent repetitive content
+  const dailyLifeScenarios = [
+    // Morning routines (beyond coffee)
+    'morning jog in the park', 'packing kids lunch boxes', 'checking emails before work', 'feeding pets',
+    // Work & commute
+    'commuting on subway', 'video conference call', 'office lunch break', 'coworking space', 'remote work setup',
+    // Home & family
+    'doing laundry', 'grocery shopping', 'cooking dinner', 'helping kids with homework', 'family game night',
+    'watching Netflix', 'reading bedtime stories', 'weekend house cleaning', 'organizing closet',
+    // Social & leisure
+    'texting friends', 'birthday party planning', 'gym workout', 'yoga class', 'book club meeting',
+    'weekend brunch', 'farmers market visit', 'library visit', 'museum trip', 'concert night',
+    // Outdoor & errands
+    'walking the dog', 'bike ride', 'visiting post office', 'pharmacy pickup', 'hair salon appointment',
+    'car wash', 'recycling day', 'yard work', 'watering plants', 'neighborhood walk',
+    // Food & dining
+    'meal prep Sunday', 'ordering takeout', 'baking cookies', 'trying new restaurant', 'packing lunch',
+    'making smoothie', 'BBQ in backyard', 'pizza night', 'dinner reservation',
+    // Personal care & reflection
+    'skincare routine', 'journaling', 'meditation', 'listening to podcast', 'planning vacation',
+    'budgeting finances', 'online shopping', 'decluttering', 'learning new skill',
+    // Seasonal & special
+    'holiday decorating', 'spring cleaning', 'summer road trip prep', 'fall leaf raking', 'winter cozy evening',
+  ];
+
+  // Randomly select 6-8 scenarios for variety each time
+  const shuffled = [...dailyLifeScenarios].sort(() => Math.random() - 0.5);
+  const selectedScenarios = shuffled.slice(0, 6 + Math.floor(Math.random() * 3)).join(', ');
+
   const modeInstructions = mode === 'IELTS'
     ? `
 IELTS Mode Content:
@@ -114,29 +143,55 @@ Content types for IELTS:
 - Future prediction: 3 sentences discussing likely future developments
 `
     : `
-Daily Life Content:
-Generate passages reflecting everyday Western life:
-- Personal monologue: describing a moment, thought, or routine
-- Movie/speech quote: iconic 2-3 sentence passage
-- Article/blog snippet: lifestyle, culture, or how-to
-- Popular science/news: plain language explanation
-- Scene description: Western daily life (street, room, commute)
+Daily Life Content - DIVERSE & AUTHENTIC Western scenarios:
+Create passages about realistic American/British daily life moments. Be CREATIVE and VARIED.
+
+Selected focus scenarios for THIS session: ${selectedScenarios}
+
+Content types:
+1. Personal narrative: First-person reflection on a moment or activity (e.g., "I finally organized my closet today...")
+2. Descriptive scene: Vivid depiction of a place or situation (e.g., "The farmers market was bustling...")
+3. How-to snippet: Practical tip or process (e.g., "Meal prepping saves hours each week...")
+4. Opinion/thought: Personal viewpoint on daily life topic (e.g., "Remote work changed my morning routine...")
+5. Observation: Noticing something in everyday life (e.g., "The autumn leaves covered the sidewalk...")
+
+IMPORTANT - Avoid these overused topics:
+❌ Morning coffee/breakfast routine (too common)
+❌ Generic "waking up" descriptions
+❌ Weather observations without context
+❌ Abstract feelings without specific situations
+
+✅ DO focus on:
+- Specific, concrete activities and locations
+- Sensory details (sights, sounds, textures)
+- Modern Western life (apps, streaming, online shopping, etc.)
+- Relatable micro-moments (waiting in line, finding parking, etc.)
+- Seasonal activities and cultural practices
 `;
 
   const prompt = `
-You are creating a short reading passage for an English learner. Do NOT use web search. Do NOT write dialogue.
+You are creating a short, FRESH reading passage for an English learner. Your goal is VARIETY and AUTHENTICITY.
 
 Practice Mode: ${mode}
 
 ${modeInstructions}
 
-Rules:
+DIVERSITY RULES:
+- Generate UNIQUE content each time - avoid repetitive topics
+- Choose ONE specific scenario and explore it vividly
+- Include concrete details, not abstract concepts
+- Make it feel REAL - like a snapshot from someone's actual day
+- Vary sentence structure and rhythm for natural speech patterns
+
+Technical Rules:
 - Write exactly 3 sentences. No dialogue. Single voice or narrative only.
 - Sound natural in American or British English. Target: ${level} learner. ${levelPrompt}
-- Topic field: short label describing the content
+- Topic field: concise label (2-4 words) describing the specific activity
 
 Output strictly valid JSON only (no markdown, no explanation):
 { "topic": "short label", "text": "Your three sentences here." }
+
+Remember: Be CREATIVE. Surprise the learner with interesting, varied content!
   `;
 
   // Try Gemini first
@@ -145,7 +200,10 @@ Output strictly valid JSON only (no markdown, no explanation):
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: prompt,
-        config: { httpOptions: { timeout: 60000 } },
+        config: { 
+          temperature: 0.9, // Higher temperature for more creative, diverse outputs
+          httpOptions: { timeout: 60000 } 
+        },
       });
       const text = response.text;
       if (text) {
@@ -164,7 +222,7 @@ Output strictly valid JSON only (no markdown, no explanation):
       console.log('🔄 Shadow challenge using Doubao fallback...');
       const response = await doubao.chat(
         [{ role: 'user', content: prompt }],
-        { temperature: 0.7, maxTokens: 512 }
+        { temperature: 0.9, maxTokens: 512 } // Higher temperature for diversity
       );
       const text = response.choices?.[0]?.message?.content;
       if (!text) throw new Error('Empty response from Doubao');
