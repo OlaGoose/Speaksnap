@@ -3,20 +3,18 @@
 import React, { useState } from 'react';
 import type { ShadowWordAnalysis } from '@/lib/types';
 
-/** Fixed pronunciation guide video IDs (in-site embed, no external redirect). */
-const SHADOW_YOUTUBE_VIDEO_IDS = ['QxQUapA-2w4', 'q7SAt9h4sd0'] as const;
-
 interface RecommendedVideo {
   videoId: string;
   title: string;
   summary: string;
+  relevanceScore?: number;
 }
 
 interface ShadowYouTubeCardProps {
   words: ShadowWordAnalysis[];
   weaknesses?: string[];
   title?: string;
-  recommendedVideo?: RecommendedVideo | null;
+  recommendedVideos?: RecommendedVideo[];
 }
 
 /**
@@ -51,37 +49,43 @@ class YouTubeCardErrorBoundary extends React.Component<
 
 /**
  * YouTube pronunciation guides card for Shadow Reading.
- * Fixed 2 videos + optional AI-recommended video based on practice context.
+ * Displays TOP 3 AI-recommended videos based on practice context from PDF library.
  */
 function ShadowYouTubeCardInner({ 
   words, 
   weaknesses, 
-  title = 'Pronunciation Guides',
-  recommendedVideo 
+  title = 'Recommended Videos',
+  recommendedVideos = []
 }: ShadowYouTubeCardProps) {
   const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
 
-  // Combine fixed videos with recommended video (if available)
-  const allVideos = [
-    ...SHADOW_YOUTUBE_VIDEO_IDS.map((id, idx) => ({
-      id,
-      title: `Pronunciation guide ${idx + 1}`,
-      isRecommended: false,
-    })),
-    ...(recommendedVideo?.videoId ? [{
-      id: recommendedVideo.videoId,
-      title: recommendedVideo.title,
-      isRecommended: true,
-    }] : []),
-  ];
+  // Show loading state if no videos yet
+  if (recommendedVideos.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl p-6 shadow-float border border-black/5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-primary-900">{title}</h3>
+          <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded-full">
+            <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+            <span className="text-xs text-blue-700 font-medium">Loading...</span>
+          </div>
+        </div>
+        <div className="text-sm text-gray-500 text-center py-4">
+          Finding the best videos for your practice...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-2xl p-6 shadow-float border border-black/5 space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-primary-900">{title}</h3>
-        <div className="flex items-center gap-1 px-2 py-1 bg-red-50 rounded-full">
-          <div className="w-2 h-2 bg-red-500 rounded-full" />
-          <span className="text-xs text-red-700 font-medium">Recommended</span>
+        <div className="flex items-center gap-1 px-2 py-1 bg-gradient-to-r from-purple-50 to-pink-50 rounded-full">
+          <div className="w-2 h-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full" />
+          <span className="text-xs bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent font-bold">
+            AI Matched
+          </span>
         </div>
       </div>
 
@@ -97,35 +101,56 @@ function ShadowYouTubeCardInner({
       )}
 
       <div className="space-y-3">
-        {allVideos.map((video) => (
+        {recommendedVideos.map((video, idx) => (
           <button
-            key={video.id}
+            key={video.videoId}
             type="button"
-            onClick={() => setPlayingVideoId(video.id)}
-            className="w-full flex gap-3 p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors text-left relative"
+            onClick={() => setPlayingVideoId(video.videoId)}
+            className="w-full flex gap-3 p-3 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 hover:from-gray-100 hover:to-gray-200 transition-all text-left relative group"
           >
-            {video.isRecommended && (
-              <div className="absolute -top-2 -right-2 z-10 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg">
-                AI Match
+            {/* Relevance badge */}
+            {idx === 0 && (
+              <div className="absolute -top-2 -right-2 z-10 bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg">
+                Best Match
               </div>
             )}
-            <div className="flex-shrink-0 relative rounded-lg overflow-hidden bg-gray-900">
+            <div className="flex-shrink-0 relative rounded-lg overflow-hidden bg-gray-900 shadow-md group-hover:shadow-lg transition-shadow">
               <img
-                src={`https://img.youtube.com/vi/${video.id}/mqdefault.jpg`}
+                src={`https://img.youtube.com/vi/${video.videoId}/mqdefault.jpg`}
                 alt={video.title}
                 className="w-28 h-20 object-cover"
                 onError={(e) => {
-                  (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${video.id}/default.jpg`;
+                  (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${video.videoId}/default.jpg`;
                 }}
               />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center opacity-90">
+              <div className="absolute inset-0 flex items-center justify-center bg-black/10 group-hover:bg-black/20 transition-colors">
+                <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center opacity-90 group-hover:scale-110 transition-transform">
                   <div className="w-0 h-0 border-t-[6px] border-t-transparent border-l-[10px] border-l-white border-b-[6px] border-b-transparent ml-1" />
                 </div>
               </div>
             </div>
-            <div className="flex-1 min-w-0 flex items-center">
-              <span className="text-sm font-medium text-primary-900 line-clamp-2">{video.title}</span>
+            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
+              <span className="text-sm font-semibold text-primary-900 line-clamp-2 leading-tight">
+                {video.title}
+              </span>
+              {video.summary && (
+                <span className="text-xs text-gray-500 line-clamp-1">
+                  {video.summary}
+                </span>
+              )}
+              {video.relevanceScore && (
+                <div className="flex items-center gap-1 mt-0.5">
+                  <div className="h-1 bg-gray-200 rounded-full overflow-hidden flex-1 max-w-[80px]">
+                    <div 
+                      className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all"
+                      style={{ width: `${video.relevanceScore}%` }}
+                    />
+                  </div>
+                  <span className="text-[10px] text-gray-400 font-medium">
+                    {video.relevanceScore}% match
+                  </span>
+                </div>
+              )}
             </div>
           </button>
         ))}

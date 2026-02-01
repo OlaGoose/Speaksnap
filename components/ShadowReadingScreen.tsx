@@ -56,11 +56,12 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
   const [userAudioBlob, setUserAudioBlob] = useState<Blob | null>(null);
   const [analysis, setAnalysis] = useState<ShadowAnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [recommendedVideo, setRecommendedVideo] = useState<{
+  const [recommendedVideos, setRecommendedVideos] = useState<Array<{
     videoId: string;
     title: string;
     summary: string;
-  } | null>(null);
+    relevanceScore?: number;
+  }>>([]);
 
   const [historyEntries, setHistoryEntries] = useState<ShadowHistoryEntry[]>([]);
   const [historyView, setHistoryView] = useState<'closed' | 'list' | 'detail'>('closed');
@@ -342,8 +343,8 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
       const list = await getShadowHistory();
       setHistoryEntries(list);
 
-      // Fetch recommended YouTube video in background (non-blocking)
-      fetchRecommendedVideo(challenge.text, data.pronunciation?.weaknesses || []);
+      // Fetch recommended YouTube videos in background (non-blocking)
+      fetchRecommendedVideos(challenge.text, data.pronunciation?.weaknesses || []);
     } catch (e) {
       console.error(e);
       setError(e instanceof Error ? e.message : 'Analysis failed.');
@@ -351,7 +352,7 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
     }
   };
 
-  const fetchRecommendedVideo = async (practiceText: string, weaknesses: string[]) => {
+  const fetchRecommendedVideos = async (practiceText: string, weaknesses: string[]) => {
     try {
       const res = await fetch('/api/shadow/youtube-recommend', {
         method: 'POST',
@@ -360,26 +361,29 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
       });
 
       if (res.ok) {
-        const video = await res.json();
-        setRecommendedVideo(video);
-        console.log('✅ Recommended video loaded:', video.title);
+        const data = await res.json();
+        const videos = data.videos || [];
+        setRecommendedVideos(videos);
+        console.log(`✅ Loaded ${videos.length} recommended videos:`, videos.map((v: { title: string }) => v.title));
       } else {
-        console.warn('⚠️ Video recommendation unavailable');
+        console.warn('⚠️ Video recommendations unavailable');
+        setRecommendedVideos([]);
       }
     } catch (e) {
-      console.warn('⚠️ Failed to fetch recommended video:', e);
+      console.warn('⚠️ Failed to fetch recommended videos:', e);
+      setRecommendedVideos([]);
       // Silently fail - not critical to user experience
     }
   };
 
   const nextChallenge = () => {
     loadChallenge();
-    setRecommendedVideo(null); // Clear previous recommendation
+    setRecommendedVideos([]); // Clear previous recommendations
   };
 
   const refreshChallenge = useCallback(() => {
     clearShadowCache();
-    setRecommendedVideo(null);
+    setRecommendedVideos([]);
     loadChallenge();
   }, [loadChallenge]);
 
@@ -605,7 +609,7 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
                       words={entryAnalysis.words || []}
                       weaknesses={entryAnalysis.pronunciation?.weaknesses || []}
                       title={card.title}
-                      recommendedVideo={null}
+                      recommendedVideos={[]}
                     />
                   ) : (
                     <SummaryCard analysis={entryAnalysis} card={card} />
@@ -806,7 +810,7 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
                           words={analysis.words || []}
                           weaknesses={analysis.pronunciation?.weaknesses || []}
                           title={card.title}
-                          recommendedVideo={recommendedVideo}
+                          recommendedVideos={recommendedVideos}
                         />
                       ) : (
                         <SummaryCard analysis={analysis} card={card} />

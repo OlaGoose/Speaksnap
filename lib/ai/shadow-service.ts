@@ -349,23 +349,24 @@ export interface RecommendedVideo {
 }
 
 /**
- * Recommend a YouTube video from PDF based on shadow reading context.
+ * Recommend YouTube videos from PDF based on shadow reading context.
  * Uses Gemini's document understanding to extract and match videos.
+ * Returns TOP 3 most relevant videos.
  */
-export async function recommendYouTubeVideo(
+export async function recommendYouTubeVideos(
   practiceText: string,
   weaknesses: string[] = [],
   pdfFileUri?: string
-): Promise<RecommendedVideo | null> {
+): Promise<RecommendedVideo[]> {
   if (!ai) {
     console.warn('Gemini API key not configured for video recommendation');
-    return null;
+    return [];
   }
 
   const fileUri = pdfFileUri || process.env.SHADOW_YOUTUBE_PDF_URI;
   if (!fileUri) {
     console.warn('SHADOW_YOUTUBE_PDF_URI not configured');
-    return null;
+    return [];
   }
 
   const weaknessContext = weaknesses.length > 0
@@ -375,28 +376,42 @@ export async function recommendYouTubeVideo(
   const prompt = `
 You are given a PDF document containing YouTube video recommendations. Each segment has this format:
 === Segment XX ===
-URL: [YouTube URL]
-Summary: [Video description]
+Title: [Video title]
+URL: https://www.youtube.com/watch?v=[VIDEO_ID]
+Keywords: [comma-separated keywords]
+Topics: [bullet points of topics]
+Summary: [detailed description]
 
 Your task:
-1. Read the entire PDF and extract all video segments
+1. Read the entire PDF and extract ALL video segments (there are 15 segments)
 2. Analyze the user's shadow reading practice context:
    - Practice text: "${practiceText}"${weaknessContext}
-3. Find the MOST relevant video that matches:
-   - Topic similarity (e.g., if practice is about coffee, recommend coffee-related video)
-   - Learning needs (e.g., if weakness is intonation, recommend videos with clear speech patterns)
-   - Practical scenarios (prefer real-world conversation videos)
+3. Select the TOP 3 MOST RELEVANT videos that best match:
+   - Topic similarity (e.g., if practice is about shopping, recommend shopping-related videos)
+   - Learning needs (e.g., if weakness is vocabulary, recommend videos with rich vocabulary context)
+   - Practical real-world scenarios (prefer authentic conversation and cultural context)
+   - Diverse topics (avoid recommending 3 videos on the same topic)
+
+IMPORTANT:
+- Extract the video ID from the URL (e.g., "jhEtBuuYNj4" from "https://www.youtube.com/watch?v=jhEtBuuYNj4")
+- Use the exact Title from the PDF
+- Rank by relevance (highest score first)
+- Return EXACTLY 3 videos
 
 Output STRICTLY valid JSON (no markdown, no explanation):
 {
-  "url": "full YouTube URL",
-  "videoId": "YouTube video ID (e.g., jhEtBuuYNj4)",
-  "title": "descriptive title based on summary (max 50 chars)",
-  "summary": "original summary from PDF",
-  "relevanceScore": number (0-100, how well it matches the context)
+  "videos": [
+    {
+      "url": "full YouTube URL from PDF",
+      "videoId": "extracted video ID (11 characters)",
+      "title": "exact title from PDF (can be long)",
+      "summary": "brief summary (max 100 chars) highlighting why it's relevant",
+      "relevanceScore": number (0-100)
+    }
+  ]
 }
 
-If no suitable video found, output: {"url": "", "videoId": "", "title": "", "summary": "", "relevanceScore": 0}
+If cannot find 3 videos, return fewer but never return empty array.
 `;
 
   try {
@@ -406,28 +421,45 @@ If no suitable video found, output: {"url": "", "videoId": "", "title": "", "sum
         createPartFromUri(fileUri, 'application/pdf'),
         prompt,
       ]),
-      config: { httpOptions: { timeout: 60000 } },
+      config: { 
+        temperature: 0.7, // Balanced for consistent quality recommendations
+        httpOptions: { timeout: 60000 } 
+      },
     });
 
     const text = response.text;
     if (!text) {
       console.warn('Empty response from video recommendation');
-      return null;
+      return [];
     }
 
-    const data = parseJSON(text) as unknown as RecommendedVideo;
+    const data = parseJSON(text) as unknown as { videos?: RecommendedVideo[] };
+    const videos = data.videos || [];
     
-    // Validate response
-    if (!data.url || !data.videoId || data.relevanceScore === 0) {
-      console.warn('No suitable video found in PDF');
-      return null;
+    // Validate and filter invalid videos
+    const validVideos = videos.filter(v => 
+      v.url && 
+      v.videoId && 
+      v.videoId.length === 11 && // YouTube video IDs are always 11 characters
+      v.title &&
+      (v.relevanceScore || 0) > 0
+    );
+
+    if (validVideos.length === 0) {
+      console.warn('No valid videos found in PDF');
+      return [];
     }
 
-    console.log('✅ Recommended video:', data.title, '(score:', data.relevanceScore, ')');
-    return data;
+    // Sort by relevance score (highest first) and take top 3
+    const top3 = validVideos
+      .sort((a, b) => (b.relevanceScore || 0) - (a.relevanceScore || 0))
+      .slice(0, 3);
+
+    console.log(`✅ Recommended ${top3.length} videos:`, top3.map(v => `${v.title} (${v.relevanceScore})`));
+    return top3;
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn('⚠️ Video recommendation failed:', msg);
-    return null;
+    return [];
   }
 }
