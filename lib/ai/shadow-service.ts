@@ -4,7 +4,7 @@
  * Doubao is used as fallback for challenge text when Gemini times out or is unavailable.
  */
 
-import { GoogleGenAI, Modality, createPartFromUri, createUserContent } from '@google/genai';
+import { GoogleGenAI, Modality, ThinkingLevel, createPartFromUri, createUserContent } from '@google/genai';
 import { DoubaoProvider } from './doubao';
 import type {
   UserLevel,
@@ -201,6 +201,9 @@ Remember: Be CREATIVE. Surprise the learner with interesting, varied content!
         model: 'gemini-3-flash-preview',
         contents: prompt,
         config: { 
+          thinkingConfig: {
+            thinkingLevel: ThinkingLevel.LOW // Fast generation for simple 3-sentence text
+          },
           temperature: 0.9, // Higher temperature for more creative, diverse outputs
           httpOptions: { timeout: 60000 } 
         },
@@ -331,7 +334,12 @@ export async function analyzeShadowReading(
         ],
       },
     ],
-    config: { httpOptions: { timeout: 60000 } },
+    config: { 
+      thinkingConfig: {
+        thinkingLevel: ThinkingLevel.MINIMAL // Minimize latency for structured audio analysis task
+      },
+      httpOptions: { timeout: 60000 } 
+    },
   });
 
   const responseText = response.text;
@@ -422,6 +430,9 @@ If cannot find 3 videos, return fewer but never return empty array.
         prompt,
       ]),
       config: { 
+        thinkingConfig: {
+          thinkingLevel: ThinkingLevel.LOW // Fast matching for video recommendation
+        },
         temperature: 0.7, // Balanced for consistent quality recommendations
         httpOptions: { timeout: 60000 } 
       },
