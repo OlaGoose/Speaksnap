@@ -151,7 +151,9 @@ export function ShadowMultiAudioMode({
     const withAudio = audioEntries.filter((e) => e.audioBlob && !e.analysis && !e.analyzing);
     if (withAudio.length === 0) return;
     setAnalyzingAll(true);
-    for (const entry of withAudio) {
+    
+    // Parallel analysis for better performance (all audios analyzed simultaneously)
+    const analysisPromises = withAudio.map(async (entry) => {
       setAudioEntries((prev) => prev.map((e) => (e.id === entry.id ? { ...e, analyzing: true, error: null } : e)));
       try {
         const userBase64 = await new Promise<string>((resolve) => {
@@ -159,6 +161,11 @@ export function ShadowMultiAudioMode({
           reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
           reader.readAsDataURL(entry.audioBlob!);
         });
+        
+        // Extended timeout for audio analysis (5 minutes)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 300000);
+        
         const res = await fetch('/api/shadow/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -168,20 +175,29 @@ export function ShadowMultiAudioMode({
             refAudioBase64,
             refText: challenge.text,
           }),
+          signal: controller.signal,
         });
+        
+        clearTimeout(timeoutId);
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Analysis failed');
+        
         setAudioEntries((prev) =>
           prev.map((e) => (e.id === entry.id ? { ...e, analysis: data, analyzing: false, error: null } : e))
         );
       } catch (err: any) {
+        const errorMessage = err.name === 'AbortError' 
+          ? 'Analysis timeout - audio may be too long' 
+          : err.message || 'Analysis failed';
         setAudioEntries((prev) =>
           prev.map((e) =>
-            e.id === entry.id ? { ...e, analyzing: false, error: err.message || 'Analysis failed' } : e
+            e.id === entry.id ? { ...e, analyzing: false, error: errorMessage } : e
           )
         );
       }
-    }
+    });
+    
+    await Promise.all(analysisPromises);
     setAnalyzingAll(false);
   };
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { analyzeShadowReading } from '@/lib/ai/shadow-service';
 
-export const maxDuration = 60;
+export const maxDuration = 300; // 5 minutes for multi-person mode support
 
 export async function POST(request: NextRequest) {
   try {
