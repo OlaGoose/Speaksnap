@@ -387,6 +387,7 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
     loadChallenge();
   }, [loadChallenge]);
 
+  /* Temporarily unused - can be restored if timestamp analysis is re-enabled
   const playAudioSegment = (audioUrl: string, startTime: number, endTime: number): Promise<void> => {
     return new Promise((resolve) => {
       const audio = new Audio(audioUrl);
@@ -402,6 +403,7 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
       audio.onended = () => resolve();
     });
   };
+  */
 
   const handleWordClick = useCallback(
     async (wordIndex: number, word: string) => {
@@ -436,16 +438,15 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
         refEnd = refStart + segmentDuration;
       }
 
-      // Play user segment first, then reference segment (user wants to hear their pronunciation first)
-      try {
-        await playAudioSegment(userAudioUrl, userStart, userEnd);
-        await new Promise((resolve) => setTimeout(resolve, 300));
-        await playAudioSegment(refAudioUrl, refStart, refEnd);
-      } catch (err) {
-        console.error('Error playing audio segment:', err);
-      }
+      /* PERFORMANCE OPTIMIZATION: Timestamp-based word playback temporarily disabled
+       * Original functionality allowed playing individual word segments with precise timing.
+       * This required 10-15 minutes of AI processing time for timestamp analysis.
+       * Users can now compare full recordings using the audio cards in the results section.
+       */
+      console.log('Word-by-word playback temporarily disabled for faster analysis');
+      return;
     },
-    [refAudioUrl, userAudioUrl, analysis]
+    []
   );
 
   /* if (state === 'loading') {
@@ -706,9 +707,9 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
 
             {state === 'results' && analysis ? (
               <>
-                <WordAnalysisView words={analysis.words} onWordClick={handleWordClick} />
+                <WordAnalysisView words={analysis.words} />
                 <p className="text-xs text-gray-400 text-center mt-2">
-                  Tap any word to hear: Your pronunciation → Reference pronunciation
+                  Color-coded feedback: <span className="text-emerald-700">Good</span> · <span className="text-amber-600">Average</span> · <span className="text-red-600">Needs Work</span>
                 </p>
               </>
             ) : (
@@ -717,16 +718,45 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
               </h1>
             )}
 
-            {refAudioUrl && (
-              <div className="flex justify-center">
-                <button
-                  type="button"
-                  onClick={() => new Audio(refAudioUrl!).play()}
-                  className="flex items-center gap-2 text-sm text-gray-500 hover:text-primary-900 transition-colors touch-manipulation min-h-[44px]"
-                >
-                  <Volume2 size={18} />
-                  <span>Play Native Reference</span>
-                </button>
+            {/* Audio Comparison Cards */}
+            {state === 'results' && refAudioUrl && userAudioUrl && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+                {/* Reference Audio */}
+                <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-2xl p-5 shadow-sm border border-emerald-100">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center">
+                      <Volume2 size={16} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-emerald-900">Native Speaker</h3>
+                      <p className="text-xs text-emerald-600">Reference pronunciation</p>
+                    </div>
+                  </div>
+                  <audio 
+                    controls 
+                    src={refAudioUrl} 
+                    className="w-full h-10 rounded-lg"
+                    style={{ filter: 'hue-rotate(100deg)' }}
+                  />
+                </div>
+
+                {/* User Audio */}
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-5 shadow-sm border border-blue-100">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center">
+                      <Mic size={16} className="text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-blue-900">Your Recording</h3>
+                      <p className="text-xs text-blue-600">Compare & practice</p>
+                    </div>
+                  </div>
+                  <audio 
+                    controls 
+                    src={userAudioUrl} 
+                    className="w-full h-10 rounded-lg"
+                  />
+                </div>
               </div>
             )}
           </div>

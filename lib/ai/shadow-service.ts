@@ -287,13 +287,13 @@ export async function analyzeShadowReading(
   const cleanMimeType = userMimeType.split(';')[0].trim();
 
   const prompt = `
-    Role: Strict Dialect Coach with Audio Timing Analysis.
+    Role: Strict Dialect Coach for Pronunciation Analysis.
     Reference Text: "${referenceText}"
 
     Task: 
     1. Listen to both "Reference Audio" (Native Speaker) and "User Audio" (Student).
     2. Compare pronunciation, intonation, and rhythm. Be strict.
-    3. For EACH word, estimate the time position (in seconds) where it appears in BOTH audios.
+    3. Analyze EACH word's pronunciation quality.
     
     Output strictly valid JSON (no markdown) with this structure:
     {
@@ -301,22 +301,27 @@ export async function analyzeShadowReading(
         { 
           "word": "string", 
           "status": "good"|"average"|"poor", 
-          "issue": "string", 
-          "phonetic": "string",
-          "refStartTime": number (seconds, e.g., 0.5),
-          "refEndTime": number (seconds, e.g., 1.2),
-          "userStartTime": number (seconds, e.g., 0.8),
-          "userEndTime": number (seconds, e.g., 1.6)
+          "issue": "string (brief explanation of the problem)",
+          "phonetic": "string (IPA notation if needed)"
         }
       ],
       "score": number (0-100),
-      "fluency": "string",
-      "pronunciation": { "strengths": ["string"], "weaknesses": ["string"] },
-      "intonation": "string",
-      "suggestions": "string"
+      "fluency": "string (overall fluency assessment)",
+      "pronunciation": { 
+        "strengths": ["string (specific positive aspects)"], 
+        "weaknesses": ["string (specific areas to improve)"] 
+      },
+      "intonation": "string (intonation and rhythm feedback)",
+      "suggestions": "string (actionable improvement tips)"
     }
     
-    IMPORTANT: Estimate timing accurately by listening to when each word is spoken in both audios.
+    IMPORTANT: Focus on pronunciation accuracy, clarity, and naturalness. Be encouraging but precise.
+    
+    /* PERFORMANCE NOTE: Timestamp analysis temporarily disabled for speed optimization.
+     * Original task included: "estimate the time position (in seconds) where each word appears in BOTH audios"
+     * Original fields: refStartTime, refEndTime, userStartTime, userEndTime
+     * This can be re-enabled in the future if needed for advanced word-by-word playback features.
+     */
   `;
 
   // Note: Use gemini-3-flash-preview for stable audio analysis; 60s timeout
