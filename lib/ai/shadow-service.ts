@@ -247,8 +247,10 @@ Remember: Be CREATIVE. Surprise the learner with interesting, varied content!
   throw new Error('No AI provider available for Shadow challenge.');
 }
 
+/** Default voice for shadow; use 'Puck' for American male (e.g. textbook). */
 export async function generateReferenceAudio(
-  text: string
+  text: string,
+  voiceName: string = 'Kore'
 ): Promise<{ base64: string }> {
   if (!ai) throw new Error('Gemini API key not configured');
 
@@ -259,7 +261,7 @@ export async function generateReferenceAudio(
       responseModalities: [Modality.AUDIO],
       speechConfig: {
         voiceConfig: {
-          prebuiltVoiceConfig: { voiceName: 'Kore' },
+          prebuiltVoiceConfig: { voiceName },
         },
       },
       httpOptions: { timeout: 60000 },

@@ -24,6 +24,7 @@ import { storage } from '@/lib/utils/storage';
 import { prefetchShadowChallenge } from '@/lib/shadowCache';
 
 const ShadowReadingScreen = lazy(() => import('./ShadowReadingScreen'));
+const TextbookScreen = lazy(() => import('./TextbookScreen'));
 
 interface LibraryScreenProps {
   onNavigate: (screen: Screen) => void;
@@ -41,7 +42,7 @@ interface DiaryEntry {
 }
 
 export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel, practiceMode }: LibraryScreenProps) {
-  const [activeTab, setActiveTab] = useState<'scenarios' | 'flashcards' | 'diary' | 'shadow'>('scenarios');
+  const [activeTab, setActiveTab] = useState<'scenarios' | 'flashcards' | 'diary' | 'shadow' | 'textbook'>('scenarios');
   const [savedScenarios, setSavedScenarios] = useState<Scenario[]>([]);
   const [expandedScenarioId, setExpandedScenarioId] = useState<string | null>(null);
   const [isWritingDiary, setIsWritingDiary] = useState(false);
@@ -170,7 +171,7 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel,
           >
             <ArrowLeft size={18} />
           </button>
-          {activeTab !== 'shadow' && (
+          {activeTab !== 'shadow' && activeTab !== 'textbook' && (
             <div className="flex-1 relative">
               <input
                 type="text"
@@ -183,7 +184,7 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel,
               <Search className="absolute left-3.5 top-2.5 text-gray-400 pointer-events-none" size={16} />
             </div>
           )}
-          {activeTab === 'shadow' && <div className="flex-1" />}
+          {(activeTab === 'shadow' || activeTab === 'textbook') && <div className="flex-1" />}
         </div>
 
         {/* Tabs */}
@@ -222,6 +223,17 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel,
             Shadow
           </button>
           <button
+            onClick={() => setActiveTab('textbook')}
+            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all touch-manipulation min-h-[44px] ${
+              activeTab === 'textbook' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-gray-600'
+            }`}
+            role="tab"
+            aria-selected={activeTab === 'textbook'}
+            aria-label="Textbook tab"
+          >
+            教材
+          </button>
+          <button
             onClick={() => setActiveTab('flashcards')}
             className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all touch-manipulation min-h-[44px] ${
               activeTab === 'flashcards' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-gray-600'
@@ -236,7 +248,7 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel,
       </div>
 
       {/* Content with optimized scrolling */}
-      <div className={`flex-1 px-4 pt-4 pb-24 safe-bottom ${activeTab === 'flashcards' ? 'overflow-hidden' : activeTab === 'shadow' ? 'overflow-hidden' : 'overflow-y-auto scroll-container'}`}>
+      <div className={`flex-1 px-4 pt-4 pb-24 safe-bottom ${activeTab === 'flashcards' ? 'overflow-hidden' : activeTab === 'shadow' || activeTab === 'textbook' ? 'overflow-hidden' : 'overflow-y-auto scroll-container'}`}>
         {activeTab === 'shadow' && (
           <Suspense
             fallback={
@@ -247,6 +259,18 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel,
             }
           >
             <ShadowReadingScreen userLevel={userLevel} practiceMode={practiceMode} />
+          </Suspense>
+        )}
+        {activeTab === 'textbook' && (
+          <Suspense
+            fallback={
+              <div className="h-full flex flex-col items-center justify-center p-8">
+                <Loader2 size={32} className="text-primary-900 animate-spin" />
+                <p className="text-sm text-gray-500 mt-2">Loading...</p>
+              </div>
+            }
+          >
+            <TextbookScreen />
           </Suspense>
         )}
         {activeTab === 'scenarios' && (
@@ -621,7 +645,7 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel,
       </div>
 
       {/* FAB with safe area */}
-      {activeTab !== 'flashcards' && activeTab !== 'shadow' && (
+      {activeTab !== 'flashcards' && activeTab !== 'shadow' && activeTab !== 'textbook' && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-30 safe-bottom">
           {activeTab === 'diary' ? (
             <button
