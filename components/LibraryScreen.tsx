@@ -187,63 +187,65 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel,
           {(activeTab === 'shadow' || activeTab === 'textbook') && <div className="flex-1" />}
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 mb-2" role="tablist">
-          <button
-            onClick={() => setActiveTab('scenarios')}
-            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all touch-manipulation min-h-[44px] ${
-              activeTab === 'scenarios' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-gray-600'
-            }`}
-            role="tab"
-            aria-selected={activeTab === 'scenarios'}
-            aria-label="Scenarios tab"
-          >
-            Scenarios
-          </button>
-          <button
-            onClick={() => setActiveTab('diary')}
-            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all touch-manipulation min-h-[44px] ${
-              activeTab === 'diary' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-gray-600'
-            }`}
-            role="tab"
-            aria-selected={activeTab === 'diary'}
-            aria-label="Diary tab"
-          >
-            Diary
-          </button>
-          <button
-            onClick={() => setActiveTab('shadow')}
-            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all touch-manipulation min-h-[44px] ${
-              activeTab === 'shadow' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-gray-600'
-            }`}
-            role="tab"
-            aria-selected={activeTab === 'shadow'}
-            aria-label="Shadow reading tab"
-          >
-            Shadow
-          </button>
-          <button
-            onClick={() => setActiveTab('textbook')}
-            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all touch-manipulation min-h-[44px] ${
-              activeTab === 'textbook' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-gray-600'
-            }`}
-            role="tab"
-            aria-selected={activeTab === 'textbook'}
-            aria-label="Textbook tab"
-          >
-            教材
-          </button>
-          <button
-            onClick={() => setActiveTab('flashcards')}
-            className={`flex-1 py-2 rounded-xl text-sm font-semibold transition-all touch-manipulation min-h-[44px] ${
-              activeTab === 'flashcards' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-gray-600'
-            }`}
-            role="tab"
-            aria-selected={activeTab === 'flashcards'}
-            aria-label="Flashcards tab"
-          >
-            Flashcards
-          </button>
+        {/* Tabs – horizontal scroll on small screens */}
+        <div className="overflow-x-auto overflow-y-hidden -mx-1 px-1 scrollbar-hide" role="tablist">
+          <div className="flex gap-2 mb-2 flex-nowrap min-w-0">
+            <button
+              onClick={() => setActiveTab('scenarios')}
+              className={`flex-shrink-0 py-2 px-3 rounded-xl text-sm font-semibold transition-all touch-manipulation min-h-[44px] min-w-[72px] ${
+                activeTab === 'scenarios' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-gray-600'
+              }`}
+              role="tab"
+              aria-selected={activeTab === 'scenarios'}
+              aria-label="Scenarios tab"
+            >
+              Scenarios
+            </button>
+            <button
+              onClick={() => setActiveTab('diary')}
+              className={`flex-shrink-0 py-2 px-3 rounded-xl text-sm font-semibold transition-all touch-manipulation min-h-[44px] min-w-[56px] ${
+                activeTab === 'diary' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-gray-600'
+              }`}
+              role="tab"
+              aria-selected={activeTab === 'diary'}
+              aria-label="Diary tab"
+            >
+              Diary
+            </button>
+            <button
+              onClick={() => setActiveTab('shadow')}
+              className={`flex-shrink-0 py-2 px-3 rounded-xl text-sm font-semibold transition-all touch-manipulation min-h-[44px] min-w-[64px] ${
+                activeTab === 'shadow' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-gray-600'
+              }`}
+              role="tab"
+              aria-selected={activeTab === 'shadow'}
+              aria-label="Shadow reading tab"
+            >
+              Shadow
+            </button>
+            <button
+              onClick={() => setActiveTab('textbook')}
+              className={`flex-shrink-0 py-2 px-3 rounded-xl text-sm font-semibold transition-all touch-manipulation min-h-[44px] min-w-[76px] ${
+                activeTab === 'textbook' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-gray-600'
+              }`}
+              role="tab"
+              aria-selected={activeTab === 'textbook'}
+              aria-label="Textbook tab"
+            >
+              Textbook
+            </button>
+            <button
+              onClick={() => setActiveTab('flashcards')}
+              className={`flex-shrink-0 py-2 px-3 rounded-xl text-sm font-semibold transition-all touch-manipulation min-h-[44px] min-w-[80px] ${
+                activeTab === 'flashcards' ? 'bg-white shadow-sm text-black' : 'text-gray-400 hover:text-gray-600'
+              }`}
+              role="tab"
+              aria-selected={activeTab === 'flashcards'}
+              aria-label="Flashcards tab"
+            >
+              Flashcards
+            </button>
+          </div>
         </div>
       </div>
 

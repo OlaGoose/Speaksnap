@@ -10,17 +10,19 @@ import {
   Check,
   AlertCircle,
   BookOpen,
+  RotateCw,
 } from 'lucide-react';
 import type { ShadowAnalysisResult, ShadowWordAnalysis } from '@/lib/types';
-import { NCE2_LESSONS, type NCE2Lesson } from '@/lib/data/nce2-lessons';
-import { getCachedRefAudio, setCachedRefAudio } from '@/lib/textbookCache';
+import { COURSES, type Lesson, type Course } from '@/lib/data/courses';
+import { getCachedRefAudio, setCachedRefAudio, clearCachedRefAudio, clearCachedRefAudioForCourse } from '@/lib/textbookCache';
 
 type TextbookView = 'list' | 'detail';
 type DetailState = 'loading_audio' | 'ready' | 'recording' | 'has_recording' | 'analyzing' | 'results';
 
 export default function TextbookScreen() {
   const [view, setView] = useState<TextbookView>('list');
-  const [lesson, setLesson] = useState<NCE2Lesson | null>(null);
+  const [selectedCourseId, setSelectedCourseId] = useState<string>(COURSES[0]?.id ?? 'nce2');
+  const [lesson, setLesson] = useState<Lesson | null>(null);
   const [detailState, setDetailState] = useState<DetailState>('loading_audio');
   const [refAudioBase64, setRefAudioBase64] = useState<string | null>(null);
   const [refAudioUrl, setRefAudioUrl] = useState<string | null>(null);
@@ -33,6 +35,8 @@ export default function TextbookScreen() {
   const chunksRef = useRef<Blob[]>([]);
   const refAudioUrlRef = useRef<string | null>(null);
   const userAudioUrlRef = useRef<string | null>(null);
+
+  const currentCourse: Course | undefined = COURSES.find((c) => c.id === selectedCourseId);
 
   const applyRefAudio = useCallback((base64: string) => {
     setRefAudioBase64(base64);
@@ -47,7 +51,7 @@ export default function TextbookScreen() {
     setDetailState('ready');
   }, []);
 
-  const loadLesson = useCallback(async (selected: NCE2Lesson) => {
+  const loadLesson = useCallback(async (courseId: string, selected: Lesson, skipCache = false) => {
     setLesson(selected);
     setView('detail');
     setDetailState('loading_audio');
@@ -67,10 +71,12 @@ export default function TextbookScreen() {
     }
 
     try {
-      const cached = await getCachedRefAudio(selected.id);
-      if (cached) {
-        applyRefAudio(cached);
-        return;
+      if (!skipCache) {
+        const cached = await getCachedRefAudio(courseId, selected.id);
+        if (cached) {
+          applyRefAudio(cached);
+          return;
+        }
       }
 
       const res = await fetch('/api/textbook/ref-audio', {
@@ -81,7 +87,7 @@ export default function TextbookScreen() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to load reference audio');
       const base64 = data.refAudioBase64 as string;
-      await setCachedRefAudio(selected.id, base64);
+      await setCachedRefAudio(courseId, selected.id, base64);
       applyRefAudio(base64);
     } catch (e) {
       console.error(e);
@@ -89,6 +95,32 @@ export default function TextbookScreen() {
       setDetailState('ready');
     }
   }, [applyRefAudio]);
+
+  const handleRefreshLesson = useCallback(async () => {
+    if (!lesson || !selectedCourseId) return;
+    await clearCachedRefAudio(selectedCourseId, lesson.id);
+    setDetailState('loading_audio');
+    try {
+      const res = await fetch('/api/textbook/ref-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: lesson.text }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load reference audio');
+      const base64 = data.refAudioBase64 as string;
+      await setCachedRefAudio(selectedCourseId, lesson.id, base64);
+      applyRefAudio(base64);
+    } catch (e) {
+      console.error(e);
+      setError(e instanceof Error ? e.message : 'Failed to refresh audio');
+      setDetailState('ready');
+    }
+  }, [lesson, selectedCourseId, applyRefAudio]);
+
+  const handleRefreshCourse = useCallback(async () => {
+    await clearCachedRefAudioForCourse(selectedCourseId);
+  }, [selectedCourseId]);
 
   const startRecording = async () => {
     if (!lesson) return;
@@ -196,23 +228,58 @@ export default function TextbookScreen() {
 
   // List view
   if (view === 'list') {
+    const course = currentCourse ?? COURSES[0];
+    const lessons = course?.lessons ?? [];
     return (
       <div className="h-full bg-primary-50 flex flex-col overflow-y-auto">
         <div className="flex-1 px-4 py-6 pb-24 safe-bottom">
           <div className="max-w-xl mx-auto space-y-4">
             <div className="flex items-center gap-2 mb-4">
-              <BookOpen size={22} className="text-primary-900" />
-              <h2 className="text-lg font-semibold text-primary-900">New Concept English Book 2</h2>
+              <BookOpen size={22} className="text-primary-900 shrink-0" />
+              <h2 className="text-lg font-semibold text-primary-900">Textbook</h2>
             </div>
-            <p className="text-sm text-gray-600">
-              Tap a lesson to practice pronunciation. Listen to the reference audio, then record and compare.
-            </p>
+
+            {/* Course selector */}
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Course</p>
+              <div className="flex gap-2 flex-wrap">
+                {COURSES.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setSelectedCourseId(c.id)}
+                    className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all touch-manipulation ${
+                      selectedCourseId === c.id
+                        ? 'bg-primary-900 text-white shadow-md'
+                        : 'bg-white text-gray-600 hover:bg-gray-50 border border-black/5'
+                    }`}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <p className="text-sm text-gray-600">
+                  Tap a lesson to practice. Listen, record, then compare.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleRefreshCourse}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-gray-500 hover:text-primary-900 hover:bg-white/80 border border-black/5 transition-colors touch-manipulation"
+                  title="Refresh course (clear cached audio for this course)"
+                >
+                  <RotateCw size={14} />
+                  Refresh
+                </button>
+              </div>
+            </div>
+
             <ul className="space-y-2">
-              {NCE2_LESSONS.map((l) => (
+              {lessons.map((l) => (
                 <li key={l.id}>
                   <button
                     type="button"
-                    onClick={() => loadLesson(l)}
+                    onClick={() => loadLesson(selectedCourseId, l)}
                     className="w-full text-left bg-white rounded-2xl p-4 shadow-float border border-black/5 hover:border-primary-200 transition-colors touch-manipulation"
                   >
                     <span className="text-xs text-gray-500 font-medium">Lesson {l.id}</span>
@@ -244,7 +311,7 @@ export default function TextbookScreen() {
       <div className="flex-1 px-4 py-6 pb-32 safe-bottom">
         <div className="max-w-xl mx-auto space-y-6">
           <div className="text-center space-y-4">
-            <div className="flex items-center gap-3 w-full max-w-xl mx-auto">
+            <div className="flex items-center gap-2 w-full max-w-xl mx-auto">
               <button
                 type="button"
                 onClick={backToList}
@@ -256,7 +323,15 @@ export default function TextbookScreen() {
               <h2 className="flex-1 text-center text-base font-semibold text-primary-900 truncate px-2">
                 Lesson {lesson.id}: {lesson.title}
               </h2>
-              <div className="w-[52px]" aria-hidden />
+              <button
+                type="button"
+                onClick={handleRefreshLesson}
+                className="p-2 rounded-full text-gray-400 hover:text-primary-900 hover:bg-white/80 transition-colors touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center shrink-0"
+                aria-label="Refresh lesson (reload reference audio)"
+                title="Refresh lesson"
+              >
+                <RotateCw size={20} />
+              </button>
             </div>
 
             {detailState === 'loading_audio' && (
@@ -277,9 +352,11 @@ export default function TextbookScreen() {
                   </>
                 ) : (
                   <>
-                    <h1 className="text-2xl md:text-3xl font-medium tracking-tight leading-tight text-primary-900 px-2">
-                      &quot;{lesson.text}&quot;
-                    </h1>
+                    <div className="w-full max-h-[40vh] overflow-y-auto rounded-2xl bg-white/80 border border-black/5 px-4 py-4 text-left">
+                      <p className="text-base md:text-lg font-medium tracking-tight leading-relaxed text-primary-900 whitespace-pre-wrap">
+                        {lesson.text}
+                      </p>
+                    </div>
                     {refAudioUrl && detailState === 'ready' && (
                       <button
                         type="button"
