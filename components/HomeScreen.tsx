@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Check, Camera, PenTool, Mic as MicIcon, BookOpen, ChevronRight } from 'lucide-react';
 import { storage } from '@/lib/utils/storage';
+import { UserAvatar } from '@/components/auth/user-avatar';
 
 interface WeeklyTasks {
   scenarios: boolean;
@@ -104,13 +105,20 @@ export default function HomeScreen() {
 
   return (
     <div className="h-full bg-primary-50 flex flex-col overflow-y-auto">
-      <div className="flex-1 px-4 py-8 pb-24 safe-bottom">
+      <div className="flex-1 px-4 pt-4 py-6 pb-24 safe-top safe-bottom">
         <div className="max-w-2xl mx-auto space-y-8">
-          {/* Notion-style page title */}
-          <header className="pt-4">
-            <h1 className="text-3xl font-semibold text-primary-900 tracking-tight mb-2">
-              Welcome back
-            </h1>
+          {/* Page title with account */}
+          <header className="pt-2">
+            <div className="flex items-center gap-3 mb-2">
+              <UserAvatar
+                size="sm"
+                showDropdown
+                className="rounded-full flex-shrink-0 p-0.5 hover:bg-primary-100/80 transition-colors"
+              />
+              <h2 className="text-3xl font-semibold text-primary-900 tracking-tight">
+                Welcome back
+              </h2>
+            </div>
             <p className="text-sm text-gray-500">
               Your weekly English learning plan.
             </p>
