@@ -192,9 +192,9 @@ export default function LibraryScreen() {
       <div className="sticky top-0 z-30 px-4 pt-4 pb-2 bg-primary-50/95 backdrop-blur-sm border-b border-black/5 safe-top">
         <div className="flex items-center gap-3 mb-4">
           <button
-            onClick={() => router.push('/camera')}
+            onClick={() => router.push('/')}
             className="w-10 h-10 rounded-full bg-white shadow-float flex items-center justify-center text-gray-700 active:scale-95 transition-transform touch-manipulation"
-            aria-label="Go back to camera"
+            aria-label="Back to home"
           >
             <ArrowLeft size={18} />
           </button>
