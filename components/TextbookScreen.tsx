@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { ShadowAnalysisResult, ShadowWordAnalysis } from '@/lib/types';
 import { NCE2_LESSONS, type NCE2Lesson } from '@/lib/data/nce2-lessons';
+import { getCachedRefAudio, setCachedRefAudio } from '@/lib/textbookCache';
 
 type TextbookView = 'list' | 'detail';
 type DetailState = 'loading_audio' | 'ready' | 'recording' | 'has_recording' | 'analyzing' | 'results';
@@ -32,6 +33,19 @@ export default function TextbookScreen() {
   const chunksRef = useRef<Blob[]>([]);
   const refAudioUrlRef = useRef<string | null>(null);
   const userAudioUrlRef = useRef<string | null>(null);
+
+  const applyRefAudio = useCallback((base64: string) => {
+    setRefAudioBase64(base64);
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: 'audio/wav' });
+    const blobUrl = URL.createObjectURL(blob);
+    if (refAudioUrlRef.current) URL.revokeObjectURL(refAudioUrlRef.current);
+    refAudioUrlRef.current = blobUrl;
+    setRefAudioUrl(blobUrl);
+    setDetailState('ready');
+  }, []);
 
   const loadLesson = useCallback(async (selected: NCE2Lesson) => {
     setLesson(selected);
@@ -53,6 +67,12 @@ export default function TextbookScreen() {
     }
 
     try {
+      const cached = await getCachedRefAudio(selected.id);
+      if (cached) {
+        applyRefAudio(cached);
+        return;
+      }
+
       const res = await fetch('/api/textbook/ref-audio', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -61,21 +81,14 @@ export default function TextbookScreen() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to load reference audio');
       const base64 = data.refAudioBase64 as string;
-      setRefAudioBase64(base64);
-      const binary = atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const blob = new Blob([bytes], { type: 'audio/wav' });
-      const blobUrl = URL.createObjectURL(blob);
-      refAudioUrlRef.current = blobUrl;
-      setRefAudioUrl(blobUrl);
-      setDetailState('ready');
+      await setCachedRefAudio(selected.id, base64);
+      applyRefAudio(base64);
     } catch (e) {
       console.error(e);
       setError(e instanceof Error ? e.message : 'Failed to load audio');
       setDetailState('ready');
     }
-  }, []);
+  }, [applyRefAudio]);
 
   const startRecording = async () => {
     if (!lesson) return;
