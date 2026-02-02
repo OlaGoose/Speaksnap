@@ -11,6 +11,8 @@ import {
   AlertCircle,
   BookOpen,
   RotateCw,
+  Search,
+  Plus,
 } from 'lucide-react';
 import type { ShadowAnalysisResult, ShadowWordAnalysis } from '@/lib/types';
 import { COURSES, type Lesson, type Course } from '@/lib/data/courses';
@@ -22,7 +24,9 @@ type DetailState = 'loading_audio' | 'ready' | 'recording' | 'has_recording' | '
 export default function TextbookScreen() {
   const [view, setView] = useState<TextbookView>('list');
   const [selectedCourseId, setSelectedCourseId] = useState<string>(COURSES[0]?.id ?? 'nce2');
+  const [courseSearchQuery, setCourseSearchQuery] = useState('');
   const [lesson, setLesson] = useState<Lesson | null>(null);
+  const [showAddCoursePlaceholder, setShowAddCoursePlaceholder] = useState(false);
   const [detailState, setDetailState] = useState<DetailState>('loading_audio');
   const [refAudioBase64, setRefAudioBase64] = useState<string | null>(null);
   const [refAudioUrl, setRefAudioUrl] = useState<string | null>(null);
@@ -117,10 +121,6 @@ export default function TextbookScreen() {
       setDetailState('ready');
     }
   }, [lesson, selectedCourseId, applyRefAudio]);
-
-  const handleRefreshCourse = useCallback(async () => {
-    await clearCachedRefAudioForCourse(selectedCourseId);
-  }, [selectedCourseId]);
 
   const startRecording = async () => {
     if (!lesson) return;
@@ -226,68 +226,156 @@ export default function TextbookScreen() {
     setError(null);
   };
 
-  // List view
+  // List view – Notion-style: minimal header, search, loaded courses, add course, lessons
   if (view === 'list') {
+    const query = courseSearchQuery.trim().toLowerCase();
+    const filteredCourses = query
+      ? COURSES.filter((c) => c.name.toLowerCase().includes(query))
+      : COURSES;
     const course = currentCourse ?? COURSES[0];
     const lessons = course?.lessons ?? [];
     return (
       <div className="h-full bg-primary-50 flex flex-col overflow-y-auto">
         <div className="flex-1 px-4 py-6 pb-24 safe-bottom">
-          <div className="max-w-xl mx-auto space-y-4">
-            <div className="flex items-center gap-2 mb-4">
-              <BookOpen size={22} className="text-primary-900 shrink-0" />
-              <h2 className="text-lg font-semibold text-primary-900">Textbook</h2>
+          <div className="max-w-xl mx-auto space-y-6">
+            {/* Notion-style page title: minimal, left-aligned */}
+            <header className="pt-1">
+              <h1 className="text-xl font-semibold text-primary-900 tracking-tight">
+                Textbook
+              </h1>
+              <p className="text-sm text-gray-500 mt-1">
+                Choose a course and tap a lesson to practice.
+              </p>
+            </header>
+
+            {/* Search courses */}
+            <div className="relative">
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                size={18}
+              />
+              <input
+                type="text"
+                placeholder="Search courses..."
+                value={courseSearchQuery}
+                onChange={(e) => setCourseSearchQuery(e.target.value)}
+                className="w-full h-10 pl-10 pr-4 bg-white rounded-lg border border-black/8 outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-400/30 transition-all text-sm placeholder:text-gray-400"
+                aria-label="Search courses"
+              />
             </div>
 
-            {/* Course selector */}
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Course</p>
-              <div className="flex gap-2 flex-wrap">
-                {COURSES.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => setSelectedCourseId(c.id)}
-                    className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-all touch-manipulation ${
-                      selectedCourseId === c.id
-                        ? 'bg-primary-900 text-white shadow-md'
-                        : 'bg-white text-gray-600 hover:bg-gray-50 border border-black/5'
-                    }`}
-                  >
-                    {c.name}
-                  </button>
-                ))}
+            {/* Loaded courses – Notion-style cards */}
+            <section>
+              <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">
+                Loaded
+              </h2>
+              <div className="space-y-1.5">
+                {filteredCourses.length === 0 ? (
+                  <div className="rounded-xl border border-black/8 bg-white/50 px-4 py-6 text-center text-sm text-gray-500">
+                    No courses match &quot;{courseSearchQuery}&quot;
+                  </div>
+                ) : (
+                  filteredCourses.map((c) => (
+                    <div
+                      key={c.id}
+                      className={`group flex items-center gap-3 rounded-xl border px-4 py-3 transition-all touch-manipulation ${
+                        selectedCourseId === c.id
+                          ? 'border-primary-300 bg-primary-50/80 shadow-sm'
+                          : 'border-black/8 bg-white hover:border-black/12 hover:bg-gray-50/80'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCourseId(c.id)}
+                        className="flex-1 min-w-0 text-left"
+                      >
+                        <span className="block text-sm font-medium text-primary-900 truncate">
+                          {c.name}
+                        </span>
+                        <span className="block text-xs text-gray-500 mt-0.5">
+                          {c.lessons.length} lessons
+                        </span>
+                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            clearCachedRefAudioForCourse(c.id);
+                          }}
+                          className="p-2 rounded-lg text-gray-400 hover:text-primary-900 hover:bg-black/5 transition-colors opacity-0 group-hover:opacity-100 md:opacity-100"
+                          title="Refresh course (clear cached audio)"
+                          aria-label="Refresh course"
+                        >
+                          <RotateCw size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
-              <div className="flex items-center justify-between gap-2 pt-1">
-                <p className="text-sm text-gray-600">
-                  Tap a lesson to practice. Listen, record, then compare.
-                </p>
-                <button
-                  type="button"
-                  onClick={handleRefreshCourse}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-gray-500 hover:text-primary-900 hover:bg-white/80 border border-black/5 transition-colors touch-manipulation"
-                  title="Refresh course (clear cached audio for this course)"
+            </section>
+
+            {/* Add / load new course – Notion-style secondary block */}
+            <section>
+              <button
+                type="button"
+                onClick={() => setShowAddCoursePlaceholder(true)}
+                className="w-full flex items-center gap-3 rounded-xl border border-dashed border-black/15 bg-white/50 px-4 py-3.5 text-left hover:border-primary-300 hover:bg-primary-50/30 transition-all touch-manipulation"
+              >
+                <div className="w-9 h-9 rounded-lg bg-gray-100 flex items-center justify-center shrink-0">
+                  <Plus size={18} className="text-gray-500" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium text-gray-700">
+                    Load new course
+                  </span>
+                  <span className="block text-xs text-gray-500 mt-0.5">
+                    Search and add more courses
+                  </span>
+                </div>
+              </button>
+              {showAddCoursePlaceholder && (
+                <div
+                  className="mt-2 rounded-xl border border-black/8 bg-white px-4 py-3 text-sm text-gray-600"
+                  role="alert"
                 >
-                  <RotateCw size={14} />
-                  Refresh
-                </button>
-              </div>
-            </div>
-
-            <ul className="space-y-2">
-              {lessons.map((l) => (
-                <li key={l.id}>
+                  Search and load new courses will be available in a future update. For now, use the loaded courses above.
                   <button
                     type="button"
-                    onClick={() => loadLesson(selectedCourseId, l)}
-                    className="w-full text-left bg-white rounded-2xl p-4 shadow-float border border-black/5 hover:border-primary-200 transition-colors touch-manipulation"
+                    onClick={() => setShowAddCoursePlaceholder(false)}
+                    className="mt-2 text-primary-600 font-medium hover:underline"
                   >
-                    <span className="text-xs text-gray-500 font-medium">Lesson {l.id}</span>
-                    <p className="text-base font-semibold text-primary-900 mt-0.5">{l.title}</p>
+                    Dismiss
                   </button>
-                </li>
-              ))}
-            </ul>
+                </div>
+              )}
+            </section>
+
+            {/* Lessons for selected course */}
+            {course && lessons.length > 0 && (
+              <section>
+                <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">
+                  {course.name}
+                </h2>
+                <ul className="space-y-1.5">
+                  {lessons.map((l) => (
+                    <li key={l.id}>
+                      <button
+                        type="button"
+                        onClick={() => loadLesson(selectedCourseId, l)}
+                        className="w-full text-left rounded-xl border border-black/8 bg-white px-4 py-3 hover:border-primary-200 hover:bg-primary-50/30 transition-all touch-manipulation"
+                      >
+                        <span className="text-xs text-gray-500 font-medium">Lesson {l.id}</span>
+                        <p className="text-sm font-medium text-primary-900 mt-0.5 line-clamp-1">
+                          {l.title}
+                        </p>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
           </div>
         </div>
       </div>
