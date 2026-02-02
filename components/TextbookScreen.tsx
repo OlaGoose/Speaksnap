@@ -245,6 +245,22 @@ export default function TextbookScreen() {
       <div className="h-full bg-primary-50 flex flex-col overflow-y-auto">
         <div className="flex-1 px-4 py-6 pb-24 safe-bottom">
           <div className="max-w-xl mx-auto space-y-6">
+            {/* Search – at top */}
+            <div className="relative">
+              <Search
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                size={18}
+              />
+              <input
+                type="text"
+                placeholder="Search courses..."
+                value={courseSearchQuery}
+                onChange={(e) => setCourseSearchQuery(e.target.value)}
+                className="w-full h-10 pl-10 pr-4 bg-white rounded-lg border border-black/8 outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-400/30 transition-all text-sm placeholder:text-gray-400"
+                aria-label="Search courses"
+              />
+            </div>
+
             {/* Loaded courses – horizontal row (Shadow-style), scroll when many */}
             <section>
               <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
@@ -300,22 +316,6 @@ export default function TextbookScreen() {
                 </div>
               </div>
             </section>
-
-            {/* Search courses */}
-            <div className="relative">
-              <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
-                size={18}
-              />
-              <input
-                type="text"
-                placeholder="Search courses..."
-                value={courseSearchQuery}
-                onChange={(e) => setCourseSearchQuery(e.target.value)}
-                className="w-full h-10 pl-10 pr-4 bg-white rounded-lg border border-black/8 outline-none focus:border-primary-400 focus:ring-1 focus:ring-primary-400/30 transition-all text-sm placeholder:text-gray-400"
-                aria-label="Search courses"
-              />
-            </div>
 
             {/* Add / load new course – Notion-style secondary block */}
             <section>

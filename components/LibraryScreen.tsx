@@ -257,9 +257,9 @@ export default function LibraryScreen() {
               }`}
               role="tab"
               aria-selected={activeTab === 'textbook'}
-              aria-label="Textbook tab"
+              aria-label="Lesson tab"
             >
-              Textbook
+              Lesson
             </button>
             <button
               onClick={() => setActiveTab('flashcards')}
