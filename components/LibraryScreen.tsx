@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
 import { Screen, Scenario, DialogueRecord, UserLevel, PracticeMode } from '@/lib/types';
 import {
   Camera,
@@ -31,6 +31,7 @@ interface LibraryScreenProps {
   onSelectScenario: (scenario: Scenario, dialogueId?: string) => void;
   userLevel: UserLevel;
   practiceMode: PracticeMode;
+  defaultTab?: string;
 }
 
 interface DiaryEntry {
@@ -41,8 +42,26 @@ interface DiaryEntry {
   timestamp: number;
 }
 
-export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel, practiceMode }: LibraryScreenProps) {
+export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel, practiceMode, defaultTab }: LibraryScreenProps) {
   const [activeTab, setActiveTab] = useState<'scenarios' | 'flashcards' | 'diary' | 'shadow' | 'textbook'>('scenarios');
+  const defaultTabAppliedRef = useRef(false);
+
+  // Apply defaultTab on mount (from HomeScreen direct navigation)
+  useEffect(() => {
+    if (defaultTab && !defaultTabAppliedRef.current) {
+      const validTabs: Array<'scenarios' | 'flashcards' | 'diary' | 'shadow' | 'textbook'> = [
+        'scenarios',
+        'flashcards',
+        'diary',
+        'shadow',
+        'textbook',
+      ];
+      if (validTabs.includes(defaultTab as any)) {
+        setActiveTab(defaultTab as typeof activeTab);
+      }
+      defaultTabAppliedRef.current = true;
+    }
+  }, [defaultTab]);
   const [savedScenarios, setSavedScenarios] = useState<Scenario[]>([]);
   const [expandedScenarioId, setExpandedScenarioId] = useState<string | null>(null);
   const [isWritingDiary, setIsWritingDiary] = useState(false);

@@ -6,17 +6,19 @@ import { Loader2 } from 'lucide-react';
 import { storage } from '@/lib/utils/storage';
 
 // Lazy load heavy components for better initial load performance
+const HomeScreen = lazy(() => import('@/components/HomeScreen'));
 const CameraScreen = lazy(() => import('@/components/CameraScreen'));
 const DialogueScreen = lazy(() => import('@/components/DialogueScreen'));
 const LibraryScreen = lazy(() => import('@/components/LibraryScreen'));
 
 export default function Home() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>(Screen.CAMERA);
+  const [currentScreen, setCurrentScreen] = useState<Screen>(Screen.HOME);
   const [currentScenario, setCurrentScenario] = useState<Scenario | null>(null);
   const [currentDialogueId, setCurrentDialogueId] = useState<string | undefined>(undefined);
   const [userLevel, setUserLevel] = useState<UserLevel>('Beginner');
   const [practiceMode, setPracticeMode] = useState<PracticeMode>('Daily');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [libraryDefaultTab, setLibraryDefaultTab] = useState<string | undefined>(undefined);
 
   // Initial setup
   useEffect(() => {
@@ -184,6 +186,19 @@ export default function Home() {
 
   const renderScreen = () => {
     switch (currentScreen) {
+      case Screen.HOME:
+        return (
+          <Suspense fallback={<LoadingFallback />}>
+            <HomeScreen
+              onNavigate={setCurrentScreen}
+              onNavigateToLibrary={(tab) => {
+                setLibraryDefaultTab(tab);
+                setCurrentScreen(Screen.LIBRARY);
+              }}
+            />
+          </Suspense>
+        );
+
       case Screen.CAMERA:
         return (
           <Suspense fallback={<LoadingFallback />}>
@@ -238,6 +253,7 @@ export default function Home() {
               }}
               userLevel={userLevel}
               practiceMode={practiceMode}
+              defaultTab={libraryDefaultTab}
             />
           </Suspense>
         );
