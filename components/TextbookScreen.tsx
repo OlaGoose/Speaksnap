@@ -182,8 +182,6 @@ export default function TextbookScreen() {
         reader.onerror = reject;
         reader.readAsDataURL(userAudioBlob);
       });
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 300000);
       const res = await fetch('/api/shadow/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -193,9 +191,7 @@ export default function TextbookScreen() {
           refAudioBase64,
           refText: lesson.text,
         }),
-        signal: controller.signal,
       });
-      clearTimeout(timeoutId);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Analysis failed');
       setAnalysis(data);
