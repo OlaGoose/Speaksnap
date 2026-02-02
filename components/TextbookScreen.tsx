@@ -245,15 +245,61 @@ export default function TextbookScreen() {
       <div className="h-full bg-primary-50 flex flex-col overflow-y-auto">
         <div className="flex-1 px-4 py-6 pb-24 safe-bottom">
           <div className="max-w-xl mx-auto space-y-6">
-            {/* Notion-style page title: minimal, left-aligned */}
-            <header className="pt-1">
-              <h1 className="text-xl font-semibold text-primary-900 tracking-tight">
-                Textbook
-              </h1>
-              <p className="text-sm text-gray-500 mt-1">
-                Choose a course and tap a lesson to practice.
-              </p>
-            </header>
+            {/* Loaded courses – horizontal row (Shadow-style), scroll when many */}
+            <section>
+              <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">
+                Loaded
+              </h2>
+              <div className="overflow-x-auto overflow-y-hidden -mx-1 px-1 scrollbar-hide">
+                <div className="flex items-stretch gap-2 min-w-0">
+                  {filteredCourses.length === 0 ? (
+                    <div className="flex-shrink-0 rounded-xl border border-black/8 bg-white/50 px-4 py-3 text-center text-sm text-gray-500 min-w-[200px]">
+                      No match
+                    </div>
+                  ) : (
+                    filteredCourses.map((c) => (
+                      <div
+                        key={c.id}
+                        className={`group flex items-center gap-2 rounded-xl border px-4 py-2.5 transition-all touch-manipulation flex-shrink-0 ${
+                          selectedCourseId === c.id
+                            ? 'border-primary-300 bg-primary-900 text-white shadow-md'
+                            : 'border-black/8 bg-white hover:border-black/12 hover:bg-gray-50/80'
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCourseId(c.id)}
+                          className="min-w-0 text-left"
+                        >
+                          <span className={`block text-sm font-medium truncate ${selectedCourseId === c.id ? 'text-white' : 'text-primary-900'}`}>
+                            {c.name}
+                          </span>
+                          <span className={`block text-xs mt-0.5 ${selectedCourseId === c.id ? 'text-white/80' : 'text-gray-500'}`}>
+                            {c.lessons.length} lessons
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            clearCachedRefAudioForCourse(c.id);
+                          }}
+                          className={`p-1.5 rounded-lg transition-colors opacity-0 group-hover:opacity-100 md:opacity-100 flex-shrink-0 ${
+                            selectedCourseId === c.id
+                              ? 'hover:bg-white/20 text-white'
+                              : 'text-gray-400 hover:text-primary-900 hover:bg-black/5'
+                          }`}
+                          title="Refresh course (clear cached audio)"
+                          aria-label="Refresh course"
+                        >
+                          <RotateCw size={14} />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </section>
 
             {/* Search courses */}
             <div className="relative">
@@ -270,58 +316,6 @@ export default function TextbookScreen() {
                 aria-label="Search courses"
               />
             </div>
-
-            {/* Loaded courses – Notion-style cards */}
-            <section>
-              <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">
-                Loaded
-              </h2>
-              <div className="space-y-1.5">
-                {filteredCourses.length === 0 ? (
-                  <div className="rounded-xl border border-black/8 bg-white/50 px-4 py-6 text-center text-sm text-gray-500">
-                    No courses match &quot;{courseSearchQuery}&quot;
-                  </div>
-                ) : (
-                  filteredCourses.map((c) => (
-                    <div
-                      key={c.id}
-                      className={`group flex items-center gap-3 rounded-xl border px-4 py-3 transition-all touch-manipulation ${
-                        selectedCourseId === c.id
-                          ? 'border-primary-300 bg-primary-50/80 shadow-sm'
-                          : 'border-black/8 bg-white hover:border-black/12 hover:bg-gray-50/80'
-                      }`}
-                    >
-                      <button
-                        type="button"
-                        onClick={() => setSelectedCourseId(c.id)}
-                        className="flex-1 min-w-0 text-left"
-                      >
-                        <span className="block text-sm font-medium text-primary-900 truncate">
-                          {c.name}
-                        </span>
-                        <span className="block text-xs text-gray-500 mt-0.5">
-                          {c.lessons.length} lessons
-                        </span>
-                      </button>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            clearCachedRefAudioForCourse(c.id);
-                          }}
-                          className="p-2 rounded-lg text-gray-400 hover:text-primary-900 hover:bg-black/5 transition-colors opacity-0 group-hover:opacity-100 md:opacity-100"
-                          title="Refresh course (clear cached audio)"
-                          aria-label="Refresh course"
-                        >
-                          <RotateCw size={16} />
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </section>
 
             {/* Add / load new course – Notion-style secondary block */}
             <section>
@@ -439,15 +433,15 @@ export default function TextbookScreen() {
             {detailState !== 'loading_audio' && (
               <>
                 {detailState === 'results' && analysis ? (
-                  <>
+                  <div className="w-full max-h-[58vh] min-h-[28vh] overflow-y-auto rounded-2xl bg-white/80 border border-black/5 px-4 py-4">
                     <WordAnalysisView words={analysis.words} />
                     <p className="text-xs text-gray-400 text-center mt-2">
                       Color-coded: <span className="text-emerald-700">Good</span> · <span className="text-amber-600">Average</span> · <span className="text-red-600">Needs Work</span>
                     </p>
-                  </>
+                  </div>
                 ) : (
                   <>
-                    <div className="w-full max-h-[40vh] overflow-y-auto rounded-2xl bg-white/80 border border-black/5 px-4 py-4 text-left">
+                    <div className="w-full max-h-[58vh] min-h-[28vh] overflow-y-auto rounded-2xl bg-white/80 border border-black/5 px-4 py-4 text-left">
                       <p className="text-base md:text-lg font-medium tracking-tight leading-relaxed text-primary-900 whitespace-pre-wrap">
                         {lesson.text}
                       </p>
