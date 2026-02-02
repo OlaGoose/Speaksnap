@@ -711,39 +711,30 @@ IMPORTANT:
     }
   }, [autoPlayAudio]);
 
-  // Auto-play AI messages when enabled
+  // Auto-play AI messages when enabled (play immediately to avoid effect cleanup cancelling scheduled play)
   useEffect(() => {
     if (!autoPlayAudioRef.current) return;
 
-    // Find the last AI message that hasn't been played
     const lastAiMessage = messages
       .filter(msg => msg.speaker === 'ai')
       .slice(-1)[0];
 
-    if (!lastAiMessage || lastAiMessage.id === lastPlayedMessageIdRef.current) {
+    if (!lastAiMessage?.text || lastAiMessage.id === lastPlayedMessageIdRef.current) {
       return;
     }
 
-    // Stop any ongoing speech
     window.speechSynthesis.cancel();
 
-    // Play the new AI message with a slight delay for better UX
-    const timeoutId = setTimeout(() => {
-      if (autoPlayAudioRef.current && lastAiMessage.text) {
-        const utterance = new SpeechSynthesisUtterance(lastAiMessage.text);
-        utterance.lang = 'en-US';
-        utterance.rate = 0.9;
-        utterance.onend = () => {
-          lastPlayedMessageIdRef.current = lastAiMessage.id;
-        };
-        utterance.onerror = () => {
-          lastPlayedMessageIdRef.current = lastAiMessage.id;
-        };
-        window.speechSynthesis.speak(utterance);
-      }
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
+    const utterance = new SpeechSynthesisUtterance(lastAiMessage.text);
+    utterance.lang = 'en-US';
+    utterance.rate = 0.9;
+    utterance.onend = () => {
+      lastPlayedMessageIdRef.current = lastAiMessage.id;
+    };
+    utterance.onerror = () => {
+      lastPlayedMessageIdRef.current = lastAiMessage.id;
+    };
+    window.speechSynthesis.speak(utterance);
   }, [messages, autoPlayAudio]);
 
   const handleVoiceInput = () => {
