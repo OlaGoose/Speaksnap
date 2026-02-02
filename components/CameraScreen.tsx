@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Image as ImageIcon,
   History,
@@ -12,29 +13,13 @@ import {
   MapPinOff,
   Loader2,
 } from 'lucide-react';
-import { Screen, UserLevel, PracticeMode } from '@/lib/types';
-
-interface CameraScreenProps {
-  onCapture: (imageSrc: string, location?: { lat: number; lng: number }) => void;
-  onVoiceCapture: (audioBlob: string, location?: { lat: number; lng: number }) => void;
-  onNavigate: (screen: Screen) => void;
-  userLevel: UserLevel;
-  setUserLevel: (level: UserLevel) => void;
-  practiceMode: PracticeMode;
-  setPracticeMode: (mode: PracticeMode) => void;
-}
+import { UserLevel, PracticeMode, Scenario } from '@/lib/types';
+import { storage } from '@/lib/utils/storage';
 
 type Mode = 'voice' | 'camera' | 'upload';
 
-export default function CameraScreen({
-  onCapture,
-  onVoiceCapture,
-  onNavigate,
-  userLevel,
-  setUserLevel,
-  practiceMode,
-  setPracticeMode,
-}: CameraScreenProps) {
+export default function CameraScreen() {
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -49,6 +34,9 @@ export default function CameraScreen({
   const [isScrollInitialized, setIsScrollInitialized] = useState(false);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [cameraRetryCount, setCameraRetryCount] = useState(0);
+  const [userLevel, setUserLevel] = useState<UserLevel>('Beginner');
+  const [practiceMode, setPracticeMode] = useState<PracticeMode>('Daily');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // Location State
   const [isLocationEnabled, setIsLocationEnabled] = useState(false);
@@ -57,6 +45,145 @@ export default function CameraScreen({
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Load user level and practice mode from storage
+  useEffect(() => {
+    (async () => {
+      const savedLevel = await storage.getItem<UserLevel>('speakSnapLevel');
+      if (savedLevel) setUserLevel(savedLevel);
+      const savedMode = await storage.getItem<PracticeMode>('speakSnapPracticeMode');
+      if (savedMode) setPracticeMode(savedMode);
+    })();
+  }, []);
+
+  // Save user level to storage when changed
+  useEffect(() => {
+    storage.setItem('speakSnapLevel', userLevel);
+  }, [userLevel]);
+
+  // Save practice mode to storage when changed
+  useEffect(() => {
+    storage.setItem('speakSnapPracticeMode', practiceMode);
+  }, [practiceMode]);
+
+  // Handle image capture and analysis
+  const handleCapture = async (imageSrc: string, location?: { lat: number; lng: number }) => {
+    setIsAnalyzing(true);
+
+    try {
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image: imageSrc,
+          level: userLevel,
+          mode: practiceMode,
+          location,
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Analysis failed');
+      }
+
+      const newScenario: Scenario = {
+        id: Date.now().toString(),
+        image_url: imageSrc,
+        location: result.location,
+        situation: result.situation,
+        difficulty: result.difficulty,
+        role_name: result.role_name,
+        context: result.context,
+        goals: result.goals,
+        completion_phrase: result.completion_phrase,
+        timestamp: Date.now(),
+        dialogues: [],
+        total_attempts: 0,
+        best_score: 0,
+        last_practiced: Date.now(),
+      };
+
+      // Save new scenario immediately
+      const scenarios = await storage.getItem<Scenario[]>('speakSnapScenarios') || [];
+      await storage.setItem('speakSnapScenarios', [newScenario, ...scenarios]);
+
+      setIsAnalyzing(false);
+      router.push(`/dialogue/${newScenario.id}`);
+    } catch (error: any) {
+      console.error('Failed to analyze image:', error);
+      setIsAnalyzing(false);
+      
+      const errorMsg = error?.message || 'Unknown error';
+      if (errorMsg.includes('timeout')) {
+        alert('Image analysis timeout. Please check your internet connection and try again.');
+      } else if (errorMsg.includes('network') || errorMsg.includes('connection')) {
+        alert('Network connection failed. Please check your internet and try again.');
+      } else {
+        alert('Could not analyze image. Please try again with a different image.');
+      }
+    }
+  };
+
+  // Handle voice capture and analysis
+  const handleVoiceCapture = async (audioBase64: string, location?: { lat: number; lng: number }) => {
+    setIsAnalyzing(true);
+
+    try {
+      const response = await fetch('/api/analyze-audio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audio: audioBase64,
+          level: userLevel,
+          mode: practiceMode,
+          location,
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Analysis failed');
+      }
+
+      const newScenario: Scenario = {
+        id: Date.now().toString(),
+        location: result.location,
+        situation: result.situation,
+        difficulty: result.difficulty,
+        role_name: result.role_name,
+        context: result.context,
+        goals: result.goals,
+        completion_phrase: result.completion_phrase,
+        timestamp: Date.now(),
+        dialogues: [],
+        total_attempts: 0,
+        best_score: 0,
+        last_practiced: Date.now(),
+      };
+
+      // Save new scenario immediately
+      const scenarios = await storage.getItem<Scenario[]>('speakSnapScenarios') || [];
+      await storage.setItem('speakSnapScenarios', [newScenario, ...scenarios]);
+
+      setIsAnalyzing(false);
+      router.push(`/dialogue/${newScenario.id}`);
+    } catch (error: any) {
+      console.error('Failed to analyze audio:', error);
+      setIsAnalyzing(false);
+      
+      const errorMsg = error?.message || 'Unknown error';
+      if (errorMsg.includes('timeout')) {
+        alert('Audio analysis timeout. Please check your internet connection and try again.');
+      } else if (errorMsg.includes('network') || errorMsg.includes('connection')) {
+        alert('Network connection failed. Please check your internet and try again.');
+      } else {
+        alert('Could not understand audio. Please try recording again.');
+      }
+    }
+  };
 
   // Initialize camera with retry and error handling
   useEffect(() => {
@@ -349,7 +476,7 @@ export default function CameraScreen({
         tempCtx?.drawImage(canvasRef.current, 0, 0, w, h);
 
         // 优化：使用更高效的压缩质量，在质量和大小之间取得更好平衡
-        onCapture(tempCanvas.toDataURL('image/jpeg', 0.8), location);
+        handleCapture(tempCanvas.toDataURL('image/jpeg', 0.8), location);
       }
     }
   };
@@ -384,7 +511,7 @@ export default function CameraScreen({
             canvas.height = height;
             const ctx = canvas.getContext('2d');
             ctx?.drawImage(img, 0, 0, width, height);
-            onCapture(canvas.toDataURL('image/jpeg', 0.7), location);
+            handleCapture(canvas.toDataURL('image/jpeg', 0.7), location);
           };
           img.src = e.target.result;
         }
@@ -436,7 +563,7 @@ export default function CameraScreen({
           const reader = new FileReader();
           reader.readAsDataURL(audioBlob);
           reader.onloadend = () => {
-            onVoiceCapture(reader.result as string, location);
+            handleVoiceCapture(reader.result as string, location);
           };
         };
 
@@ -474,6 +601,20 @@ export default function CameraScreen({
     { id: 'camera', icon: Sparkles, label: 'Camera' },
     { id: 'upload', icon: ImageIcon, label: 'Upload' },
   ];
+
+  // Show analyzing screen
+  if (isAnalyzing) {
+    return (
+      <div className="h-full w-full bg-primary-50 text-primary-900 flex flex-col items-center justify-center p-8 text-center">
+        <div className="relative mb-8">
+          <div className="absolute inset-0 bg-blue-100 rounded-full blur-xl opacity-50 animate-pulse"></div>
+          <Loader2 size={48} className="text-primary-900 animate-spin relative z-10" />
+        </div>
+        <h2 className="text-xl font-bold mb-2">Creating Scenario...</h2>
+        <p className="text-gray-500 text-sm">Adapting to {userLevel} level.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="relative h-full w-full bg-black overflow-hidden flex flex-col select-none text-white [font-size:130%]">
@@ -587,7 +728,7 @@ export default function CameraScreen({
       {/* Top Header */}
       <div className="absolute top-4 left-0 right-0 p-6 z-20 flex justify-between items-start safe-area-top">
         <button
-          onClick={() => onNavigate(Screen.LIBRARY)}
+          onClick={() => router.push('/library')}
           className="h-10 w-10 rounded-full bg-black/20 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-black/40 transition-all active:scale-95"
         >
           <History size={23} />

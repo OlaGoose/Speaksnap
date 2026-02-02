@@ -1,14 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Screen } from '@/lib/types';
+import { useRouter } from 'next/navigation';
 import { Check, Camera, PenTool, Mic as MicIcon, BookOpen, ChevronRight } from 'lucide-react';
 import { storage } from '@/lib/utils/storage';
-
-interface HomeScreenProps {
-  onNavigate: (screen: Screen) => void;
-  onNavigateToLibrary: (tab: string) => void;
-}
 
 interface WeeklyTasks {
   scenarios: boolean;
@@ -45,7 +40,8 @@ function getWeekDays(): Array<{ dayName: string; date: number; isToday: boolean 
   return weekDays;
 }
 
-export default function HomeScreen({ onNavigate, onNavigateToLibrary }: HomeScreenProps) {
+export default function HomeScreen() {
+  const router = useRouter();
   const [tasks, setTasks] = useState<WeeklyTasks>({
     scenarios: false,
     diary: false,
@@ -74,39 +70,35 @@ export default function HomeScreen({ onNavigate, onNavigateToLibrary }: HomeScre
     title: string;
     subtitle: string;
     icon: React.ReactNode;
-    navigate: Screen | null;
-    libraryTab?: string;
+    href: string;
   }> = [
     {
       key: 'scenarios',
       title: 'Speaking Practice',
       subtitle: 'Create a scenario and practice dialogue',
       icon: <Camera size={18} className="text-blue-600" />,
-      navigate: Screen.CAMERA,
+      href: '/camera',
     },
     {
       key: 'diary',
       title: 'Diary',
       subtitle: 'Write and improve your English diary',
       icon: <PenTool size={18} className="text-purple-600" />,
-      navigate: null,
-      libraryTab: 'diary',
+      href: '/library/diary',
     },
     {
       key: 'shadow',
       title: 'Shadow Reading',
       subtitle: 'Practice pronunciation with shadow technique',
       icon: <MicIcon size={18} className="text-emerald-600" />,
-      navigate: null,
-      libraryTab: 'shadow',
+      href: '/library/shadow',
     },
     {
       key: 'textbook',
       title: 'Textbook Study',
       subtitle: 'Learn with New Concept English courses',
       icon: <BookOpen size={18} className="text-amber-600" />,
-      navigate: null,
-      libraryTab: 'textbook',
+      href: '/library/textbook',
     },
   ];
 
@@ -186,13 +178,7 @@ export default function HomeScreen({ onNavigate, onNavigateToLibrary }: HomeScre
                   {/* Task info – clickable to navigate */}
                   <button
                     type="button"
-                    onClick={() => {
-                      if (task.libraryTab) {
-                        onNavigateToLibrary(task.libraryTab);
-                      } else if (task.navigate) {
-                        onNavigate(task.navigate);
-                      }
-                    }}
+                    onClick={() => router.push(task.href)}
                     className="flex-1 min-w-0 text-left"
                   >
                     <span className="block text-sm font-medium text-primary-900">
@@ -217,7 +203,7 @@ export default function HomeScreen({ onNavigate, onNavigateToLibrary }: HomeScre
           <section className="pt-4">
             <button
               type="button"
-              onClick={() => onNavigate(Screen.LIBRARY)}
+              onClick={() => router.push('/library')}
               className="w-full flex items-center justify-center gap-2 rounded-xl border border-black/8 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:border-primary-200 hover:bg-primary-50/30 transition-all touch-manipulation"
             >
               View All Activities →

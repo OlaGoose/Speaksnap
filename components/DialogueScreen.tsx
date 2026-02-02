@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import {
   X,
   Lightbulb,
@@ -20,26 +21,49 @@ import { storage } from '@/lib/utils/storage';
 import { useVoiceRecorder } from '@/lib/hooks/useVoiceRecorder';
 import { useGeminiLive } from '@/lib/hooks/useGeminiLive';
 
-interface DialogueScreenProps {
-  scenario: Scenario;
-  userLevel: UserLevel;
-  practiceMode: PracticeMode;
-  onBack: () => void;
-  onFinish: () => void;
-  dialogueId?: string; // For resuming existing dialogue
-}
-
-export default function DialogueScreen({
-  scenario,
-  userLevel,
-  practiceMode,
-  onBack,
-  onFinish,
-  dialogueId,
-}: DialogueScreenProps) {
-  const [currentDialogueId] = useState(dialogueId || `dialogue_${Date.now()}`);
+export default function DialogueScreen() {
+  const router = useRouter();
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const scenarioId = params.scenarioId as string;
+  const resumeDialogueId = searchParams.get('dialogueId');
+  
+  const [scenario, setScenario] = useState<Scenario | null>(null);
+  const [userLevel, setUserLevel] = useState<UserLevel>('Beginner');
+  const [practiceMode, setPracticeMode] = useState<PracticeMode>('Daily');
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentDialogueId] = useState(resumeDialogueId || `dialogue_${Date.now()}`);
   const [messages, setMessages] = useState<DialogueLine[]>([]);
   const [hints, setHints] = useState<string[]>([]);
+
+  // Load scenario and user settings
+  useEffect(() => {
+    (async () => {
+      try {
+        // Load scenario
+        const scenarios = await storage.getItem<Scenario[]>('speakSnapScenarios') || [];
+        const foundScenario = scenarios.find((s) => s.id === scenarioId);
+        if (!foundScenario) {
+          alert('Scenario not found');
+          router.push('/library');
+          return;
+        }
+        setScenario(foundScenario);
+
+        // Load user settings
+        const savedLevel = await storage.getItem<UserLevel>('speakSnapLevel');
+        if (savedLevel) setUserLevel(savedLevel);
+        const savedMode = await storage.getItem<PracticeMode>('speakSnapPracticeMode');
+        if (savedMode) setPracticeMode(savedMode);
+
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Failed to load scenario:', error);
+        alert('Failed to load scenario');
+        router.push('/library');
+      }
+    })();
+  }, [scenarioId, router]);
   const [inputValue, setInputValue] = useState('');
   const [interimText, setInterimText] = useState(''); // 实时识别的临时文本
   const [showSuggestions, setShowSuggestions] = useState(true);
@@ -162,7 +186,7 @@ export default function DialogueScreen({
       'The doctor will see you soon!',
       'All done!',
       'Your package is on its way!',
-      scenario.completion_phrase || ''
+      scenario?.completion_phrase || ''
     ];
 
     const isGoalComplete = completionPhrases.some(phrase => 
@@ -204,10 +228,12 @@ export default function DialogueScreen({
         setGoalProgress(newProgress);
       }
     }
-  }, [goalProgress, showGoalComplete, messages, scenario.completion_phrase]);
+  }, [goalProgress, showGoalComplete, messages, scenario?.completion_phrase]);
 
   // Gemini Live Integration - 构建场景和NPC角色的系统指令
   const buildSystemInstruction = () => {
+    if (!scenario) return '';
+    
     // 根据场景构建NPC角色和对话背景
     const npcRole = {
       'Coffee Shop': 'a friendly barista at a coffee shop',
@@ -403,12 +429,12 @@ IMPORTANT:
 
   // Initialize chat with AI's first line or load existing dialogue
   useEffect(() => {
-    if (dialogueId) {
+    if (resumeDialogueId) {
       // Load existing dialogue
       (async () => {
         const scenarios = await storage.getItem<Scenario[]>('speakSnapScenarios') || [];
-        const currentScenario = scenarios.find((s: Scenario) => s.id === scenario.id);
-        const existingDialogue = currentScenario?.dialogues?.find((d: any) => d.id === dialogueId);
+        const currentScenario = scenarios.find((s: Scenario) => s.id === scenario?.id);
+        const existingDialogue = currentScenario?.dialogues?.find((d: any) => d.id === resumeDialogueId);
       
         if (existingDialogue) {
           setMessages(existingDialogue.messages);
@@ -442,7 +468,7 @@ IMPORTANT:
     
     // Save initial state
     saveDialogueProgress(initialMessages, false);
-  }, [scenario, dialogueId]);
+  }, [scenario, resumeDialogueId]);
 
   // Detect mobile device
   useEffect(() => {
@@ -761,7 +787,7 @@ IMPORTANT:
         body: JSON.stringify({
           history,
           userText: textToSend,
-          scenarioContext: scenario.context,
+          scenarioContext: loadedScenario.context,
           level: userLevel,
         }),
       });
@@ -848,7 +874,7 @@ IMPORTANT:
   const saveDialogueProgress = useCallback(async (currentMessages: DialogueLine[], isCompleted: boolean = false) => {
     try {
       const scenarios = await storage.getItem<Scenario[]>('speakSnapScenarios') || [];
-      const scenarioIndex = scenarios.findIndex((s: Scenario) => s.id === scenario.id);
+      const scenarioIndex = scenarios.findIndex((s: Scenario) => s.id === loadedScenario.id);
       
       if (scenarioIndex === -1) {
         console.warn('Scenario not found for saving dialogue');
@@ -896,7 +922,7 @@ IMPORTANT:
     } catch (error) {
       console.error('❌ Failed to save dialogue:', error);
     }
-  }, [scenario.id, currentDialogueId, userLevel]);
+  }, [scenario?.id, currentDialogueId, userLevel]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -974,7 +1000,7 @@ IMPORTANT:
         body: JSON.stringify({
           text: selectedText,
           context: context,
-          scenario: scenario.location,
+          scenario: loadedScenario.location,
         }),
       });
 
@@ -995,8 +1021,8 @@ IMPORTANT:
           native_usage: cardContent.native_usage,
           video_ids: cardContent.video_ids || [],
         },
-        context: `${scenario.location} - ${scenario.situation}`,
-        image_url: scenario.image_url,
+        context: `${loadedScenario.location} - ${loadedScenario.situation}`,
+        image_url: loadedScenario.image_url,
         timestamp: Date.now(),
         source: 'dialogue',
       };
@@ -1025,8 +1051,8 @@ IMPORTANT:
           translation: 'Translation pending...',
           definition: `From: ${context}`,
         },
-        context: scenario.location,
-        image_url: scenario.image_url,
+        context: loadedScenario.location,
+        image_url: loadedScenario.image_url,
         timestamp: Date.now(),
         source: 'dialogue',
       };
@@ -1041,6 +1067,22 @@ IMPORTANT:
     }
   };
 
+  // Show loading screen
+  if (isLoading || !scenario) {
+    return (
+      <div className="h-full w-full bg-primary-50 text-primary-900 flex flex-col items-center justify-center p-8 text-center">
+        <div className="relative mb-8">
+          <div className="absolute inset-0 bg-blue-100 rounded-full blur-xl opacity-50 animate-pulse"></div>
+          <Loader2 size={48} className="text-primary-900 animate-spin relative z-10" />
+        </div>
+        <h2 className="text-xl font-bold mb-2">Loading...</h2>
+      </div>
+    );
+  }
+
+  // TypeScript guard: scenario is non-null from here
+  const loadedScenario: Scenario = scenario;
+
   return (
     <div className="flex flex-col h-full w-full bg-primary-50 relative overflow-hidden">
       {/* Header */}
@@ -1049,10 +1091,10 @@ IMPORTANT:
         <div className="flex items-center gap-3">
           {/* Scenario Image - Small, top left */}
           <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-md bg-white ring-2 ring-white transform transition-transform duration-300 hover:scale-105 pointer-events-auto">
-            {scenario.image_url ? (
+            {loadedScenario.image_url ? (
               <img
-                src={scenario.image_url}
-                alt={scenario.location}
+                src={loadedScenario.image_url}
+                alt={loadedScenario.location}
                 className="w-full h-full object-cover"
               />
             ) : (
@@ -1112,7 +1154,7 @@ IMPORTANT:
         </div>
 
         <button
-          onClick={onBack}
+          onClick={() => router.push('/library')}
           className="w-10 h-10 rounded-full bg-white/80 backdrop-blur-md shadow-float border border-white/50 flex items-center justify-center text-gray-400 hover:text-gray-900 transition-all pointer-events-auto active:scale-95 hover:bg-white touch-manipulation"
           aria-label="Close dialogue"
         >
@@ -1157,10 +1199,10 @@ IMPORTANT:
         <div className="flex flex-col items-center justify-center w-full mb-8 animate-in fade-in slide-in-from-bottom duration-700">
           <div className="text-center px-4 max-w-[85%]">
             <h3 className="text-primary-900 font-bold text-lg tracking-tight mb-1">
-              {scenario.location}
+              {loadedScenario.location}
             </h3>
             <p className="text-gray-500 text-[13px] font-medium leading-relaxed">
-              {scenario.situation}
+              {loadedScenario.situation}
             </p>
           </div>
         </div>
@@ -1607,7 +1649,7 @@ IMPORTANT:
                     </button>
                     <button
                       onClick={() => {
-                        onFinish();
+                        router.push('/library');
                       }}
                       className="w-full bg-white/90 hover:bg-white text-green-600 font-semibold py-3 px-4 rounded-xl transition-all shadow-lg"
                     >

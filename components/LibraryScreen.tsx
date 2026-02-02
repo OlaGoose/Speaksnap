@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react';
-import { Screen, Scenario, DialogueRecord, UserLevel, PracticeMode } from '@/lib/types';
+import { useParams, useRouter } from 'next/navigation';
+import { Scenario, DialogueRecord, UserLevel, PracticeMode } from '@/lib/types';
 import {
   Camera,
   MapPin,
@@ -26,14 +27,6 @@ import { prefetchShadowChallenge } from '@/lib/shadowCache';
 const ShadowReadingScreen = lazy(() => import('./ShadowReadingScreen'));
 const TextbookScreen = lazy(() => import('./TextbookScreen'));
 
-interface LibraryScreenProps {
-  onNavigate: (screen: Screen) => void;
-  onSelectScenario: (scenario: Scenario, dialogueId?: string) => void;
-  userLevel: UserLevel;
-  practiceMode: PracticeMode;
-  defaultTab?: string;
-}
-
 interface DiaryEntry {
   id: string;
   original?: string;
@@ -42,13 +35,29 @@ interface DiaryEntry {
   timestamp: number;
 }
 
-export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel, practiceMode, defaultTab }: LibraryScreenProps) {
+export default function LibraryScreen() {
+  const router = useRouter();
+  const params = useParams();
+  const tabParam = params.tab as string[] | undefined;
+  const urlTab = tabParam?.[0]; // [[...tab]] catch-all returns array
+  
+  const [userLevel, setUserLevel] = useState<UserLevel>('Beginner');
+  const [practiceMode, setPracticeMode] = useState<PracticeMode>('Daily');
   const [activeTab, setActiveTab] = useState<'scenarios' | 'flashcards' | 'diary' | 'shadow' | 'textbook'>('scenarios');
-  const defaultTabAppliedRef = useRef(false);
 
-  // Apply defaultTab on mount (from HomeScreen direct navigation)
+  // Load user settings
   useEffect(() => {
-    if (defaultTab && !defaultTabAppliedRef.current) {
+    (async () => {
+      const savedLevel = await storage.getItem<UserLevel>('speakSnapLevel');
+      if (savedLevel) setUserLevel(savedLevel);
+      const savedMode = await storage.getItem<PracticeMode>('speakSnapPracticeMode');
+      if (savedMode) setPracticeMode(savedMode);
+    })();
+  }, []);
+
+  // Set active tab from URL on mount
+  useEffect(() => {
+    if (urlTab) {
       const validTabs: Array<'scenarios' | 'flashcards' | 'diary' | 'shadow' | 'textbook'> = [
         'scenarios',
         'flashcards',
@@ -56,12 +65,11 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel,
         'shadow',
         'textbook',
       ];
-      if (validTabs.includes(defaultTab as any)) {
-        setActiveTab(defaultTab as typeof activeTab);
+      if (validTabs.includes(urlTab as any)) {
+        setActiveTab(urlTab as typeof activeTab);
       }
-      defaultTabAppliedRef.current = true;
     }
-  }, [defaultTab]);
+  }, [urlTab]);
   const [savedScenarios, setSavedScenarios] = useState<Scenario[]>([]);
   const [expandedScenarioId, setExpandedScenarioId] = useState<string | null>(null);
   const [isWritingDiary, setIsWritingDiary] = useState(false);
@@ -184,7 +192,7 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel,
       <div className="sticky top-0 z-30 px-4 pt-4 pb-2 bg-primary-50/95 backdrop-blur-sm border-b border-black/5 safe-top">
         <div className="flex items-center gap-3 mb-4">
           <button
-            onClick={() => onNavigate(Screen.CAMERA)}
+            onClick={() => router.push('/camera')}
             className="w-10 h-10 rounded-full bg-white shadow-float flex items-center justify-center text-gray-700 active:scale-95 transition-transform touch-manipulation"
             aria-label="Go back to camera"
           >
@@ -408,7 +416,7 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel,
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                onSelectScenario(scenario, inProgressDialogue.id);
+                                router.push(`/dialogue/${scenario.id}?dialogueId=${inProgressDialogue.id}`);
                               }}
                               className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-sm"
                             >
@@ -420,7 +428,7 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel,
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              onSelectScenario(scenario);
+                              router.push(`/dialogue/${scenario.id}`);
                             }}
                             className="w-full bg-primary-900 hover:bg-primary-800 text-white px-4 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-sm"
                           >
@@ -469,7 +477,7 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel,
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          onSelectScenario(scenario, dialogue.id);
+                                          router.push(`/dialogue/${scenario.id}?dialogueId=${dialogue.id}`);
                                         }}
                                         className="flex items-center justify-center w-8 h-8 hover:bg-gray-100 rounded-lg transition-colors"
                                         title="View dialogue"
@@ -679,7 +687,7 @@ export default function LibraryScreen({ onNavigate, onSelectScenario, userLevel,
             </button>
           ) : (
             <button
-              onClick={() => onNavigate(Screen.CAMERA)}
+              onClick={() => router.push('/camera')}
               className="bg-primary-900 text-white px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 touch-manipulation min-h-[44px]"
               aria-label="Create new scenario"
             >

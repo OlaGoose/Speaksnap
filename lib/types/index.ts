@@ -5,14 +5,6 @@
 export type UserLevel = 'Beginner' | 'Intermediate' | 'Advanced';
 export type PracticeMode = 'Daily' | 'IELTS';
 
-export enum Screen {
-  HOME = 'HOME',
-  CAMERA = 'CAMERA',
-  ANALYSIS = 'ANALYSIS',
-  DIALOGUE = 'DIALOGUE',
-  LIBRARY = 'LIBRARY',
-}
-
 export interface DialogueLine {
   id: string;
   speaker: 'ai' | 'user';
