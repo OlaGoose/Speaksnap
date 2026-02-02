@@ -156,9 +156,15 @@ export function ShadowMultiAudioMode({
     const analysisPromises = withAudio.map(async (entry) => {
       setAudioEntries((prev) => prev.map((e) => (e.id === entry.id ? { ...e, analyzing: true, error: null } : e)));
       try {
-        const userBase64 = await new Promise<string>((resolve) => {
+        const userBase64 = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
-          reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
+          reader.onloadend = () => {
+            const dataUrl = reader.result as string;
+            const b64 = dataUrl?.split(',')[1];
+            if (!b64 || b64.length < 100) reject(new Error('Recording is too short or invalid'));
+            else resolve(b64);
+          };
+          reader.onerror = () => reject(new Error('Failed to read recording'));
           reader.readAsDataURL(entry.audioBlob!);
         });
         
@@ -179,11 +185,18 @@ export function ShadowMultiAudioMode({
         });
         
         clearTimeout(timeoutId);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Analysis failed');
+        const text = await res.text();
+        let data: { error?: string; [k: string]: unknown };
+        try {
+          data = text ? JSON.parse(text) : {};
+        } catch {
+          throw new Error(res.ok ? 'Invalid response from server' : (text || 'Analysis failed'));
+        }
+        if (!res.ok) throw new Error(String((data.error ?? data.message ?? text) || 'Analysis failed'));
         
+        const result = data as unknown as ShadowAnalysisResult;
         setAudioEntries((prev) =>
-          prev.map((e) => (e.id === entry.id ? { ...e, analysis: data, analyzing: false, error: null } : e))
+          prev.map((e) => (e.id === entry.id ? { ...e, analysis: result, analyzing: false, error: null } : e))
         );
       } catch (err: any) {
         const errorMessage = err.name === 'AbortError' 

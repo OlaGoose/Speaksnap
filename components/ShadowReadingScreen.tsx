@@ -314,9 +314,11 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
       const base64 = await new Promise<string>((resolve, reject) => {
         reader.onloadend = () => {
           const result = reader.result as string;
-          resolve(result.split(',')[1] || result);
+          const b64 = result?.split(',')[1] || result;
+          if (!b64 || String(b64).length < 100) reject(new Error('Recording is too short or invalid'));
+          else resolve(typeof b64 === 'string' ? b64 : String(b64));
         };
-        reader.onerror = reject;
+        reader.onerror = () => reject(new Error('Failed to read recording'));
         reader.readAsDataURL(userAudioBlob);
       });
 
@@ -331,20 +333,27 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Analysis failed');
+      const text = await res.text();
+      let data: { error?: string; [k: string]: unknown };
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error(res.ok ? 'Invalid response from server' : (text || 'Analysis failed'));
+      }
+      if (!res.ok) throw new Error(String((data.error ?? data.message ?? text) || 'Analysis failed'));
 
-      setAnalysis(data);
+      const result = data as unknown as ShadowAnalysisResult;
+      setAnalysis(result);
       setState('results');
       await addShadowHistoryEntry(
         { topic: challenge.topic, text: challenge.text, sourceUrl: challenge.sourceUrl },
-        data
+        result
       );
       const list = await getShadowHistory();
       setHistoryEntries(list);
 
       // Fetch recommended YouTube videos in background (non-blocking)
-      fetchRecommendedVideos(challenge.text, data.pronunciation?.weaknesses || []);
+      fetchRecommendedVideos(challenge.text, result.pronunciation?.weaknesses || []);
     } catch (e) {
       console.error(e);
       setError(e instanceof Error ? e.message : 'Analysis failed.');

@@ -178,8 +178,13 @@ export default function TextbookScreen() {
     try {
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
-        reader.onloadend = () => resolve((reader.result as string).split(',')[1]);
-        reader.onerror = reject;
+        reader.onloadend = () => {
+          const dataUrl = reader.result as string;
+          const b64 = dataUrl?.split(',')[1];
+          if (!b64 || b64.length < 100) reject(new Error('Recording is too short or invalid'));
+          else resolve(b64);
+        };
+        reader.onerror = () => reject(new Error('Failed to read recording'));
         reader.readAsDataURL(userAudioBlob);
       });
       const res = await fetch('/api/shadow/analyze', {
@@ -192,9 +197,15 @@ export default function TextbookScreen() {
           refText: lesson.text,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Analysis failed');
-      setAnalysis(data);
+      const text = await res.text();
+      let data: { error?: string; [k: string]: unknown };
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        throw new Error(res.ok ? 'Invalid response from server' : (text || 'Analysis failed'));
+      }
+      if (!res.ok) throw new Error(String((data.error ?? data.message ?? text) || 'Analysis failed'));
+      setAnalysis(data as unknown as ShadowAnalysisResult);
       setDetailState('results');
     } catch (e) {
       console.error(e);
