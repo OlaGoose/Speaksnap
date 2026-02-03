@@ -24,8 +24,8 @@ export default function HomeScreen() {
   const [activeTab, setActiveTab] = useState<HomeTab>(HomeTab.PLAN);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [settingsOrigin, setSettingsOrigin] = useState({ x: 0, y: 0 });
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const [animationOrigin, setAnimationOrigin] = useState({ x: 0, y: 0 });
   const scheme = useTheme();
   const isDarkMode = scheme === 'dark';
   const pageTheme = THEME_PAGE[scheme];
@@ -33,7 +33,7 @@ export default function HomeScreen() {
   const handleOpenSettings = () => {
     if (settingsButtonRef.current) {
       const rect = settingsButtonRef.current.getBoundingClientRect();
-      setSettingsOrigin({
+      setAnimationOrigin({
         x: rect.left + rect.width / 2,
         y: rect.top + rect.height / 2,
       });
@@ -128,7 +128,7 @@ export default function HomeScreen() {
         {isSettingsOpen && (
           <PlanSettings
             onClose={() => setIsSettingsOpen(false)}
-            origin={settingsOrigin}
+            origin={animationOrigin}
           />
         )}
       </AnimatePresence>
