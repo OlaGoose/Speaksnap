@@ -1,16 +1,15 @@
 'use client';
 
+import Link from 'next/link';
 import { useState, useRef } from 'react';
 import { AnimatePresence, type PanInfo } from 'framer-motion';
-import { SlidersHorizontal } from 'lucide-react';
+import { SlidersHorizontal, Flame } from 'lucide-react';
 import { useTheme } from '@/lib/hooks/useTheme';
-import { HomeTab } from '@/lib/types/home';
 import { DAILY_SCHEDULE, getWeekLabel } from '@/lib/constants/home';
 import { THEME_PAGE } from '@/lib/constants/theme';
 import { UserSidebar } from '@/components/layout/user-sidebar';
 import WeekCalendar from './home/WeekCalendar';
 import TaskCard from './home/TaskCard';
-import BottomNav from './home/BottomNav';
 import PlanSettings from './home/PlanSettings';
 
 function getTodayDayIndex(): number {
@@ -21,7 +20,6 @@ function getTodayDayIndex(): number {
 
 export default function HomeScreen() {
   const [currentDayIndex, setCurrentDayIndex] = useState(getTodayDayIndex());
-  const [activeTab, setActiveTab] = useState<HomeTab>(HomeTab.PLAN);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const settingsButtonRef = useRef<HTMLButtonElement>(null);
@@ -94,24 +92,24 @@ export default function HomeScreen() {
 
       <div className="relative z-10 h-full flex flex-col max-w-md mx-auto min-h-[100dvh]">
         <header className="px-6 pt-12 pb-2 safe-top">
-          <div className="flex justify-end mb-4">
+          <div className="flex justify-between items-start mb-4">
+            <div>
+              <h1 className={`text-4xl font-extrabold tracking-tight mb-1 ${pageTheme.headerTitle}`}>
+                Plan
+              </h1>
+              <p className={`text-xs font-bold tracking-wider uppercase ${pageTheme.headerSubtitle}`}>
+                Your weekly English plan · {getWeekLabel()}
+              </p>
+            </div>
             <button
               ref={settingsButtonRef}
               type="button"
               onClick={handleOpenSettings}
-              className={`w-10 h-10 rounded-full backdrop-blur-sm flex items-center justify-center transition-colors touch-manipulation z-20 ${pageTheme.settingsBtn}`}
+              className={`w-10 h-10 rounded-full backdrop-blur-sm flex items-center justify-center transition-colors touch-manipulation z-20 flex-shrink-0 ${pageTheme.settingsBtn}`}
               aria-label="Settings"
             >
               <SlidersHorizontal size={20} className={pageTheme.settingsIcon} />
             </button>
-          </div>
-          <div>
-            <h1 className={`text-4xl font-extrabold tracking-tight mb-1 ${pageTheme.headerTitle}`}>
-              Plan
-            </h1>
-            <p className={`text-xs font-bold tracking-wider uppercase ${pageTheme.headerSubtitle}`}>
-              Your weekly English plan · {getWeekLabel()}
-            </p>
           </div>
         </header>
 
@@ -132,12 +130,21 @@ export default function HomeScreen() {
             />
           </AnimatePresence>
         </div>
+      </div>
 
-        <BottomNav
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          isDarkMode={isDarkMode}
-        />
+      {/* Fixed Talk Now button */}
+      <div className="fixed bottom-0 left-0 right-0 z-30 p-4 safe-bottom max-w-md mx-auto">
+        <Link
+          href="/library"
+          className="bg-apple-blue hover:bg-apple-blue-hover text-white shadow-lg active:scale-[0.98] transition-all font-semibold touch-manipulation w-full py-3 rounded-full flex items-center justify-center gap-2 group"
+        >
+          <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm flex-shrink-0">
+            <div className="w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center shadow-inner">
+              <Flame size={18} className="text-orange-600 fill-orange-500" />
+            </div>
+          </div>
+          <span className="text-[1.2rem]">Talk Now</span>
+        </Link>
       </div>
 
       <UserSidebar
