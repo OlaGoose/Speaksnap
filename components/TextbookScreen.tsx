@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import type { ShadowAnalysisResult, ShadowWordAnalysis } from '@/lib/types';
 import { COURSES, type Lesson, type Course } from '@/lib/data/courses';
+import { PRIMARY_BUTTON_BASE, PRIMARY_BUTTON_FAB } from '@/lib/constants/theme';
 import { getCachedRefAudio, setCachedRefAudio, clearCachedRefAudio, clearCachedRefAudioForCourse } from '@/lib/textbookCache';
 
 type TextbookView = 'list' | 'detail';
@@ -567,7 +568,7 @@ export default function TextbookScreen() {
             <button
               type="button"
               onClick={stopRecording}
-              className="bg-primary-900 text-white px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 touch-manipulation min-h-[44px]"
+              className={`${PRIMARY_BUTTON_BASE} ${PRIMARY_BUTTON_FAB}`}
               aria-label="Stop recording"
             >
               <Square size={18} />
@@ -577,7 +578,7 @@ export default function TextbookScreen() {
             <button
               type="button"
               onClick={startRecording}
-              className="bg-primary-900 text-white px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 touch-manipulation min-h-[44px]"
+              className={`${PRIMARY_BUTTON_BASE} ${PRIMARY_BUTTON_FAB}`}
               aria-label="Start recording"
             >
               <Mic size={18} />

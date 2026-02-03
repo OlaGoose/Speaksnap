@@ -14,6 +14,7 @@ import {
   Activity,
 } from 'lucide-react';
 import type { ShadowDailyChallenge, ShadowAnalysisResult } from '@/lib/types';
+import { PRIMARY_BUTTON_BASE, PRIMARY_BUTTON_FAB } from '@/lib/constants/theme';
 
 interface AudioEntry {
   id: string;
@@ -323,7 +324,7 @@ export function ShadowMultiAudioMode({
                     <div className="space-y-3">
                       <button
                         onClick={() => startRecording(entry.id)}
-                        className="w-full bg-primary-900 text-white py-3 rounded-lg font-medium flex items-center justify-center gap-2"
+                        className="w-full bg-apple-blue hover:bg-apple-blue-hover text-white py-3 rounded-lg font-medium flex items-center justify-center gap-2 active:scale-[0.98] transition-all"
                       >
                         <Mic size={18} />
                         Record
@@ -406,7 +407,7 @@ export function ShadowMultiAudioMode({
             <button
               type="button"
               onClick={stopRecording}
-              className="bg-primary-900 text-white px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 touch-manipulation min-h-[44px]"
+              className={`${PRIMARY_BUTTON_BASE} ${PRIMARY_BUTTON_FAB}`}
               aria-label="Stop recording"
             >
               <Square size={18} />
@@ -419,9 +420,9 @@ export function ShadowMultiAudioMode({
               disabled={!canAnalyze}
               className={`px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 touch-manipulation min-h-[44px] transition-all ${
                 canAnalyze
-                  ? 'bg-primary-900 text-white hover:scale-105 active:scale-95 cursor-pointer'
+                  ? 'bg-apple-blue hover:bg-apple-blue-hover text-white hover:scale-105 active:scale-95 cursor-pointer'
                   : anyAnalyzing
-                    ? 'bg-primary-900 text-white cursor-wait'
+                    ? 'bg-apple-blue text-white cursor-wait'
                     : 'bg-gray-300 text-gray-500 cursor-not-allowed'
               }`}
               aria-label={anyAnalyzing ? 'Analyzing...' : 'Analyze all'}

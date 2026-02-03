@@ -22,6 +22,7 @@ import {
 import FlashcardDeck from './FlashcardDeck';
 import DiaryEditor from './DiaryEditor';
 import { storage } from '@/lib/utils/storage';
+import { PRIMARY_BUTTON_BASE, PRIMARY_BUTTON_FAB } from '@/lib/constants/theme';
 import { prefetchShadowChallenge } from '@/lib/shadowCache';
 
 const ShadowReadingScreen = lazy(() => import('./ShadowReadingScreen'));
@@ -418,7 +419,7 @@ export default function LibraryScreen() {
                                 e.stopPropagation();
                                 router.push(`/dialogue/${scenario.id}?dialogueId=${inProgressDialogue.id}`);
                               }}
-                              className="w-full bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-sm"
+                              className="w-full bg-apple-blue hover:bg-apple-blue-hover text-white px-4 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-sm"
                             >
                               <Play size={16} />
                               Continue Dialogue ({inProgressDialogue.messages.length} messages)
@@ -430,7 +431,7 @@ export default function LibraryScreen() {
                               e.stopPropagation();
                               router.push(`/dialogue/${scenario.id}`);
                             }}
-                            className="w-full bg-primary-900 hover:bg-primary-800 text-white px-4 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-sm"
+                            className="w-full bg-apple-blue hover:bg-apple-blue-hover text-white px-4 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 active:scale-[0.98] transition-all shadow-sm"
                           >
                             <MessageCircle size={16} />
                             Start New Dialogue
@@ -679,7 +680,7 @@ export default function LibraryScreen() {
           {activeTab === 'diary' ? (
             <button
               onClick={() => setIsWritingDiary(true)}
-              className="bg-primary-900 text-white px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 touch-manipulation min-h-[44px]"
+              className={`${PRIMARY_BUTTON_BASE} ${PRIMARY_BUTTON_FAB}`}
               aria-label="Write diary"
             >
               <PenTool size={18} />
@@ -688,7 +689,7 @@ export default function LibraryScreen() {
           ) : (
             <button
               onClick={() => router.push('/camera')}
-              className="bg-primary-900 text-white px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 touch-manipulation min-h-[44px]"
+              className={`${PRIMARY_BUTTON_BASE} ${PRIMARY_BUTTON_FAB}`}
               aria-label="Create new scenario"
             >
               <Camera size={18} />

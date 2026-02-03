@@ -24,6 +24,7 @@ const config: Config = {
         },
         apple: {
           blue: '#007AFF',
+          'blue-hover': '#0066DD',
           'blue-light': '#5AC8FA',
           silver: '#8E8E93',
           'silver-light': '#C0C0C0',

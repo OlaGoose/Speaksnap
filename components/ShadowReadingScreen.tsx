@@ -25,6 +25,7 @@ import type {
 import { getCachedChallenge, getInFlightRequest, clearShadowCache } from '@/lib/shadowCache';
 import { getShadowHistory, addShadowHistoryEntry } from '@/lib/utils/shadowHistory';
 import { storage } from '@/lib/utils/storage';
+import { PRIMARY_BUTTON_BASE, PRIMARY_BUTTON_FAB } from '@/lib/constants/theme';
 
 const SHADOW_SOURCE_FILE_KEY = 'speakSnapShadowSourceFile';
 import { ShadowYouTubeCard } from './ShadowYouTubeCard';
@@ -917,7 +918,7 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
             <button
               type="button"
               onClick={stopRecording}
-              className="bg-primary-900 text-white px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 touch-manipulation min-h-[44px]"
+              className={`${PRIMARY_BUTTON_BASE} ${PRIMARY_BUTTON_FAB}`}
               aria-label="Stop recording"
             >
               <Square size={18} />
@@ -927,7 +928,7 @@ export default function ShadowReadingScreen({ userLevel, practiceMode }: ShadowR
             <button
               type="button"
               onClick={startRecording}
-              className="bg-primary-900 text-white px-5 py-3 rounded-full font-semibold shadow-2xl flex items-center gap-2 hover:scale-105 transition-transform active:scale-95 touch-manipulation min-h-[44px]"
+              className={`${PRIMARY_BUTTON_BASE} ${PRIMARY_BUTTON_FAB}`}
               aria-label="Start recording"
             >
               <Mic size={18} />
