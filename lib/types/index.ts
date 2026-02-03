@@ -4,6 +4,7 @@
 
 export type UserLevel = 'Beginner' | 'Intermediate' | 'Advanced';
 export type PracticeMode = 'Daily' | 'IELTS';
+export type PreferredModel = 'Auto' | 'Gemini' | 'OpenAI' | 'Doubao';
 
 export interface DialogueLine {
   id: string;

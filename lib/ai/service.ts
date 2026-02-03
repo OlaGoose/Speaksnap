@@ -12,7 +12,17 @@ import type {
   DiaryProcessResult,
   UserLevel,
   PracticeMode,
+  PreferredModel,
 } from '@/lib/types';
+
+type ImageProvider = 'gemini' | 'openai' | 'doubao';
+
+function getImageProviderOrder(preferred?: PreferredModel): ImageProvider[] {
+  if (preferred === 'OpenAI') return ['openai', 'gemini', 'doubao'];
+  if (preferred === 'Doubao') return ['doubao', 'gemini', 'openai'];
+  if (preferred === 'Gemini') return ['gemini', 'openai', 'doubao'];
+  return ['gemini', 'openai', 'doubao'];
+}
 
 // Initialize providers
 const doubaoConfig = {
@@ -43,10 +53,6 @@ const gemini = geminiKey ? new GoogleGenerativeAI(geminiKey) : null;
 
 const AI_PROVIDER = (process.env.NEXT_PUBLIC_AI_PROVIDER || 'auto').toLowerCase();
 
-function getEffectiveProvider(req?: string): string {
-  return (req || AI_PROVIDER).toLowerCase();
-}
-
 /** Error message when no AI provider is configured (map to 503 in API routes). */
 export const NO_AI_PROVIDER_MESSAGE = 'No AI provider configured. Please set at least one of: NEXT_PUBLIC_GEMINI_API_KEY, NEXT_PUBLIC_OPENAI_API_KEY, or Doubao env vars.';
 
@@ -64,10 +70,9 @@ export async function analyzeScene(
   level: UserLevel,
   location?: { lat: number; lng: number },
   mode: PracticeMode = 'Daily',
-  provider?: string
+  preferredModel?: PreferredModel
 ): Promise<AnalyzeImageResponse> {
   ensureProviderAvailable();
-  const effective = getEffectiveProvider(provider);
   const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg);base64,/, '');
 
   const now = new Date();
@@ -130,11 +135,10 @@ Return JSON:
   `;
 
   let lastError: any = null;
+  const order = getImageProviderOrder(preferredModel);
 
-  // Priority: Gemini -> OpenAI -> Doubao (vision) as fallback
-
-  // Try Gemini (prioritize for image analysis - better quality and cost)
-  if ((effective === 'gemini' || effective === 'auto') && gemini) {
+  for (const provider of order) {
+  if (provider === 'gemini' && gemini) {
     try {
       console.log('🔄 Analyzing image with Gemini Vision...');
       const model = gemini.getGenerativeModel({ 
@@ -182,9 +186,7 @@ Return JSON:
       }
     }
   }
-
-  // Try OpenAI as fallback
-  if ((effective === 'openai' || effective === 'auto') && openai) {
+  if (provider === 'openai' && openai) {
     try {
       console.log('🔄 Trying OpenAI Vision...');
       
@@ -232,9 +234,7 @@ Return JSON:
       }
     }
   }
-
-  // Try Doubao Vision as fallback when Gemini/OpenAI timeout or are unavailable
-  if ((effective === 'doubao' || effective === 'auto') && doubao) {
+  if (provider === 'doubao' && doubao) {
     try {
       console.log('🔄 Trying Doubao Vision (fallback)...');
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -265,6 +265,7 @@ Return JSON:
         console.warn('❌ Doubao Vision analysis failed:', error.message);
       }
     }
+  }
   }
 
   // Provide user-friendly error message
@@ -344,10 +345,9 @@ export async function analyzeAudio(
   level: UserLevel,
   location?: { lat: number; lng: number },
   mode: PracticeMode = 'Daily',
-  provider?: string
+  preferredModel?: PreferredModel
 ): Promise<AnalyzeImageResponse> {
   ensureProviderAvailable();
-  const effective = getEffectiveProvider(provider);
   const now = new Date();
   const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const dayPart =
@@ -417,31 +417,25 @@ Return JSON:
   `;
 
   let lastError: any = null;
+  const order = getImageProviderOrder(preferredModel);
 
-  // Try Doubao (priority 1)
-  if ((effective === 'doubao' || effective === 'auto') && doubao) {
+  for (const provider of order) {
+  if (provider === 'doubao' && doubao) {
     try {
       console.log('🔥 Trying Doubao audio analysis...');
       const response = await doubao.chat([
         { role: 'system', content: 'You are a scenario generator. Always return valid JSON.' },
         { role: 'user', content: prompt },
-      ], {
-        maxTokens: 4000, // Scenarios need more tokens for detailed responses
-        temperature: 0.8,
-      });
+      ], { maxTokens: 4000, temperature: 0.8 });
       const text = response.choices[0]?.message?.content;
       if (!text) throw new Error('Empty response from Doubao');
-      const parsed = DoubaoProvider.parseJSONResponse(text);
       console.log('✅ Doubao audio analysis successful');
-      return validateAnalysisResponse(parsed);
+      return validateAnalysisResponse(DoubaoProvider.parseJSONResponse(text));
     } catch (error: any) {
       lastError = error;
-      console.warn('❌ Doubao audio analysis failed:', error.message);
     }
   }
-
-  // Try Gemini (priority 2)
-  if ((effective === 'gemini' || effective === 'auto') && gemini) {
+  if (provider === 'gemini' && gemini) {
     try {
       console.log('🔄 Trying Gemini audio analysis...');
       const model = gemini.getGenerativeModel({ model: 'gemini-2.5-flash' });
@@ -453,16 +447,9 @@ Return JSON:
       return validateAnalysisResponse(JSON.parse(jsonMatch[0]));
     } catch (error: any) {
       lastError = error;
-      if (error.message?.includes('API key') || error.message?.includes('401') || error.message?.includes('403')) {
-        console.log('ℹ️ Gemini skipped (API key issue)');
-      } else {
-        console.warn('❌ Gemini audio analysis failed:', error.message);
-      }
     }
   }
-
-  // Try OpenAI (priority 3 - fallback)
-  if ((effective === 'openai' || effective === 'auto') && openai) {
+  if (provider === 'openai' && openai) {
     try {
       console.log('🔄 Trying OpenAI audio analysis...');
       const response = await openai.chat.completions.create({
@@ -479,12 +466,8 @@ Return JSON:
       return validateAnalysisResponse(JSON.parse(text));
     } catch (error: any) {
       lastError = error;
-      if (error.message?.includes('API key') || error.message?.includes('401') || error.message?.includes('403')) {
-        console.log('ℹ️ OpenAI skipped (API key issue)');
-      } else {
-        console.warn('❌ OpenAI audio analysis failed:', error.message);
-      }
     }
+  }
   }
 
   // Fallback scenario

@@ -13,10 +13,9 @@ import {
   MapPinOff,
   Loader2,
 } from 'lucide-react';
-import { UserLevel, PracticeMode, Scenario } from '@/lib/types';
+import { UserLevel, PracticeMode, PreferredModel, Scenario } from '@/lib/types';
 import { storage } from '@/lib/utils/storage';
-import { PLAN_SETTINGS_LOCATION_KEY, SPEAK_SNAP_AI_PROVIDER_KEY } from '@/lib/constants/theme';
-import type { AiProviderChoice } from '@/lib/constants/theme';
+import { SETTINGS_KEYS } from '@/lib/constants/settings';
 
 type Mode = 'voice' | 'camera' | 'upload';
 
@@ -38,40 +37,48 @@ export default function CameraScreen() {
   const [cameraRetryCount, setCameraRetryCount] = useState(0);
   const [userLevel, setUserLevel] = useState<UserLevel>('Beginner');
   const [practiceMode, setPracticeMode] = useState<PracticeMode>('Daily');
+  const [preferredModel, setPreferredModel] = useState<PreferredModel>('Auto');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // Location State
   const [isLocationEnabled, setIsLocationEnabled] = useState(false);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
-  const [aiProvider, setAiProvider] = useState<AiProviderChoice | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load user level, practice mode, and location permission from storage
   useEffect(() => {
     (async () => {
-      const savedLevel = await storage.getItem<UserLevel>('speakSnapLevel');
+      const [savedLevel, savedMode, savedModel, savedLocation] = await Promise.all([
+        storage.getItem<UserLevel>(SETTINGS_KEYS.level),
+        storage.getItem<PracticeMode>(SETTINGS_KEYS.practiceMode),
+        storage.getItem<PreferredModel>(SETTINGS_KEYS.preferredModel),
+        storage.getItem<boolean>(SETTINGS_KEYS.locationEnabled),
+      ]);
       if (savedLevel) setUserLevel(savedLevel);
-      const savedMode = await storage.getItem<PracticeMode>('speakSnapPracticeMode');
       if (savedMode) setPracticeMode(savedMode);
-      const savedLocation = await storage.getItem<boolean>(PLAN_SETTINGS_LOCATION_KEY);
+      if (savedModel) setPreferredModel(savedModel);
       if (savedLocation != null) setIsLocationEnabled(savedLocation);
-      const savedProvider = await storage.getItem<AiProviderChoice>(SPEAK_SNAP_AI_PROVIDER_KEY);
-      if (savedProvider) setAiProvider(savedProvider);
     })();
   }, []);
 
-  // Save user level to storage when changed
   useEffect(() => {
-    storage.setItem('speakSnapLevel', userLevel);
+    storage.setItem(SETTINGS_KEYS.level, userLevel);
   }, [userLevel]);
 
-  // Save practice mode to storage when changed
   useEffect(() => {
-    storage.setItem('speakSnapPracticeMode', practiceMode);
+    storage.setItem(SETTINGS_KEYS.practiceMode, practiceMode);
   }, [practiceMode]);
+
+  useEffect(() => {
+    storage.setItem(SETTINGS_KEYS.preferredModel, preferredModel);
+  }, [preferredModel]);
+
+  const handleLocationToggle = () => {
+    const next = !isLocationEnabled;
+    setIsLocationEnabled(next);
+    storage.setItem(SETTINGS_KEYS.locationEnabled, next);
+  };
 
   // Handle image capture and analysis
   const handleCapture = async (imageSrc: string, location?: { lat: number; lng: number }) => {
@@ -86,7 +93,7 @@ export default function CameraScreen() {
           level: userLevel,
           mode: practiceMode,
           location,
-          provider: aiProvider ?? undefined,
+          preferredModel,
         }),
       });
 
@@ -147,7 +154,7 @@ export default function CameraScreen() {
           level: userLevel,
           mode: practiceMode,
           location,
-          provider: aiProvider ?? undefined,
+          preferredModel,
         }),
       });
 
@@ -744,13 +751,9 @@ export default function CameraScreen() {
         </button>
 
         <div className="flex items-center gap-2">
-          {/* Location Toggle (synced with Plan Settings > Permissions) */}
+          {/* Location Toggle */}
           <button
-            onClick={() => {
-              const next = !isLocationEnabled;
-              setIsLocationEnabled(next);
-              storage.setItem(PLAN_SETTINGS_LOCATION_KEY, next);
-            }}
+            onClick={handleLocationToggle}
             className={`h-10 w-10 rounded-full backdrop-blur-md border border-white/10 flex items-center justify-center transition-all active:scale-95 ${
               isLocationEnabled
                 ? 'bg-blue-500/30 text-blue-400'

@@ -12,7 +12,7 @@ function isUnavailableError(message: string): boolean {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { audio, level, mode, location, provider } = body;
+    const { audio, level, mode, location, preferredModel } = body;
 
     if (!audio || !level) {
       return NextResponse.json(
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await analyzeAudio(audio, level, location, mode ?? 'Daily', provider);
+    const result = await analyzeAudio(audio, level, location, mode ?? 'Daily', preferredModel);
 
     return NextResponse.json(result);
   } catch (error: any) {
