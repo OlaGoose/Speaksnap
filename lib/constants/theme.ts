@@ -1,6 +1,17 @@
 /** Plan Settings 中 Location 开关的 storage key，与 Camera 场景练习共用 */
 export const PLAN_SETTINGS_LOCATION_KEY = 'plan_settings_location_enabled';
 
+/** 等级（与 Camera 一致） */
+export const SPEAK_SNAP_LEVEL_KEY = 'speakSnapLevel';
+
+/** 练习模式 Daily | IELTS */
+export const SPEAK_SNAP_PRACTICE_MODE_KEY = 'speakSnapPracticeMode';
+
+/** AI 模型选择：auto | openai | gemini | doubao */
+export const SPEAK_SNAP_AI_PROVIDER_KEY = 'speakSnapAiProvider';
+
+export type AiProviderChoice = 'auto' | 'openai' | 'gemini' | 'doubao';
+
 /**
  * 主题色（记录）：Apple 科技蓝，用于白天模式主按钮等。
  * - 主色: #007AFF (apple-blue)

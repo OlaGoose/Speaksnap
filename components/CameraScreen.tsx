@@ -15,7 +15,8 @@ import {
 } from 'lucide-react';
 import { UserLevel, PracticeMode, Scenario } from '@/lib/types';
 import { storage } from '@/lib/utils/storage';
-import { PLAN_SETTINGS_LOCATION_KEY } from '@/lib/constants/theme';
+import { PLAN_SETTINGS_LOCATION_KEY, SPEAK_SNAP_AI_PROVIDER_KEY } from '@/lib/constants/theme';
+import type { AiProviderChoice } from '@/lib/constants/theme';
 
 type Mode = 'voice' | 'camera' | 'upload';
 
@@ -42,6 +43,7 @@ export default function CameraScreen() {
   // Location State
   const [isLocationEnabled, setIsLocationEnabled] = useState(false);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+  const [aiProvider, setAiProvider] = useState<AiProviderChoice | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -56,6 +58,8 @@ export default function CameraScreen() {
       if (savedMode) setPracticeMode(savedMode);
       const savedLocation = await storage.getItem<boolean>(PLAN_SETTINGS_LOCATION_KEY);
       if (savedLocation != null) setIsLocationEnabled(savedLocation);
+      const savedProvider = await storage.getItem<AiProviderChoice>(SPEAK_SNAP_AI_PROVIDER_KEY);
+      if (savedProvider) setAiProvider(savedProvider);
     })();
   }, []);
 
@@ -82,6 +86,7 @@ export default function CameraScreen() {
           level: userLevel,
           mode: practiceMode,
           location,
+          provider: aiProvider ?? undefined,
         }),
       });
 
@@ -142,6 +147,7 @@ export default function CameraScreen() {
           level: userLevel,
           mode: practiceMode,
           location,
+          provider: aiProvider ?? undefined,
         }),
       });
 

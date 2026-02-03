@@ -43,6 +43,10 @@ const gemini = geminiKey ? new GoogleGenerativeAI(geminiKey) : null;
 
 const AI_PROVIDER = (process.env.NEXT_PUBLIC_AI_PROVIDER || 'auto').toLowerCase();
 
+function getEffectiveProvider(req?: string): string {
+  return (req || AI_PROVIDER).toLowerCase();
+}
+
 /** Error message when no AI provider is configured (map to 503 in API routes). */
 export const NO_AI_PROVIDER_MESSAGE = 'No AI provider configured. Please set at least one of: NEXT_PUBLIC_GEMINI_API_KEY, NEXT_PUBLIC_OPENAI_API_KEY, or Doubao env vars.';
 
@@ -59,9 +63,11 @@ export async function analyzeScene(
   base64Image: string,
   level: UserLevel,
   location?: { lat: number; lng: number },
-  mode: PracticeMode = 'Daily'
+  mode: PracticeMode = 'Daily',
+  provider?: string
 ): Promise<AnalyzeImageResponse> {
   ensureProviderAvailable();
+  const effective = getEffectiveProvider(provider);
   const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg);base64,/, '');
 
   const now = new Date();
@@ -128,7 +134,7 @@ Return JSON:
   // Priority: Gemini -> OpenAI -> Doubao (vision) as fallback
 
   // Try Gemini (prioritize for image analysis - better quality and cost)
-  if ((AI_PROVIDER === 'gemini' || AI_PROVIDER === 'auto') && gemini) {
+  if ((effective === 'gemini' || effective === 'auto') && gemini) {
     try {
       console.log('🔄 Analyzing image with Gemini Vision...');
       const model = gemini.getGenerativeModel({ 
@@ -178,7 +184,7 @@ Return JSON:
   }
 
   // Try OpenAI as fallback
-  if ((AI_PROVIDER === 'openai' || AI_PROVIDER === 'auto') && openai) {
+  if ((effective === 'openai' || effective === 'auto') && openai) {
     try {
       console.log('🔄 Trying OpenAI Vision...');
       
@@ -228,7 +234,7 @@ Return JSON:
   }
 
   // Try Doubao Vision as fallback when Gemini/OpenAI timeout or are unavailable
-  if ((AI_PROVIDER === 'doubao' || AI_PROVIDER === 'auto') && doubao) {
+  if ((effective === 'doubao' || effective === 'auto') && doubao) {
     try {
       console.log('🔄 Trying Doubao Vision (fallback)...');
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -337,9 +343,11 @@ export async function analyzeAudio(
   base64Audio: string,
   level: UserLevel,
   location?: { lat: number; lng: number },
-  mode: PracticeMode = 'Daily'
+  mode: PracticeMode = 'Daily',
+  provider?: string
 ): Promise<AnalyzeImageResponse> {
   ensureProviderAvailable();
+  const effective = getEffectiveProvider(provider);
   const now = new Date();
   const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const dayPart =
@@ -411,7 +419,7 @@ Return JSON:
   let lastError: any = null;
 
   // Try Doubao (priority 1)
-  if ((AI_PROVIDER === 'doubao' || AI_PROVIDER === 'auto') && doubao) {
+  if ((effective === 'doubao' || effective === 'auto') && doubao) {
     try {
       console.log('🔥 Trying Doubao audio analysis...');
       const response = await doubao.chat([
@@ -433,7 +441,7 @@ Return JSON:
   }
 
   // Try Gemini (priority 2)
-  if ((AI_PROVIDER === 'gemini' || AI_PROVIDER === 'auto') && gemini) {
+  if ((effective === 'gemini' || effective === 'auto') && gemini) {
     try {
       console.log('🔄 Trying Gemini audio analysis...');
       const model = gemini.getGenerativeModel({ model: 'gemini-2.5-flash' });
@@ -454,7 +462,7 @@ Return JSON:
   }
 
   // Try OpenAI (priority 3 - fallback)
-  if ((AI_PROVIDER === 'openai' || AI_PROVIDER === 'auto') && openai) {
+  if ((effective === 'openai' || effective === 'auto') && openai) {
     try {
       console.log('🔄 Trying OpenAI audio analysis...');
       const response = await openai.chat.completions.create({

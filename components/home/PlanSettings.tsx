@@ -2,11 +2,27 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { MoreHorizontal, Check, ChevronRight, Flame } from 'lucide-react';
+import { MoreHorizontal, Check, ChevronRight, Sparkles } from 'lucide-react';
 import { WEEK_DAYS } from '@/lib/constants/home';
-import { PLAN_SETTINGS_LOCATION_KEY } from '@/lib/constants/theme';
+import {
+  PLAN_SETTINGS_LOCATION_KEY,
+  SPEAK_SNAP_LEVEL_KEY,
+  SPEAK_SNAP_PRACTICE_MODE_KEY,
+  SPEAK_SNAP_AI_PROVIDER_KEY,
+  type AiProviderChoice,
+} from '@/lib/constants/theme';
 import { storage } from '@/lib/utils/storage';
+import type { UserLevel, PracticeMode } from '@/lib/types';
+
 const BUTTON_RADIUS_PX = 28;
+const USER_LEVELS: UserLevel[] = ['Beginner', 'Intermediate', 'Advanced'];
+const PRACTICE_MODES: PracticeMode[] = ['Daily', 'IELTS'];
+const AI_PROVIDERS: { value: AiProviderChoice; label: string }[] = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'gemini', label: 'Gemini' },
+  { value: 'doubao', label: 'Doubao' },
+];
 
 interface PlanSettingsProps {
   onClose: () => void;
@@ -21,7 +37,9 @@ export default function PlanSettings({
   origin,
   isDarkMode,
 }: PlanSettingsProps) {
-  const [difficulty, setDifficulty] = useState('Beginner');
+  const [userLevel, setUserLevel] = useState<UserLevel>('Beginner');
+  const [practiceMode, setPracticeMode] = useState<PracticeMode>('Daily');
+  const [aiProvider, setAiProvider] = useState<AiProviderChoice>('auto');
   const [locationEnabled, setLocationEnabled] = useState(false);
 
   const startX =
@@ -30,10 +48,35 @@ export default function PlanSettings({
   const startY = origin.y || FALLBACK_ORIGIN.y;
 
   useEffect(() => {
-    storage.getItem<boolean>(PLAN_SETTINGS_LOCATION_KEY).then((v) => {
-      if (v != null) setLocationEnabled(v);
-    });
+    (async () => {
+      const [savedLevel, savedMode, savedProvider, savedLocation] =
+        await Promise.all([
+          storage.getItem<UserLevel>(SPEAK_SNAP_LEVEL_KEY),
+          storage.getItem<PracticeMode>(SPEAK_SNAP_PRACTICE_MODE_KEY),
+          storage.getItem<AiProviderChoice>(SPEAK_SNAP_AI_PROVIDER_KEY),
+          storage.getItem<boolean>(PLAN_SETTINGS_LOCATION_KEY),
+        ]);
+      if (savedLevel) setUserLevel(savedLevel);
+      if (savedMode) setPracticeMode(savedMode);
+      if (savedProvider) setAiProvider(savedProvider);
+      if (savedLocation != null) setLocationEnabled(savedLocation);
+    })();
   }, []);
+
+  const handleLevel = (level: UserLevel) => {
+    setUserLevel(level);
+    storage.setItem(SPEAK_SNAP_LEVEL_KEY, level);
+  };
+
+  const handlePracticeMode = (mode: PracticeMode) => {
+    setPracticeMode(mode);
+    storage.setItem(SPEAK_SNAP_PRACTICE_MODE_KEY, mode);
+  };
+
+  const handleAiProvider = (provider: AiProviderChoice) => {
+    setAiProvider(provider);
+    storage.setItem(SPEAK_SNAP_AI_PROVIDER_KEY, provider);
+  };
 
   const handleLocationToggle = (next: boolean) => {
     setLocationEnabled(next);
@@ -52,8 +95,8 @@ export default function PlanSettings({
   const sectionTitle = isDarkMode ? 'text-white' : 'text-slate-900';
   const goalCard =
     'from-apple-blue to-[#0066ff] shadow-xl shadow-blue-500/20';
-  const difficultyTrack = isDarkMode ? 'bg-gray-800 p-1' : 'bg-gray-100 p-1';
-  const difficultyInactive = isDarkMode
+  const trackBg = isDarkMode ? 'bg-gray-800 p-1' : 'bg-gray-100 p-1';
+  const inactiveText = isDarkMode
     ? 'text-gray-400 hover:text-gray-300'
     : 'text-gray-400 hover:text-gray-600';
   const dayPill =
@@ -67,6 +110,9 @@ export default function PlanSettings({
     : isDarkMode
       ? 'bg-gray-600'
       : 'bg-slate-300';
+  const optionBtn = isDarkMode
+    ? 'bg-gray-800 border-gray-700 hover:border-gray-600 text-gray-200'
+    : 'bg-white border-gray-200 hover:border-gray-300 text-slate-800';
 
   return (
     <motion.div
@@ -86,11 +132,11 @@ export default function PlanSettings({
         duration: 0.5,
         ease: [0.32, 0.72, 0, 1],
       }}
-      className="fixed inset-0 z-50 flex flex-col items-center"
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center px-4 py-6"
     >
       <div className="absolute inset-0 bg-black/40" aria-hidden />
       <div
-        className={`relative mt-6 mx-4 mb-6 w-full max-w-md rounded-3xl overflow-hidden ${overlay} no-scrollbar flex flex-col max-h-[calc(100dvh-3rem)]`}
+        className={`relative w-full max-w-md rounded-3xl overflow-hidden ${overlay} no-scrollbar flex flex-col max-h-[min(85dvh,800px)] shadow-2xl`}
       >
         <div
           className={`flex-shrink-0 px-6 pt-6 pb-4 flex justify-between items-center ${headerBg}`}
@@ -113,7 +159,7 @@ export default function PlanSettings({
           </button>
         </div>
 
-        <div className="px-6 pb-10 space-y-8 overflow-y-auto">
+        <div className="px-6 pb-10 space-y-8 overflow-y-auto flex-1 min-h-0">
           <section>
             <h2 className={`text-xl font-bold mb-4 ${sectionTitle}`}>Goal</h2>
             <div
@@ -121,11 +167,9 @@ export default function PlanSettings({
             >
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                  <div className="w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center shadow-inner">
-                    <Flame size={18} className="text-orange-600 fill-orange-500" />
-                  </div>
+                  <Sparkles size={22} className="text-amber-200" />
                 </div>
-                <span className="font-bold text-lg">Lose Weight</span>
+                <span className="font-bold text-lg">Learn English</span>
               </div>
               <ChevronRight size={24} className="text-white/80" />
             </div>
@@ -135,16 +179,16 @@ export default function PlanSettings({
             <h2 className={`text-xl font-bold mb-4 ${sectionTitle}`}>
               Difficulty
             </h2>
-            <div className={`${difficultyTrack} rounded-full flex relative`}>
-              {['Beginner', 'Intermediate', 'Advanced'].map((level) => {
-                const isActive = difficulty === level;
+            <div className={`${trackBg} rounded-full flex relative`}>
+              {USER_LEVELS.map((level) => {
+                const isActive = userLevel === level;
                 return (
                   <button
                     key={level}
                     type="button"
-                    onClick={() => setDifficulty(level)}
+                    onClick={() => handleLevel(level)}
                     className={`flex-1 py-3 text-sm font-semibold rounded-full transition-all duration-300 relative z-10 ${
-                      isActive ? 'text-white shadow-md' : difficultyInactive
+                      isActive ? 'text-white shadow-md' : inactiveText
                     }`}
                   >
                     {level}
@@ -159,6 +203,63 @@ export default function PlanSettings({
                         }}
                       />
                     )}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section>
+            <h2 className={`text-xl font-bold mb-4 ${sectionTitle}`}>
+              Practice Mode
+            </h2>
+            <div className={`${trackBg} rounded-full flex relative`}>
+              {PRACTICE_MODES.map((mode) => {
+                const isActive = practiceMode === mode;
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => handlePracticeMode(mode)}
+                    className={`flex-1 py-3 text-sm font-semibold rounded-full transition-all duration-300 relative z-10 ${
+                      isActive ? 'text-white shadow-md' : inactiveText
+                    }`}
+                  >
+                    {mode}
+                    {isActive && (
+                      <motion.div
+                        layoutId="practiceModeBg"
+                        className="absolute inset-0 bg-apple-blue rounded-full -z-10"
+                        transition={{
+                          type: 'spring',
+                          bounce: 0.2,
+                          duration: 0.6,
+                        }}
+                      />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section>
+            <h2 className={`text-xl font-bold mb-4 ${sectionTitle}`}>Model</h2>
+            <div className="grid grid-cols-2 gap-2">
+              {AI_PROVIDERS.map(({ value, label }) => {
+                const isActive = aiProvider === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => handleAiProvider(value)}
+                    className={`py-3 px-4 rounded-xl border-2 text-sm font-semibold transition-all touch-manipulation ${
+                      isActive
+                        ? 'bg-apple-blue border-apple-blue text-white shadow-lg shadow-blue-500/20'
+                        : `${optionBtn} border`
+                    }`}
+                  >
+                    {label}
                   </button>
                 );
               })}
@@ -184,9 +285,7 @@ export default function PlanSettings({
             <h2 className={`text-xl font-bold mb-4 ${sectionTitle}`}>
               Permissions
             </h2>
-            <div
-              className={`rounded-2xl overflow-hidden border ${permBox}`}
-            >
+            <div className={`rounded-2xl overflow-hidden border ${permBox}`}>
               <div className="flex items-center justify-between p-4">
                 <span className={`font-medium ${permLabel}`}>Location</span>
                 <button
