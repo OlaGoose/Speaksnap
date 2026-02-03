@@ -1,223 +1,137 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Check, Camera, PenTool, Mic as MicIcon, BookOpen, ChevronRight } from 'lucide-react';
-import { storage } from '@/lib/utils/storage';
-import { UserAvatar } from '@/components/auth/user-avatar';
+import { useState, useRef } from 'react';
+import { AnimatePresence, type PanInfo } from 'framer-motion';
+import { SlidersHorizontal } from 'lucide-react';
+import { useTheme } from '@/lib/hooks/useTheme';
+import { HomeTab } from '@/lib/types/home';
+import { DAILY_SCHEDULE, getWeekLabel } from '@/lib/constants/home';
+import WeekCalendar from './home/WeekCalendar';
+import TaskCard from './home/TaskCard';
+import BottomNav from './home/BottomNav';
+import PlanSettings from './home/PlanSettings';
 
-interface WeeklyTasks {
-  scenarios: boolean;
-  diary: boolean;
-  shadow: boolean;
-  textbook: boolean;
-}
-
-function getWeekKey(): string {
+function getTodayDayIndex(): number {
   const now = new Date();
-  const year = now.getFullYear();
-  const onejan = new Date(now.getFullYear(), 0, 1);
-  const weekNum = Math.ceil(((now.getTime() - onejan.getTime()) / 86400000 + onejan.getDay() + 1) / 7);
-  return `${year}_W${weekNum}`;
-}
-
-function getWeekDays(): Array<{ dayName: string; date: number; isToday: boolean }> {
-  const now = new Date();
-  const today = now.getDate();
-  const currentDay = now.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-  const mondayOffset = currentDay === 0 ? -6 : 1 - currentDay; // Offset to get Monday of current week
-  const weekDays = [];
-  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  
-  for (let i = 0; i < 7; i++) {
-    const day = new Date(now);
-    day.setDate(now.getDate() + mondayOffset + i);
-    weekDays.push({
-      dayName: dayNames[i],
-      date: day.getDate(),
-      isToday: day.getDate() === today && day.getMonth() === now.getMonth(),
-    });
-  }
-  return weekDays;
+  const today = now.getDay();
+  return today === 0 ? 6 : today - 1;
 }
 
 export default function HomeScreen() {
-  const router = useRouter();
-  const [tasks, setTasks] = useState<WeeklyTasks>({
-    scenarios: false,
-    diary: false,
-    shadow: false,
-    textbook: false,
-  });
-  const weekKey = getWeekKey();
-  const weekDays = getWeekDays();
+  const [currentDayIndex, setCurrentDayIndex] = useState(getTodayDayIndex());
+  const [activeTab, setActiveTab] = useState<HomeTab>(HomeTab.PLAN);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [animationOrigin, setAnimationOrigin] = useState({ x: 0, y: 0 });
+  const settingsButtonRef = useRef<HTMLButtonElement>(null);
+  const theme = useTheme();
+  const isDarkMode = theme === 'dark';
 
-  useEffect(() => {
-    (async () => {
-      const key = `weekly_tasks_${weekKey}`;
-      const saved = await storage.getItem<WeeklyTasks>(key);
-      if (saved) setTasks(saved);
-    })();
-  }, [weekKey]);
-
-  const toggleTask = async (taskName: keyof WeeklyTasks) => {
-    const updated = { ...tasks, [taskName]: !tasks[taskName] };
-    setTasks(updated);
-    await storage.setItem(`weekly_tasks_${weekKey}`, updated);
+  const handleOpenSettings = () => {
+    if (settingsButtonRef.current) {
+      const rect = settingsButtonRef.current.getBoundingClientRect();
+      setAnimationOrigin({
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2,
+      });
+    }
+    setIsSettingsOpen(true);
   };
 
-  const taskList: Array<{
-    key: keyof WeeklyTasks;
-    title: string;
-    subtitle: string;
-    icon: React.ReactNode;
-    href: string;
-  }> = [
-    {
-      key: 'scenarios',
-      title: 'Speaking Practice',
-      subtitle: 'Create a scenario and practice dialogue',
-      icon: <Camera size={18} className="text-blue-600" />,
-      href: '/camera',
-    },
-    {
-      key: 'diary',
-      title: 'Diary',
-      subtitle: 'Write and improve your English diary',
-      icon: <PenTool size={18} className="text-purple-600" />,
-      href: '/library/diary',
-    },
-    {
-      key: 'shadow',
-      title: 'Shadow Reading',
-      subtitle: 'Practice pronunciation with shadow technique',
-      icon: <MicIcon size={18} className="text-emerald-600" />,
-      href: '/library/shadow',
-    },
-    {
-      key: 'textbook',
-      title: 'Textbook Study',
-      subtitle: 'Learn with New Concept English courses',
-      icon: <BookOpen size={18} className="text-amber-600" />,
-      href: '/library/textbook',
-    },
-  ];
+  const handleDragEnd = (
+    _event: MouseEvent | TouchEvent | PointerEvent,
+    info: PanInfo
+  ) => {
+    const threshold = 50;
+    if (info.offset.x < -threshold) {
+      if (currentDayIndex < DAILY_SCHEDULE.length - 1) {
+        setCurrentDayIndex(currentDayIndex + 1);
+      }
+    } else if (info.offset.x > threshold) {
+      if (currentDayIndex > 0) {
+        setCurrentDayIndex(currentDayIndex - 1);
+      }
+    }
+  };
+
+  const cardTheme = isDarkMode ? 'dark' : 'light';
+
+  const pageBg = isDarkMode
+    ? 'bg-gray-950 text-white'
+    : 'bg-[#f0f0f4] text-gray-900';
+  const gradient = 'from-[#00c6fb] via-[#005bea] to-[#0f172a]';
+  const headerTitle = 'text-white';
+  const headerSubtitle = 'text-blue-100/90';
+  const settingsBtn = 'bg-white/20 hover:bg-white/30';
+  const settingsIcon = 'text-white';
 
   return (
-    <div className="h-full bg-primary-50 flex flex-col overflow-y-auto">
-      <div className="flex-1 px-4 pt-4 py-6 pb-24 safe-top safe-bottom">
-        <div className="max-w-2xl mx-auto space-y-8">
-          {/* Page title with account */}
-          <header className="pt-2">
-            <div className="flex items-center gap-3 mb-2">
-              <UserAvatar
-                size="sm"
-                showDropdown
-                className="rounded-full flex-shrink-0 p-0.5 hover:bg-primary-100/80 transition-colors"
-              />
-              <h2 className="text-3xl font-semibold text-primary-900 tracking-tight">
-                Welcome back
-              </h2>
-            </div>
-            <p className="text-sm text-gray-500">
-              Your weekly English learning plan.
-            </p>
-          </header>
+    <div
+      className={`relative w-full min-h-[100dvh] overflow-hidden font-sans selection:bg-blue-500/30 ${pageBg}`}
+    >
+      <div
+        className={`absolute inset-0 bg-gradient-to-b ${gradient} h-[38vh] pointer-events-none`}
+        style={{
+          borderBottomLeftRadius: '50% 3%',
+          borderBottomRightRadius: '50% 3%',
+        }}
+      />
 
-          {/* Weekly calendar – Notion-style horizontal strip */}
-          <section>
-            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">
-              This Week
-            </h2>
-            <div className="grid grid-cols-7 gap-2">
-              {weekDays.map((day, idx) => (
-                <div
-                  key={idx}
-                  className={`flex flex-col items-center justify-center rounded-xl px-2 py-3 transition-all ${
-                    day.isToday
-                      ? 'bg-primary-900 text-white shadow-md'
-                      : 'bg-white border border-black/8 text-gray-600'
-                  }`}
-                >
-                  <span className={`text-xs font-medium ${day.isToday ? 'text-white/80' : 'text-gray-500'}`}>
-                    {day.dayName}
-                  </span>
-                  <span className={`text-lg font-semibold mt-1 ${day.isToday ? 'text-white' : 'text-primary-900'}`}>
-                    {day.date}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Weekly tasks – Notion-style task list */}
-          <section>
-            <h2 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">
-              Weekly Goals
-            </h2>
-            <div className="space-y-2">
-              {taskList.map((task) => (
-                <div
-                  key={task.key}
-                  className="group flex items-center gap-3 bg-white rounded-xl border border-black/8 px-4 py-3.5 hover:border-primary-200 hover:bg-primary-50/30 transition-all"
-                >
-                  {/* Checkbox */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleTask(task.key);
-                    }}
-                    className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all touch-manipulation ${
-                      tasks[task.key]
-                        ? 'bg-primary-900 border-primary-900'
-                        : 'border-gray-300 hover:border-primary-400'
-                    }`}
-                    aria-label={`Toggle ${task.title}`}
-                  >
-                    {tasks[task.key] && <Check size={14} className="text-white" strokeWidth={3} />}
-                  </button>
-
-                  {/* Task icon */}
-                  <div className="flex-shrink-0 w-9 h-9 rounded-lg bg-gray-50 flex items-center justify-center">
-                    {task.icon}
-                  </div>
-
-                  {/* Task info – clickable to navigate */}
-                  <button
-                    type="button"
-                    onClick={() => router.push(task.href)}
-                    className="flex-1 min-w-0 text-left"
-                  >
-                    <span className="block text-sm font-medium text-primary-900">
-                      {task.title}
-                    </span>
-                    <span className="block text-xs text-gray-500 mt-0.5">
-                      {task.subtitle}
-                    </span>
-                  </button>
-
-                  {/* Arrow on hover */}
-                  <ChevronRight
-                    size={18}
-                    className="flex-shrink-0 text-gray-300 group-hover:text-primary-400 transition-colors"
-                  />
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Quick actions – optional section for direct navigation */}
-          <section className="pt-4">
+      <div className="relative z-10 h-full flex flex-col max-w-md mx-auto min-h-[100dvh]">
+        <header className="px-6 pt-12 pb-2 safe-top">
+          <div className="flex justify-end mb-3">
             <button
+              ref={settingsButtonRef}
               type="button"
-              onClick={() => router.push('/library')}
-              className="w-full flex items-center justify-center gap-2 rounded-xl border border-black/8 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:border-primary-200 hover:bg-primary-50/30 transition-all touch-manipulation"
+              onClick={handleOpenSettings}
+              className={`w-12 h-12 rounded-full backdrop-blur-sm flex items-center justify-center transition-colors touch-manipulation z-20 ${settingsBtn}`}
+              aria-label="Settings"
             >
-              View All Activities →
+              <SlidersHorizontal size={24} className={settingsIcon} />
             </button>
-          </section>
+          </div>
+          <div>
+            <h1 className={`text-[2.7rem] font-extrabold tracking-tight mb-1.5 ${headerTitle}`}>
+              Plan
+            </h1>
+            <p className={`text-[0.9rem] font-bold tracking-wider uppercase ${headerSubtitle}`}>
+              Your weekly English plan · {getWeekLabel()}
+            </p>
+          </div>
+        </header>
+
+        <WeekCalendar
+          selectedIndex={currentDayIndex}
+          onSelectDay={setCurrentDayIndex}
+          isDarkMode={isDarkMode}
+        />
+
+        <div className="relative flex-1 w-full min-h-0">
+          <AnimatePresence mode="popLayout" initial={false}>
+            <TaskCard
+              key={currentDayIndex}
+              day={DAILY_SCHEDULE[currentDayIndex]}
+              dayIndex={currentDayIndex}
+              onDragEnd={handleDragEnd}
+              cardTheme={cardTheme}
+            />
+          </AnimatePresence>
         </div>
+
+        <BottomNav
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          isDarkMode={isDarkMode}
+        />
+
+        <AnimatePresence>
+          {isSettingsOpen && (
+            <PlanSettings
+              onClose={() => setIsSettingsOpen(false)}
+              origin={animationOrigin}
+              isDarkMode={isDarkMode}
+            />
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
