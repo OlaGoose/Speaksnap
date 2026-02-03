@@ -1,123 +1,47 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { MoreHorizontal, Check, ChevronRight, Sparkles } from 'lucide-react';
+import { MoreHorizontal, Check, ChevronRight, Target } from 'lucide-react';
+import { useTheme } from '@/lib/hooks/useTheme';
 import { WEEK_DAYS } from '@/lib/constants/home';
-import {
-  PLAN_SETTINGS_LOCATION_KEY,
-  SPEAK_SNAP_LEVEL_KEY,
-  SPEAK_SNAP_PRACTICE_MODE_KEY,
-  SPEAK_SNAP_AI_PROVIDER_KEY,
-  type AiProviderChoice,
-} from '@/lib/constants/theme';
-import { storage } from '@/lib/utils/storage';
-import type { UserLevel, PracticeMode } from '@/lib/types';
-
-const BUTTON_RADIUS_PX = 28;
-const USER_LEVELS: UserLevel[] = ['Beginner', 'Intermediate', 'Advanced'];
-const PRACTICE_MODES: PracticeMode[] = ['Daily', 'IELTS'];
-const AI_PROVIDERS: { value: AiProviderChoice; label: string }[] = [
-  { value: 'auto', label: 'Auto' },
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'gemini', label: 'Gemini' },
-  { value: 'doubao', label: 'Doubao' },
-];
 
 interface PlanSettingsProps {
   onClose: () => void;
   origin: { x: number; y: number };
-  isDarkMode: boolean;
 }
 
-const FALLBACK_ORIGIN = { x: 0, y: 60 };
+export default function PlanSettings({ onClose, origin }: PlanSettingsProps) {
+  const scheme = useTheme();
+  const isDark = scheme === 'dark';
+  const [difficulty, setDifficulty] = useState('Beginner');
+  const [remindersEnabled, setRemindersEnabled] = useState(true);
 
-export default function PlanSettings({
-  onClose,
-  origin,
-  isDarkMode,
-}: PlanSettingsProps) {
-  const [userLevel, setUserLevel] = useState<UserLevel>('Beginner');
-  const [practiceMode, setPracticeMode] = useState<PracticeMode>('Daily');
-  const [aiProvider, setAiProvider] = useState<AiProviderChoice>('auto');
-  const [locationEnabled, setLocationEnabled] = useState(false);
+  const fallbackX =
+    typeof window !== 'undefined' ? window.innerWidth - 40 : 300;
+  const fallbackY = 60;
+  const startX = origin.x || fallbackX;
+  const startY = origin.y || fallbackY;
 
-  const startX =
-    origin.x ||
-    (typeof window !== 'undefined' ? window.innerWidth - 40 : 300);
-  const startY = origin.y || FALLBACK_ORIGIN.y;
-
-  useEffect(() => {
-    (async () => {
-      const [savedLevel, savedMode, savedProvider, savedLocation] =
-        await Promise.all([
-          storage.getItem<UserLevel>(SPEAK_SNAP_LEVEL_KEY),
-          storage.getItem<PracticeMode>(SPEAK_SNAP_PRACTICE_MODE_KEY),
-          storage.getItem<AiProviderChoice>(SPEAK_SNAP_AI_PROVIDER_KEY),
-          storage.getItem<boolean>(PLAN_SETTINGS_LOCATION_KEY),
-        ]);
-      if (savedLevel) setUserLevel(savedLevel);
-      if (savedMode) setPracticeMode(savedMode);
-      if (savedProvider) setAiProvider(savedProvider);
-      if (savedLocation != null) setLocationEnabled(savedLocation);
-    })();
-  }, []);
-
-  const handleLevel = (level: UserLevel) => {
-    setUserLevel(level);
-    storage.setItem(SPEAK_SNAP_LEVEL_KEY, level);
-  };
-
-  const handlePracticeMode = (mode: PracticeMode) => {
-    setPracticeMode(mode);
-    storage.setItem(SPEAK_SNAP_PRACTICE_MODE_KEY, mode);
-  };
-
-  const handleAiProvider = (provider: AiProviderChoice) => {
-    setAiProvider(provider);
-    storage.setItem(SPEAK_SNAP_AI_PROVIDER_KEY, provider);
-  };
-
-  const handleLocationToggle = (next: boolean) => {
-    setLocationEnabled(next);
-    storage.setItem(PLAN_SETTINGS_LOCATION_KEY, next);
-  };
-
-  const overlay = isDarkMode
+  const overlay = isDark
     ? 'bg-gray-950 text-white'
     : 'bg-white text-slate-900';
-  const headerBg = isDarkMode
+  const headerBar = isDark
     ? 'bg-gray-950/90 backdrop-blur-md'
     : 'bg-white/90 backdrop-blur-md';
-  const leftBtn = isDarkMode
-    ? 'bg-gray-800 text-white active:bg-gray-700'
-    : 'bg-gray-100 text-slate-900 active:bg-gray-200';
-  const sectionTitle = isDarkMode ? 'text-white' : 'text-slate-900';
-  const goalCard =
-    'from-apple-blue to-[#0066ff] shadow-xl shadow-blue-500/20';
-  const trackBg = isDarkMode ? 'bg-gray-800 p-1' : 'bg-gray-100 p-1';
-  const inactiveText = isDarkMode
-    ? 'text-gray-400 hover:text-gray-300'
-    : 'text-gray-400 hover:text-gray-600';
-  const dayPill =
-    'bg-apple-blue text-white shadow-lg shadow-blue-500/20';
-  const permBox = isDarkMode
-    ? 'bg-gray-800/80 border-gray-700'
-    : 'bg-slate-50 border-slate-100';
-  const permLabel = isDarkMode ? 'text-gray-100' : 'text-slate-900';
-  const toggleTrack = locationEnabled
-    ? 'bg-apple-blue'
-    : isDarkMode
-      ? 'bg-gray-600'
-      : 'bg-slate-300';
-  const optionBtn = isDarkMode
-    ? 'bg-gray-800 border-gray-700 hover:border-gray-600 text-gray-200'
-    : 'bg-white border-gray-200 hover:border-gray-300 text-slate-800';
+  const headerIconBtn = isDark
+    ? 'bg-white/10 active:bg-white/20'
+    : 'bg-gray-100 active:bg-gray-200';
+  const sectionTitle = isDark ? 'text-white' : 'text-slate-900';
+  const segmentBg = isDark ? 'bg-white/5' : 'bg-gray-100';
+  const segmentBorder = isDark ? 'border-white/10' : 'border-slate-200/60';
+  const segmentText = isDark ? 'text-white' : 'text-slate-900';
+  const toggleTrack = remindersEnabled ? 'bg-apple-blue' : isDark ? 'bg-slate-600' : 'bg-slate-300';
 
   return (
     <motion.div
       initial={{
-        clipPath: `circle(${BUTTON_RADIUS_PX}px at ${startX}px ${startY}px)`,
+        clipPath: `circle(0px at ${startX}px ${startY}px)`,
         opacity: 0,
       }}
       animate={{
@@ -125,185 +49,127 @@ export default function PlanSettings({
         opacity: 1,
       }}
       exit={{
-        clipPath: `circle(${BUTTON_RADIUS_PX}px at ${startX}px ${startY}px)`,
+        clipPath: `circle(0px at ${startX}px ${startY}px)`,
         opacity: 0,
       }}
       transition={{
         duration: 0.5,
         ease: [0.32, 0.72, 0, 1],
       }}
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center px-4 py-6"
+      className={`fixed inset-0 z-50 overflow-y-auto no-scrollbar ${overlay}`}
     >
-      <div className="absolute inset-0 bg-black/40" aria-hidden />
       <div
-        className={`relative w-full max-w-md rounded-3xl overflow-hidden ${overlay} no-scrollbar flex flex-col max-h-[min(85dvh,800px)] shadow-2xl`}
+        className={`sticky top-0 z-10 px-6 pt-12 pb-4 flex justify-between items-center safe-top ${headerBar}`}
       >
-        <div
-          className={`flex-shrink-0 px-6 pt-6 pb-4 flex justify-between items-center ${headerBg}`}
+        <button
+          type="button"
+          className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors touch-manipulation ${headerIconBtn}`}
+          aria-label="More"
         >
-          <button
-            type="button"
-            className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors touch-manipulation ${leftBtn}`}
-            aria-label="More options"
-          >
-            <MoreHorizontal size={20} />
-          </button>
-          <h1 className={`text-lg font-bold ${sectionTitle}`}>Plan Settings</h1>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-10 h-10 bg-apple-blue hover:bg-apple-blue-hover rounded-full flex items-center justify-center text-white shadow-lg active:scale-95 transition-all touch-manipulation"
-            aria-label="Close"
-          >
-            <Check size={20} strokeWidth={3} />
-          </button>
-        </div>
+          <MoreHorizontal size={20} className={isDark ? 'text-white' : 'text-slate-900'} />
+        </button>
+        <h1 className={`text-lg font-bold ${sectionTitle}`}>Plan Settings</h1>
+        <button
+          type="button"
+          onClick={onClose}
+          className="w-10 h-10 bg-apple-blue hover:bg-apple-blue-hover rounded-full flex items-center justify-center text-white shadow-lg active:scale-95 transition-transform touch-manipulation"
+          aria-label="Done"
+        >
+          <Check size={20} strokeWidth={3} />
+        </button>
+      </div>
 
-        <div className="px-6 pb-10 space-y-8 overflow-y-auto flex-1 min-h-0">
-          <section>
-            <h2 className={`text-xl font-bold mb-4 ${sectionTitle}`}>Goal</h2>
+      <div className="px-6 pb-10 space-y-8">
+        <section>
+          <h2 className={`text-xl font-bold mb-4 ${sectionTitle}`}>Goal</h2>
+          <div
+            className={`rounded-2xl p-4 flex items-center justify-between cursor-pointer active:scale-[0.99] transition-transform bg-apple-blue text-white shadow-lg`}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
+                <Target size={20} className="text-white" />
+              </div>
+              <span className="font-bold text-lg">Daily Practice</span>
+            </div>
+            <ChevronRight size={24} className="text-white/80" />
+          </div>
+        </section>
+
+        <section>
+          <h2 className={`text-xl font-bold mb-4 ${sectionTitle}`}>Difficulty</h2>
+          <div className={`p-1 rounded-full flex relative ${segmentBg}`}>
+            {['Beginner', 'Intermediate', 'Advanced'].map((level) => {
+              const isActive = difficulty === level;
+              return (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => setDifficulty(level)}
+                  className={`flex-1 py-3 text-sm font-semibold rounded-full transition-all duration-300 relative z-10 touch-manipulation ${
+                    isActive
+                      ? 'text-white shadow-md'
+                      : isDark
+                        ? 'text-slate-400 hover:text-slate-300'
+                        : 'text-gray-400 hover:text-gray-600'
+                  }`}
+                >
+                  {level}
+                  {isActive && (
+                    <motion.div
+                      layoutId="planSettingsDifficultyBg"
+                      className="absolute inset-0 bg-apple-blue rounded-full -z-10"
+                      transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section>
+          <h2 className={`text-xl font-bold mb-4 ${sectionTitle}`}>Schedule</h2>
+          <div className="flex justify-between items-center gap-1">
+            {WEEK_DAYS.map((day, i) => (
+              <button
+                key={i}
+                type="button"
+                className="w-10 h-10 rounded-full bg-apple-blue text-white font-bold text-sm flex items-center justify-center shadow-lg active:scale-90 transition-transform touch-manipulation"
+              >
+                {day}
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section>
+          <h2 className={`text-xl font-bold mb-4 ${sectionTitle}`}>Practice Time</h2>
+          <div className={`rounded-2xl overflow-hidden border ${segmentBg} ${segmentBorder}`}>
             <div
-              className={`bg-gradient-to-r ${goalCard} rounded-2xl p-4 flex items-center justify-between shadow-xl text-white cursor-pointer active:scale-[0.99] transition-transform touch-manipulation`}
+              className={`flex items-center justify-between p-4 border-b ${segmentBorder}`}
             >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                  <Sparkles size={22} className="text-amber-200" />
-                </div>
-                <span className="font-bold text-lg">Learn English</span>
-              </div>
-              <ChevronRight size={24} className="text-white/80" />
+              <span className={`font-medium ${segmentText}`}>Reminders</span>
+              <button
+                type="button"
+                onClick={() => setRemindersEnabled(!remindersEnabled)}
+                className={`w-12 h-7 rounded-full p-1 transition-colors duration-300 touch-manipulation ${toggleTrack}`}
+                aria-label={remindersEnabled ? 'Disable reminders' : 'Enable reminders'}
+              >
+                <div
+                  className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-300 ${
+                    remindersEnabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
             </div>
-          </section>
-
-          <section>
-            <h2 className={`text-xl font-bold mb-4 ${sectionTitle}`}>
-              Difficulty
-            </h2>
-            <div className={`${trackBg} rounded-full flex relative`}>
-              {USER_LEVELS.map((level) => {
-                const isActive = userLevel === level;
-                return (
-                  <button
-                    key={level}
-                    type="button"
-                    onClick={() => handleLevel(level)}
-                    className={`flex-1 py-3 text-sm font-semibold rounded-full transition-all duration-300 relative z-10 ${
-                      isActive ? 'text-white shadow-md' : inactiveText
-                    }`}
-                  >
-                    {level}
-                    {isActive && (
-                      <motion.div
-                        layoutId="difficultyBg"
-                        className="absolute inset-0 bg-apple-blue rounded-full -z-10"
-                        transition={{
-                          type: 'spring',
-                          bounce: 0.2,
-                          duration: 0.6,
-                        }}
-                      />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          <section>
-            <h2 className={`text-xl font-bold mb-4 ${sectionTitle}`}>
-              Practice Mode
-            </h2>
-            <div className={`${trackBg} rounded-full flex relative`}>
-              {PRACTICE_MODES.map((mode) => {
-                const isActive = practiceMode === mode;
-                return (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => handlePracticeMode(mode)}
-                    className={`flex-1 py-3 text-sm font-semibold rounded-full transition-all duration-300 relative z-10 ${
-                      isActive ? 'text-white shadow-md' : inactiveText
-                    }`}
-                  >
-                    {mode}
-                    {isActive && (
-                      <motion.div
-                        layoutId="practiceModeBg"
-                        className="absolute inset-0 bg-apple-blue rounded-full -z-10"
-                        transition={{
-                          type: 'spring',
-                          bounce: 0.2,
-                          duration: 0.6,
-                        }}
-                      />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          <section>
-            <h2 className={`text-xl font-bold mb-4 ${sectionTitle}`}>Model</h2>
-            <div className="grid grid-cols-2 gap-2">
-              {AI_PROVIDERS.map(({ value, label }) => {
-                const isActive = aiProvider === value;
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => handleAiProvider(value)}
-                    className={`py-3 px-4 rounded-xl border-2 text-sm font-semibold transition-all touch-manipulation ${
-                      isActive
-                        ? 'bg-apple-blue border-apple-blue text-white shadow-lg shadow-blue-500/20'
-                        : `${optionBtn} border`
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          <section>
-            <h2 className={`text-xl font-bold mb-4 ${sectionTitle}`}>Schedule</h2>
-            <div className="flex justify-between items-center">
-              {WEEK_DAYS.map((day, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  className={`w-10 h-10 rounded-full ${dayPill} font-bold text-sm flex items-center justify-center active:scale-90 transition-transform touch-manipulation`}
-                >
-                  {day}
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section>
-            <h2 className={`text-xl font-bold mb-4 ${sectionTitle}`}>
-              Permissions
-            </h2>
-            <div className={`rounded-2xl overflow-hidden border ${permBox}`}>
-              <div className="flex items-center justify-between p-4">
-                <span className={`font-medium ${permLabel}`}>Location</span>
-                <button
-                  type="button"
-                  onClick={() => handleLocationToggle(!locationEnabled)}
-                  className={`w-12 h-7 rounded-full p-1 transition-colors duration-300 ${toggleTrack}`}
-                  aria-label={locationEnabled ? 'Disable location' : 'Enable location'}
-                >
-                  <div
-                    className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-300 ${
-                      locationEnabled ? 'translate-x-5' : 'translate-x-0'
-                    }`}
-                  />
-                </button>
+            <div className={`flex items-center justify-between p-4`}>
+              <span className={`font-medium ${segmentText}`}>Time</span>
+              <div className={`${isDark ? 'bg-white/10' : 'bg-slate-200/70'} px-3 py-1.5 rounded-lg`}>
+                <span className={`font-semibold text-sm ${segmentText}`}>7:00 PM</span>
               </div>
             </div>
-          </section>
-        </div>
+          </div>
+        </section>
       </div>
     </motion.div>
   );
