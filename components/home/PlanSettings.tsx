@@ -1,10 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { MoreHorizontal, Check, ChevronRight, Flame } from 'lucide-react';
+import { MoreHorizontal, Check, ChevronRight, Flame, MapPin, MapPinOff } from 'lucide-react';
 import { useTheme } from '@/lib/hooks/useTheme';
-import { WEEK_DAYS } from '@/lib/constants/home';
+import { storage } from '@/lib/utils/storage';
+import type { UserLevel, PracticeMode, AiModelPreference } from '@/lib/types';
+
+const STORAGE_LEVEL = 'speakSnapLevel';
+const STORAGE_PRACTICE_MODE = 'speakSnapPracticeMode';
+const STORAGE_MODEL = 'speakSnapModel';
+const STORAGE_LOCATION_ENABLED = 'speakSnapLocationEnabled';
+
+const DIFFICULTY_OPTIONS: UserLevel[] = ['Beginner', 'Intermediate', 'Advanced'];
+const PRACTICE_OPTIONS: PracticeMode[] = ['Daily', 'IELTS'];
+const MODEL_OPTIONS: { value: AiModelPreference; label: string }[] = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'gemini', label: 'Gemini' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'doubao', label: 'Doubao' },
+];
 
 interface PlanSettingsProps {
   onClose: () => void;
@@ -14,8 +29,41 @@ interface PlanSettingsProps {
 export default function PlanSettings({ onClose, origin }: PlanSettingsProps) {
   const scheme = useTheme();
   const isDark = scheme === 'dark';
-  const [difficulty, setDifficulty] = useState('Beginner');
-  const [remindersEnabled, setRemindersEnabled] = useState(true);
+  const [difficulty, setDifficulty] = useState<UserLevel>('Beginner');
+  const [practiceMode, setPracticeMode] = useState<PracticeMode>('Daily');
+  const [model, setModel] = useState<AiModelPreference>('auto');
+  const [locationEnabled, setLocationEnabled] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const [savedLevel, savedMode, savedModel, savedLoc] = await Promise.all([
+        storage.getItem<UserLevel>(STORAGE_LEVEL),
+        storage.getItem<PracticeMode>(STORAGE_PRACTICE_MODE),
+        storage.getItem<AiModelPreference>(STORAGE_MODEL),
+        storage.getItem<boolean>(STORAGE_LOCATION_ENABLED),
+      ]);
+      if (savedLevel) setDifficulty(savedLevel);
+      if (savedMode) setPracticeMode(savedMode);
+      if (savedModel) setModel(savedModel);
+      if (savedLoc != null) setLocationEnabled(savedLoc);
+    })();
+  }, []);
+
+  useEffect(() => {
+    storage.setItem(STORAGE_LEVEL, difficulty);
+  }, [difficulty]);
+
+  useEffect(() => {
+    storage.setItem(STORAGE_PRACTICE_MODE, practiceMode);
+  }, [practiceMode]);
+
+  useEffect(() => {
+    storage.setItem(STORAGE_MODEL, model);
+  }, [model]);
+
+  useEffect(() => {
+    storage.setItem(STORAGE_LOCATION_ENABLED, locationEnabled);
+  }, [locationEnabled]);
 
   const startX =
     origin.x ||
@@ -33,7 +81,6 @@ export default function PlanSettings({ onClose, origin }: PlanSettingsProps) {
   const panelBorder = isDark ? 'border-gray-700' : 'border-slate-200/60';
   const toggleTrack = isDark ? 'bg-slate-600' : 'bg-slate-300';
   const rowBorder = isDark ? 'border-gray-700' : 'border-slate-200/60';
-  const timeChip = isDark ? 'bg-gray-700 text-gray-200' : 'bg-slate-200/70 text-slate-900';
 
   return (
     <motion.div
@@ -97,7 +144,7 @@ export default function PlanSettings({ onClose, origin }: PlanSettingsProps) {
         <section>
           <h2 className={`text-xl font-bold mb-4 ${sectionTitle}`}>Difficulty</h2>
           <div className={`p-1 rounded-full flex relative ${isDark ? 'bg-gray-800' : 'bg-gray-100'}`}>
-            {['Beginner', 'Intermediate', 'Advanced'].map((level) => {
+            {DIFFICULTY_OPTIONS.map((level) => {
               const isActive = difficulty === level;
               return (
                 <button
@@ -123,40 +170,78 @@ export default function PlanSettings({ onClose, origin }: PlanSettingsProps) {
         </section>
 
         <section>
-          <h2 className={`text-xl font-bold mb-4 ${sectionTitle}`}>Schedule</h2>
-          <div className="flex justify-between items-center">
-            {WEEK_DAYS.map((day, i) => (
-              <button
-                key={i}
-                type="button"
-                className={`w-10 h-10 rounded-full ${accentBtn} font-bold text-sm flex items-center justify-center active:scale-90 transition-transform shadow-blue-500/20`}
-              >
-                {day}
-              </button>
-            ))}
+          <h2 className={`text-xl font-bold mb-4 ${sectionTitle}`}>Practice Type</h2>
+          <div className={`p-1 rounded-full flex relative ${isDark ? 'bg-gray-800' : 'bg-gray-100'}`}>
+            {PRACTICE_OPTIONS.map((mode) => {
+              const isActive = practiceMode === mode;
+              return (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setPracticeMode(mode)}
+                  className={`flex-1 py-3 text-sm font-semibold rounded-full transition-all duration-300 relative z-10 ${
+                    isActive ? 'text-white shadow-md' : `${cardText} ${isDark ? 'hover:text-gray-200' : 'hover:text-gray-600'}`
+                  }`}
+                >
+                  {mode}
+                  {isActive && (
+                    <motion.div
+                      layoutId="practiceTypeBg"
+                      className="absolute inset-0 bg-apple-blue rounded-full -z-10"
+                      transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+                    />
+                  )}
+                </button>
+              );
+            })}
           </div>
         </section>
 
         <section>
-          <h2 className={`text-xl font-bold mb-4 ${sectionTitle}`}>Workout Time</h2>
+          <h2 className={`text-xl font-bold mb-4 ${sectionTitle}`}>Model</h2>
+          <div className={`p-1 rounded-full flex gap-1 relative ${isDark ? 'bg-gray-800' : 'bg-gray-100'}`}>
+            {MODEL_OPTIONS.map((opt) => {
+              const isActive = model === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setModel(opt.value)}
+                  className={`flex-1 py-3 text-sm font-semibold rounded-full transition-all duration-300 relative z-10 ${
+                    isActive ? 'text-white shadow-md' : `${cardText} ${isDark ? 'hover:text-gray-200' : 'hover:text-gray-600'}`
+                  }`}
+                >
+                  {opt.label}
+                  {isActive && (
+                    <motion.div
+                      layoutId="modelBg"
+                      className="absolute inset-0 bg-apple-blue rounded-full -z-10"
+                      transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        <section>
+          <h2 className={`text-xl font-bold mb-4 ${sectionTitle}`}>Permission</h2>
           <div className={`rounded-2xl overflow-hidden border ${panelBg} ${panelBorder}`}>
-            <div className={`flex items-center justify-between p-4 border-b ${rowBorder}`}>
-              <span className={`font-medium ${sectionTitle}`}>Reminders</span>
+            <div className="flex items-center justify-between p-4">
+              <span className={`font-medium ${sectionTitle} flex items-center gap-2`}>
+                {locationEnabled ? <MapPin size={20} /> : <MapPinOff size={20} />}
+                Location
+              </span>
               <button
                 type="button"
-                onClick={() => setRemindersEnabled(!remindersEnabled)}
-                className={`w-12 h-7 rounded-full p-1 transition-colors duration-300 ${remindersEnabled ? 'bg-apple-blue' : toggleTrack}`}
+                onClick={() => setLocationEnabled(!locationEnabled)}
+                className={`w-12 h-7 rounded-full p-1 transition-colors duration-300 ${locationEnabled ? 'bg-apple-blue' : toggleTrack}`}
               >
                 <div
-                  className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-300 ${remindersEnabled ? 'translate-x-5' : 'translate-x-0'}`}
+                  className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-300 ${locationEnabled ? 'translate-x-5' : 'translate-x-0'}`}
                 />
               </button>
-            </div>
-            <div className="flex items-center justify-between p-4">
-              <span className={`font-medium ${sectionTitle}`}>Time</span>
-              <div className={`${timeChip} px-3 py-1.5 rounded-lg`}>
-                <span className={`font-semibold text-sm ${sectionTitle}`}>7:00 PM</span>
-              </div>
             </div>
           </div>
         </section>

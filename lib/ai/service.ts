@@ -12,17 +12,8 @@ import type {
   DiaryProcessResult,
   UserLevel,
   PracticeMode,
-  PreferredModel,
+  AiModelPreference,
 } from '@/lib/types';
-
-type ImageProvider = 'gemini' | 'openai' | 'doubao';
-
-function getImageProviderOrder(preferred?: PreferredModel): ImageProvider[] {
-  if (preferred === 'OpenAI') return ['openai', 'gemini', 'doubao'];
-  if (preferred === 'Doubao') return ['doubao', 'gemini', 'openai'];
-  if (preferred === 'Gemini') return ['gemini', 'openai', 'doubao'];
-  return ['gemini', 'openai', 'doubao'];
-}
 
 // Initialize providers
 const doubaoConfig = {
@@ -70,9 +61,10 @@ export async function analyzeScene(
   level: UserLevel,
   location?: { lat: number; lng: number },
   mode: PracticeMode = 'Daily',
-  preferredModel?: PreferredModel
+  preferredModel?: AiModelPreference
 ): Promise<AnalyzeImageResponse> {
   ensureProviderAvailable();
+  const provider: string = (preferredModel && preferredModel !== 'auto') ? preferredModel : (AI_PROVIDER || 'auto');
   const cleanBase64 = base64Image.replace(/^data:image\/(png|jpeg|jpg);base64,/, '');
 
   const now = new Date();
@@ -135,10 +127,13 @@ Return JSON:
   `;
 
   let lastError: any = null;
-  const order = getImageProviderOrder(preferredModel);
 
-  for (const provider of order) {
-  if (provider === 'gemini' && gemini) {
+  // Priority: Gemini -> OpenAI -> Doubao (vision) as fallback; or single provider when preferredModel is set
+  const tryGemini = (provider === 'gemini' || provider === 'auto') && gemini;
+  const tryOpenAI = (provider === 'openai' || provider === 'auto') && openai;
+  const tryDoubao = (provider === 'doubao' || provider === 'auto') && doubao;
+
+  if (tryGemini) {
     try {
       console.log('🔄 Analyzing image with Gemini Vision...');
       const model = gemini.getGenerativeModel({ 
@@ -175,6 +170,7 @@ Return JSON:
       return validateAnalysisResponse(JSON.parse(jsonMatch[0]));
     } catch (error: any) {
       lastError = error;
+      if (provider === 'gemini') throw error;
       if (error.message?.includes('API key') || error.message?.includes('401') || error.message?.includes('403')) {
         console.log('ℹ️ Gemini skipped (API key issue)');
       } else if (error.message?.includes('timeout')) {
@@ -186,7 +182,8 @@ Return JSON:
       }
     }
   }
-  if (provider === 'openai' && openai) {
+
+  if (tryOpenAI) {
     try {
       console.log('🔄 Trying OpenAI Vision...');
       
@@ -223,6 +220,7 @@ Return JSON:
       return validateAnalysisResponse(JSON.parse(text));
     } catch (error: any) {
       lastError = error;
+      if (provider === 'openai') throw error;
       if (error.message?.includes('API key') || error.message?.includes('401') || error.message?.includes('403')) {
         console.log('ℹ️ OpenAI skipped (API key issue)');
       } else if (error.message?.includes('timeout')) {
@@ -234,7 +232,8 @@ Return JSON:
       }
     }
   }
-  if (provider === 'doubao' && doubao) {
+
+  if (tryDoubao) {
     try {
       console.log('🔄 Trying Doubao Vision (fallback)...');
       const timeoutPromise = new Promise<never>((_, reject) => {
@@ -257,6 +256,7 @@ Return JSON:
       return validateAnalysisResponse(parsed);
     } catch (error: any) {
       lastError = error;
+      if (provider === 'doubao') throw error;
       if (error.message?.includes('timeout')) {
         console.warn('❌ Doubao Vision analysis timeout');
       } else if (error.message?.includes('401') || error.message?.includes('403')) {
@@ -266,9 +266,7 @@ Return JSON:
       }
     }
   }
-  }
 
-  // Provide user-friendly error message
   const errorMsg = lastError?.message || 'All AI providers failed';
   if (errorMsg.includes('timeout')) {
     throw new Error('Image analysis timeout. Please check your internet connection and try again.');
@@ -345,9 +343,10 @@ export async function analyzeAudio(
   level: UserLevel,
   location?: { lat: number; lng: number },
   mode: PracticeMode = 'Daily',
-  preferredModel?: PreferredModel
+  preferredModel?: AiModelPreference
 ): Promise<AnalyzeImageResponse> {
   ensureProviderAvailable();
+  const provider: string = (preferredModel && preferredModel !== 'auto') ? preferredModel : (AI_PROVIDER || 'auto');
   const now = new Date();
   const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const dayPart =
@@ -417,25 +416,33 @@ Return JSON:
   `;
 
   let lastError: any = null;
-  const order = getImageProviderOrder(preferredModel);
+  const tryDoubaoA = (provider === 'doubao' || provider === 'auto') && doubao;
+  const tryGeminiA = (provider === 'gemini' || provider === 'auto') && gemini;
+  const tryOpenAIA = (provider === 'openai' || provider === 'auto') && openai;
 
-  for (const provider of order) {
-  if (provider === 'doubao' && doubao) {
+  if (tryDoubaoA) {
     try {
       console.log('🔥 Trying Doubao audio analysis...');
-      const response = await doubao.chat([
+      const response = await doubao!.chat([
         { role: 'system', content: 'You are a scenario generator. Always return valid JSON.' },
         { role: 'user', content: prompt },
-      ], { maxTokens: 4000, temperature: 0.8 });
+      ], {
+        maxTokens: 4000,
+        temperature: 0.8,
+      });
       const text = response.choices[0]?.message?.content;
       if (!text) throw new Error('Empty response from Doubao');
+      const parsed = DoubaoProvider.parseJSONResponse(text);
       console.log('✅ Doubao audio analysis successful');
-      return validateAnalysisResponse(DoubaoProvider.parseJSONResponse(text));
+      return validateAnalysisResponse(parsed);
     } catch (error: any) {
       lastError = error;
+      if (provider === 'doubao') throw error;
+      console.warn('❌ Doubao audio analysis failed:', error.message);
     }
   }
-  if (provider === 'gemini' && gemini) {
+
+  if (tryGeminiA) {
     try {
       console.log('🔄 Trying Gemini audio analysis...');
       const model = gemini.getGenerativeModel({ model: 'gemini-2.5-flash' });
@@ -447,9 +454,16 @@ Return JSON:
       return validateAnalysisResponse(JSON.parse(jsonMatch[0]));
     } catch (error: any) {
       lastError = error;
+      if (provider === 'gemini') throw error;
+      if (error.message?.includes('API key') || error.message?.includes('401') || error.message?.includes('403')) {
+        console.log('ℹ️ Gemini skipped (API key issue)');
+      } else {
+        console.warn('❌ Gemini audio analysis failed:', error.message);
+      }
     }
   }
-  if (provider === 'openai' && openai) {
+
+  if (tryOpenAIA) {
     try {
       console.log('🔄 Trying OpenAI audio analysis...');
       const response = await openai.chat.completions.create({
@@ -466,11 +480,15 @@ Return JSON:
       return validateAnalysisResponse(JSON.parse(text));
     } catch (error: any) {
       lastError = error;
+      if (provider === 'openai') throw error;
+      if (error.message?.includes('API key') || error.message?.includes('401') || error.message?.includes('403')) {
+        console.log('ℹ️ OpenAI skipped (API key issue)');
+      } else {
+        console.warn('❌ OpenAI audio analysis failed:', error.message);
+      }
     }
   }
-  }
 
-  // Fallback scenario
   console.warn('⚠️ All AI providers failed, using fallback scenario');
   return {
     location: transcribedText || 'Practice Location',

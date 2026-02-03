@@ -12,7 +12,7 @@ function isUnavailableError(message: string): boolean {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { image, level, mode, location, preferredModel } = body;
+    const { image, level, mode, location, model } = body;
 
     if (!image || !level) {
       return NextResponse.json(
@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await analyzeScene(image, level, location, mode ?? 'Daily', preferredModel);
+    const result = await analyzeScene(image, level, location, mode ?? 'Daily', model);
 
     return NextResponse.json(result);
   } catch (error: any) {

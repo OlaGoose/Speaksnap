@@ -13,9 +13,8 @@ import {
   MapPinOff,
   Loader2,
 } from 'lucide-react';
-import { UserLevel, PracticeMode, PreferredModel, Scenario } from '@/lib/types';
+import { UserLevel, PracticeMode, Scenario, AiModelPreference } from '@/lib/types';
 import { storage } from '@/lib/utils/storage';
-import { SETTINGS_KEYS } from '@/lib/constants/settings';
 
 type Mode = 'voice' | 'camera' | 'upload';
 
@@ -37,11 +36,11 @@ export default function CameraScreen() {
   const [cameraRetryCount, setCameraRetryCount] = useState(0);
   const [userLevel, setUserLevel] = useState<UserLevel>('Beginner');
   const [practiceMode, setPracticeMode] = useState<PracticeMode>('Daily');
-  const [preferredModel, setPreferredModel] = useState<PreferredModel>('Auto');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const [isLocationEnabled, setIsLocationEnabled] = useState(false);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+  const [modelPreference, setModelPreference] = useState<AiModelPreference>('auto');
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -49,36 +48,31 @@ export default function CameraScreen() {
 
   useEffect(() => {
     (async () => {
-      const [savedLevel, savedMode, savedModel, savedLocation] = await Promise.all([
-        storage.getItem<UserLevel>(SETTINGS_KEYS.level),
-        storage.getItem<PracticeMode>(SETTINGS_KEYS.practiceMode),
-        storage.getItem<PreferredModel>(SETTINGS_KEYS.preferredModel),
-        storage.getItem<boolean>(SETTINGS_KEYS.locationEnabled),
+      const [savedLevel, savedMode, savedLoc, savedModel] = await Promise.all([
+        storage.getItem<UserLevel>('speakSnapLevel'),
+        storage.getItem<PracticeMode>('speakSnapPracticeMode'),
+        storage.getItem<boolean>('speakSnapLocationEnabled'),
+        storage.getItem<AiModelPreference>('speakSnapModel'),
       ]);
       if (savedLevel) setUserLevel(savedLevel);
       if (savedMode) setPracticeMode(savedMode);
-      if (savedModel) setPreferredModel(savedModel);
-      if (savedLocation != null) setIsLocationEnabled(savedLocation);
+      if (savedLoc != null) setIsLocationEnabled(savedLoc);
+      if (savedModel) setModelPreference(savedModel);
     })();
   }, []);
 
+  // Save user level to storage when changed
   useEffect(() => {
-    storage.setItem(SETTINGS_KEYS.level, userLevel);
+    storage.setItem('speakSnapLevel', userLevel);
   }, [userLevel]);
 
   useEffect(() => {
-    storage.setItem(SETTINGS_KEYS.practiceMode, practiceMode);
+    storage.setItem('speakSnapPracticeMode', practiceMode);
   }, [practiceMode]);
 
   useEffect(() => {
-    storage.setItem(SETTINGS_KEYS.preferredModel, preferredModel);
-  }, [preferredModel]);
-
-  const handleLocationToggle = () => {
-    const next = !isLocationEnabled;
-    setIsLocationEnabled(next);
-    storage.setItem(SETTINGS_KEYS.locationEnabled, next);
-  };
+    storage.setItem('speakSnapLocationEnabled', isLocationEnabled);
+  }, [isLocationEnabled]);
 
   // Handle image capture and analysis
   const handleCapture = async (imageSrc: string, location?: { lat: number; lng: number }) => {
@@ -93,7 +87,7 @@ export default function CameraScreen() {
           level: userLevel,
           mode: practiceMode,
           location,
-          preferredModel,
+          model: modelPreference,
         }),
       });
 
@@ -153,8 +147,8 @@ export default function CameraScreen() {
           audio: audioBase64,
           level: userLevel,
           mode: practiceMode,
+          model: modelPreference,
           location,
-          preferredModel,
         }),
       });
 
@@ -753,7 +747,7 @@ export default function CameraScreen() {
         <div className="flex items-center gap-2">
           {/* Location Toggle */}
           <button
-            onClick={handleLocationToggle}
+            onClick={() => setIsLocationEnabled(!isLocationEnabled)}
             className={`h-10 w-10 rounded-full backdrop-blur-md border border-white/10 flex items-center justify-center transition-all active:scale-95 ${
               isLocationEnabled
                 ? 'bg-blue-500/30 text-blue-400'
