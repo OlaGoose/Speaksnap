@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { UserLevel, PracticeMode, Scenario } from '@/lib/types';
 import { storage } from '@/lib/utils/storage';
+import { PLAN_SETTINGS_LOCATION_KEY } from '@/lib/constants/theme';
 
 type Mode = 'voice' | 'camera' | 'upload';
 
@@ -46,13 +47,15 @@ export default function CameraScreen() {
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load user level and practice mode from storage
+  // Load user level, practice mode, and location permission from storage
   useEffect(() => {
     (async () => {
       const savedLevel = await storage.getItem<UserLevel>('speakSnapLevel');
       if (savedLevel) setUserLevel(savedLevel);
       const savedMode = await storage.getItem<PracticeMode>('speakSnapPracticeMode');
       if (savedMode) setPracticeMode(savedMode);
+      const savedLocation = await storage.getItem<boolean>(PLAN_SETTINGS_LOCATION_KEY);
+      if (savedLocation != null) setIsLocationEnabled(savedLocation);
     })();
   }, []);
 
@@ -735,9 +738,13 @@ export default function CameraScreen() {
         </button>
 
         <div className="flex items-center gap-2">
-          {/* Location Toggle */}
+          {/* Location Toggle (synced with Plan Settings > Permissions) */}
           <button
-            onClick={() => setIsLocationEnabled(!isLocationEnabled)}
+            onClick={() => {
+              const next = !isLocationEnabled;
+              setIsLocationEnabled(next);
+              storage.setItem(PLAN_SETTINGS_LOCATION_KEY, next);
+            }}
             className={`h-10 w-10 rounded-full backdrop-blur-md border border-white/10 flex items-center justify-center transition-all active:scale-95 ${
               isLocationEnabled
                 ? 'bg-blue-500/30 text-blue-400'
