@@ -1,3 +1,11 @@
+/*
+ * @Author: meta-kk 11097094+teacher-kk@user.noreply.gitee.com
+ * @Date: 2026-02-03 09:08:26
+ * @LastEditors: meta-kk 11097094+teacher-kk@user.noreply.gitee.com
+ * @LastEditTime: 2026-02-03 13:10:27
+ * @FilePath: /v3/components/home/TaskList.tsx
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
 'use client';
 
 import { useRouter } from 'next/navigation';
@@ -16,7 +24,7 @@ export default function TaskList({ tasks, cardTheme }: TaskListProps) {
   const bgIcon = isDark ? 'bg-gray-800' : 'bg-gray-100';
 
   return (
-    <div className="mt-8 pb-24">
+    <div className="mt-6 pb-24">
       <h3 className={`text-lg font-bold mb-4 ${textPrimary}`}>Today&apos;s Tasks</h3>
       <div className="space-y-3">
         {tasks.map((task) => {

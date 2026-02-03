@@ -309,7 +309,7 @@ body {
   /* Optimize touch targets - minimum 44x44px */
   /* Exclude elements inside scrollable containers to avoid touch-action conflicts */
   /* Exclude selection toolbar buttons and suggestion buttons to maintain compact size */
-  button:not(.flashcard-scroll button):not(.flashcard-scroll *):not(.selection-toolbar-btn):not(.suggestion-btn), 
+  button:not(.flashcard-scroll button):not(.flashcard-scroll *):not(.selection-toolbar-btn):not(.suggestion-btn):not(.toggle-switch), 
   a:not(.flashcard-scroll a):not(.flashcard-scroll *):not(.selection-toolbar-btn):not(.suggestion-btn), 
   [role="button"]:not(.flashcard-scroll [role="button"]):not(.flashcard-scroll *):not(.selection-toolbar-btn):not(.suggestion-btn) {
     -webkit-tap-highlight-color: rgba(0, 0, 0, 0.1);
@@ -326,6 +326,12 @@ body {
   
   /* Suggestion buttons - compact size for mobile */
   .suggestion-btn {
+    min-height: auto !important;
+    min-width: auto !important;
+  }
+
+  /* Toggle switch (e.g. PlanSettings Location) - keep natural w-12 h-7 size */
+  .toggle-switch {
     min-height: auto !important;
     min-width: auto !important;
   }

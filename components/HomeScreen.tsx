@@ -59,17 +59,38 @@ export default function HomeScreen() {
 
   const cardTheme = isDarkMode ? 'dark' : 'light';
 
+  const videoId = 'GecQwh2iwJY';
+  const embedParams = 'autoplay=1&mute=1&loop=1&playlist=' + videoId + '&controls=0&showinfo=0&rel=0&playsinline=1';
+
   return (
     <div
       className={`relative w-full min-h-[100dvh] overflow-hidden font-sans selection:bg-blue-500/30 ${pageTheme.pageBg}`}
     >
-      <div
-        className={`absolute inset-0 z-0 bg-gradient-to-b ${pageTheme.gradient} h-[58vh] pointer-events-none`}
-        style={{
-          borderBottomLeftRadius: '50% 12%',
-          borderBottomRightRadius: '50% 12%',
-        }}
-      />
+      {/* Full-screen YouTube background (black before video loads) */}
+      <div className="absolute inset-0 z-0 overflow-hidden bg-black">
+        <div
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+          style={{
+            width: 'max(100vw, 177.78vh)',
+            height: 'max(56.25vw, 100vh)',
+          }}
+        >
+          <iframe
+            src={`https://www.youtube.com/embed/${videoId}?${embedParams}`}
+            title="Background video"
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+        {/* 蒙层 */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: 'linear-gradient(to bottom, rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.5) 50%, rgba(0,0,0,0.7) 100%)',
+          }}
+        />
+      </div>
 
       <div className="relative z-10 h-full flex flex-col max-w-md mx-auto min-h-[100dvh]">
         <header className="px-6 pt-12 pb-2 safe-top">

@@ -1,8 +1,16 @@
+/*
+ * @Author: meta-kk 11097094+teacher-kk@user.noreply.gitee.com
+ * @Date: 2026-02-03 09:08:55
+ * @LastEditors: meta-kk 11097094+teacher-kk@user.noreply.gitee.com
+ * @LastEditTime: 2026-02-03 13:10:05
+ * @FilePath: /v3/components/home/TaskCard.tsx
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
 'use client';
 
 import Link from 'next/link';
 import { motion, type PanInfo } from 'framer-motion';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, Flame } from 'lucide-react';
 import type { DaySchedule } from '@/lib/types/home';
 import { getSubtitle } from '@/lib/constants/home';
 import { PRIMARY_BUTTON_BASE, PRIMARY_BUTTON_FULL, THEME_CARD } from '@/lib/constants/theme';
@@ -69,7 +77,7 @@ export default function TaskCard({
           </button>
         </div>
 
-        <p className={`text-sm leading-relaxed mb-8 ${t.textSecondary}`}>
+        <p className={`text-sm leading-relaxed mb-6 ${t.textSecondary}`}>
           {day.description}
         </p>
 
@@ -77,17 +85,12 @@ export default function TaskCard({
           href="/library"
           className={`${PRIMARY_BUTTON_BASE} ${PRIMARY_BUTTON_FULL} group`}
         >
-          <svg
-            width={24}
-            height={24}
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            className="text-white group-hover:translate-x-0.5 transition-transform flex-shrink-0"
-            aria-hidden
-          >
-            <path d="M8 5v14l9-7-9-7z" />
-          </svg>
-          <span className="text-[1.2rem]">View All Activities</span>
+          <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center backdrop-blur-sm flex-shrink-0">
+            <div className="w-8 h-8 bg-yellow-400 rounded-full flex items-center justify-center shadow-inner">
+              <Flame size={18} className="text-orange-600 fill-orange-500" />
+            </div>
+          </div>
+          <span className="text-[1.2rem]">Talk Now</span>
         </Link>
         </div>
 

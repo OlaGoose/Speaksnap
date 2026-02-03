@@ -236,7 +236,7 @@ export default function PlanSettings({ onClose, origin }: PlanSettingsProps) {
               <button
                 type="button"
                 onClick={() => setLocationEnabled(!locationEnabled)}
-                className={`w-12 h-7 rounded-full p-1 transition-colors duration-300 ${locationEnabled ? 'bg-apple-blue' : toggleTrack}`}
+                className={`toggle-switch w-12 h-7 rounded-full p-1 transition-colors duration-300 ${locationEnabled ? 'bg-apple-blue' : toggleTrack}`}
               >
                 <div
                   className={`w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-300 ${locationEnabled ? 'translate-x-5' : 'translate-x-0'}`}

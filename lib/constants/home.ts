@@ -1,5 +1,4 @@
 import {
-  Camera,
   PenTool,
   Mic as MicIcon,
   BookOpen,
@@ -16,14 +15,6 @@ import type { DaySchedule, HomeTask } from '@/lib/types/home';
 export const WEEK_DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'] as const;
 
 const BASE_TASKS: Array<Omit<HomeTask, 'id'> & { key: string }> = [
-  {
-    key: 'scenarios',
-    title: 'Speaking Practice',
-    subtitle: 'Create a scenario and practice dialogue',
-    href: '/camera',
-    icon: Camera,
-    iconColor: 'text-blue-600',
-  },
   {
     key: 'diary',
     title: 'Diary',
